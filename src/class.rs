@@ -8,25 +8,34 @@ pub struct ClassFile {
 pub type ClassResult = Result<ClassFile>;
 
 struct BufferReader<'a> {
-    data: &'a [u8],
+    buffer: &'a [u8],
+    position: usize,
 }
 
 const SIZE_U32: usize = std::mem::size_of::<u32>();
 
 impl<'a> BufferReader<'a> {
     fn new(data: &'a [u8]) -> Self {
-        BufferReader { data }
+        BufferReader {
+            buffer: data,
+            position: 0,
+        }
+    }
+
+    fn advance(&mut self, size: usize) -> Result<&[u8]> {
+        if self.buffer.len() < size {
+            Err(Error::new(ErrorKind::InvalidData, "Not enough data"))
+        } else {
+            let slice = &self.buffer[self.position..self.position + size];
+            self.position += size;
+            Ok(slice)
+        }
     }
 
     fn next_u32(&mut self) -> Result<u32> {
-        if self.data.len() < SIZE_U32 {
-            Err(Error::new(ErrorKind::InvalidData, "Not enough data"))
-        } else {
-            let (num_slice, rest) = self.data.split_at(SIZE_U32);
-            let read = u32::from_be_bytes(num_slice.try_into().unwrap());
-            self.data = rest;
-            Ok(read)
-        }
+        let num_slice = self.advance(SIZE_U32)?;
+        let read = u32::from_be_bytes(num_slice.try_into().unwrap());
+        Ok(read)
     }
 }
 
