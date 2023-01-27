@@ -87,25 +87,25 @@ impl<'a> Parser<'a> {
         let len = self.buffer.read_u16()?;
         self.buffer
             .read_utf8(len as usize)
-            .map(|s| ConstantPoolEntry::String(s))
+            .map(ConstantPoolEntry::String)
     }
 
     fn parse_int_constant(&mut self) -> Result<ConstantPoolEntry> {
         self.buffer
             .read_i32()
-            .map(|n| ConstantPoolEntry::Integer(n))
+            .map(ConstantPoolEntry::Integer)
     }
 
     fn parse_float_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_f32().map(|n| ConstantPoolEntry::Float(n))
+        self.buffer.read_f32().map(ConstantPoolEntry::Float)
     }
 
     fn parse_long_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_i64().map(|n| ConstantPoolEntry::Long(n))
+        self.buffer.read_i64().map(ConstantPoolEntry::Long)
     }
 
     fn parse_double_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_f64().map(|n| ConstantPoolEntry::Double(n))
+        self.buffer.read_f64().map(ConstantPoolEntry::Double)
     }
 
     fn parse_class_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
@@ -184,7 +184,7 @@ impl<'a> Parser<'a> {
 pub fn read(path: &Path) -> Result<ClassFile> {
     println!("Reading class from file {}", path.display());
 
-    let mut file = File::open(&path)?;
+    let mut file = File::open(path)?;
     let mut buf: Vec<u8> = Vec::new();
     file.read_to_end(&mut buf)?;
 
