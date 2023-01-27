@@ -2,7 +2,8 @@ use std::{fs::File, io::Read, path::Path};
 
 use crate::{
     buffer::Buffer,
-    class_file::{ClassAccessFlags, ClassFile, JAVA7_CLASSFILE},
+    class_access_flags::ClassAccessFlags,
+    class_file::{ClassFile, JAVA7_CLASSFILE},
     class_reader_error::{ClassReaderError, Result},
     constant_pool::ConstantPoolEntry,
 };
@@ -91,9 +92,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_int_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer
-            .read_i32()
-            .map(ConstantPoolEntry::Integer)
+        self.buffer.read_i32().map(ConstantPoolEntry::Integer)
     }
 
     fn parse_float_constant(&mut self) -> Result<ConstantPoolEntry> {

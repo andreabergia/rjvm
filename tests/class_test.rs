@@ -1,9 +1,6 @@
 use std::path::PathBuf;
 
-use rjvm::{
-    class_file::{ClassAccessFlags, JAVA6_CLASSFILE},
-    class_reader,
-};
+use rjvm::{class_access_flags::ClassAccessFlags, class_file::JAVA6_CLASSFILE, class_reader};
 
 extern crate rjvm;
 
