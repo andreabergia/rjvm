@@ -20,3 +20,19 @@ pub fn read(data: &[u8]) -> ClassResult {
         name: "todo".to_string(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use crate::class;
+
+    #[test]
+    fn magic_number_is_required() {
+        let data = vec![0x00];
+        let class_file = class::read(&data).map_err(|e| e.kind());
+
+        let expected = Err(io::ErrorKind::InvalidData);
+        assert_eq!(expected, class_file);
+    }
+}
