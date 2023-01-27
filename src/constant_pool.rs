@@ -25,7 +25,7 @@ enum ConstantPoolPhysicalEntry {
 
 /// Implementation of the constant pool of a java class.
 /// Note that constants are 1-based in java.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ConstantPool {
     entries: Vec<ConstantPoolPhysicalEntry>,
 }
@@ -44,6 +44,10 @@ impl InvalidConstantPoolIndexError {
 }
 
 impl ConstantPool {
+    pub fn new() -> ConstantPool {
+        Default::default()
+    }
+
     /// Adds a new entry.
     pub fn add(&mut self, entry: ConstantPoolEntry) {
         let add_tombstone = match &entry {
@@ -75,12 +79,6 @@ impl ConstantPool {
                     Err(InvalidConstantPoolIndexError::new(input_index))
                 }
             }
-        }
-    }
-
-    pub fn new() -> ConstantPool {
-        ConstantPool {
-            entries: Vec::new(),
         }
     }
 
