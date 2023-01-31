@@ -1,7 +1,7 @@
 use crate::class_reader_error::ClassReaderError;
 use crate::class_reader_error::Result;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default, strum_macros::Display)]
 #[allow(dead_code)]
 pub enum ClassFileVersion {
     Jdk1_1,
@@ -9,11 +9,12 @@ pub enum ClassFileVersion {
     Jdk1_3,
     Jdk1_4,
     Jdk1_5,
+    #[default]
     Jdk6,
 }
 
 impl ClassFileVersion {
-    fn from(major: u16, minor: u16) -> Result<ClassFileVersion> {
+    pub fn from(major: u16, minor: u16) -> Result<ClassFileVersion> {
         match major {
             45u16 => Ok(ClassFileVersion::Jdk1_1),
             46u16 => Ok(ClassFileVersion::Jdk1_2),
