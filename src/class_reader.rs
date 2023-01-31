@@ -48,6 +48,7 @@ impl<'a> Parser<'a> {
         if self.class_file.major_version >= JAVA7_CLASSFILE {
             Err(ClassReaderError::UnsupportedVersion(
                 self.class_file.major_version,
+                self.class_file.minor_version,
             ))
         } else {
             Ok(())
