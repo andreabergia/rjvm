@@ -38,7 +38,7 @@ impl<'a> Parser<'a> {
         match self.buffer.read_u32() {
             Ok(0xCAFEBABE) => Ok(()),
             Ok(_) => Err(ClassReaderError::InvalidClassData(
-                "Invalid magic number".to_owned(),
+                "invalid magic number".to_owned(),
             )),
             Err(err) => Err(err),
         }
@@ -193,21 +193,24 @@ pub fn read(path: &Path) -> Result<ClassFile> {
     let mut buf: Vec<u8> = Vec::new();
     file.read_to_end(&mut buf)?;
 
-    Parser::new(&buf).parse()
+    read_buffer(&buf)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use std::io;
+pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
+    Parser::new(buf).parse()
+}
 
-//     use crate::class;
+#[cfg(test)]
+mod tests {
+    use crate::class_reader::read_buffer;
+    use crate::class_reader_error::ClassReaderError;
 
-//     #[test]
-//     fn magic_number_is_required() {
-//         let data = vec![0x00];
-//         let class_file = class::read(&data).map_err(|e| e.kind());
-
-//         let expected = Err(io::ErrorKind::InvalidData);
-//         assert_eq!(expected, class_file);
-//     }
-// }
+    #[test]
+    fn magic_number_is_required() {
+        let data = vec![0x00, 0x01, 0x02, 0x03];
+        assert!(matches!(
+            read_buffer(&data),
+            Err(ClassReaderError::InvalidClassData(s)) if s == "invalid magic number"
+        ));
+    }
+}
