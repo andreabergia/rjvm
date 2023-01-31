@@ -3,7 +3,7 @@ use std::{fs::File, io::Read, path::Path};
 use crate::{
     buffer::Buffer,
     class_access_flags::ClassAccessFlags,
-    class_file::{ClassFile},
+    class_file::ClassFile,
     class_file_version::ClassFileVersion,
     class_reader_error::{ClassReaderError, Result},
     constant_pool::ConstantPoolEntry,
@@ -29,6 +29,7 @@ impl<'a> Parser<'a> {
         self.read_access_flags()?;
         self.class_file.name = self.read_class_reference()?;
         self.class_file.superclass = self.read_class_reference()?;
+        self.read_interfaces()?;
 
         Ok(self.class_file)
     }
@@ -174,6 +175,14 @@ impl<'a> Parser<'a> {
                 .text_of(super_constant_idx)
                 .map_err(|err| err.into())
         }
+    }
+
+    fn read_interfaces(&mut self) -> Result<()> {
+        let interfaces_count = self.buffer.read_u16()?;
+        self.class_file.interfaces = (0..interfaces_count)
+            .map(|_| self.read_class_reference())
+            .collect::<Result<Vec<String>>>()?;
+        Ok(())
     }
 }
 

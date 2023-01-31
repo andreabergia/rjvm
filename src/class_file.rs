@@ -13,6 +13,7 @@ pub struct ClassFile {
     pub flags: ClassAccessFlags,
     pub name: String,
     pub superclass: String,
+    pub interfaces: Vec<String>,
 }
 
 impl fmt::Display for ClassFile {
@@ -23,6 +24,7 @@ impl fmt::Display for ClassFile {
             self.name, self.superclass, self.version
         )?;
         write!(f, "{}", self.constants)?;
-        writeln!(f, "flags: {:?}", self.flags)
+        writeln!(f, "flags: {:?}", self.flags)?;
+        writeln!(f, "interfaces: {:?}", self.interfaces)
     }
 }

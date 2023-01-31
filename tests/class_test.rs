@@ -20,4 +20,5 @@ fn can_read_class_file() {
     );
     assert_eq!("rjvm/Complex", class.name);
     assert_eq!("java/lang/Object", class.superclass);
+    assert_eq!(vec!("java/lang/Cloneable", "java/io/Serializable"), class.interfaces);
 }

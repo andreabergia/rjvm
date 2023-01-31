@@ -1,6 +1,8 @@
 package rjvm;
 
-public class Complex {
+import java.io.Serializable;
+
+public class Complex implements Cloneable, Serializable {
     private final double real;
     private final double imag;
 
