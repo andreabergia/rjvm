@@ -23,6 +23,6 @@ impl fmt::Display for ClassFile {
             self.name, self.superclass, self.version
         )?;
         write!(f, "{}", self.constants)?;
-        writeln!(f, "{:?}", self.flags)
+        writeln!(f, "flags: {:?}", self.flags)
     }
 }

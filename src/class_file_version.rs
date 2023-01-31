@@ -16,12 +16,12 @@ pub enum ClassFileVersion {
 impl ClassFileVersion {
     pub fn from(major: u16, minor: u16) -> Result<ClassFileVersion> {
         match major {
-            45u16 => Ok(ClassFileVersion::Jdk1_1),
-            46u16 => Ok(ClassFileVersion::Jdk1_2),
-            47u16 => Ok(ClassFileVersion::Jdk1_3),
-            48u16 => Ok(ClassFileVersion::Jdk1_4),
-            49u16 => Ok(ClassFileVersion::Jdk1_5),
-            50u16 => Ok(ClassFileVersion::Jdk6),
+            45 => Ok(ClassFileVersion::Jdk1_1),
+            46 => Ok(ClassFileVersion::Jdk1_2),
+            47 => Ok(ClassFileVersion::Jdk1_3),
+            48 => Ok(ClassFileVersion::Jdk1_4),
+            49 => Ok(ClassFileVersion::Jdk1_5),
+            50 => Ok(ClassFileVersion::Jdk6),
             _ => Err(ClassReaderError::UnsupportedVersion(major, minor)),
         }
     }
