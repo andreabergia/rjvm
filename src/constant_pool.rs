@@ -179,8 +179,6 @@ impl From<InvalidConstantPoolIndexError> for fmt::Error {
     }
 }
 
-// use std::io::{Error, ErrorKind, Result};
-
 #[cfg(test)]
 mod tests {
     use crate::constant_pool::{ConstantPool, ConstantPoolEntry, InvalidConstantPoolIndexError};
