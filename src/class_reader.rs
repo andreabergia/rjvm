@@ -1,5 +1,6 @@
 use std::{fs::File, io::Read, path::Path};
 
+use log::warn;
 use result::prelude::*;
 
 use crate::attribute::Attribute;
@@ -86,7 +87,7 @@ impl<'a> ClassFileReader<'a> {
                 11 => self.read_interface_method_reference_constant()?,
                 12 => self.read_name_and_type_constant()?,
                 _ => {
-                    println!("Constant {} is of type {}", i, tag);
+                    warn!("invalid entry in constant pool at index {} tag {}", i, tag);
                     return Err(ClassReaderError::InvalidClassData(format!(
                         "Unknown constant type: 0x{:X}",
                         tag

@@ -6,10 +6,13 @@ build:
     cargo build
 
 test:
-    cargo test
+    RUST_LOG=trace cargo test -- --nocapture
 
 lint:
     cargo clippy --fix --allow-dirty --allow-staged
+
+clean:
+    cargo clean
 
 generate-test-classes:
     cd ./tests/resources && ./compile.sh

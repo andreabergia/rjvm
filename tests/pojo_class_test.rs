@@ -9,10 +9,9 @@ use rjvm::{class_access_flags::ClassAccessFlags, class_file_version::ClassFileVe
 
 mod utils;
 
-#[test]
+#[test_log::test]
 fn can_read_pojo_class_file() {
     let class = utils::read_class_from_file("Complex");
-    println!("Read class file: {}", class);
     assert_eq!(ClassFileVersion::Jdk6, class.version);
     assert_eq!(
         ClassAccessFlags::PUBLIC | ClassAccessFlags::SUPER,
