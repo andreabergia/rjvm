@@ -288,8 +288,6 @@ impl<'a> ClassFileReader<'a> {
 }
 
 pub fn read(path: &Path) -> Result<ClassFile> {
-    println!("Reading class from file {}", path.display());
-
     let mut file = File::open(path)?;
     let mut buf: Vec<u8> = Vec::new();
     file.read_to_end(&mut buf)?;
