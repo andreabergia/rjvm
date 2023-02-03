@@ -12,20 +12,20 @@ use crate::{
     constant_pool::ConstantPoolEntry,
 };
 
-struct Parser<'a> {
+struct ClassFileReader<'a> {
     buffer: Buffer<'a>,
     class_file: ClassFile,
 }
 
-impl<'a> Parser<'a> {
-    fn new(data: &[u8]) -> Parser {
-        Parser {
+impl<'a> ClassFileReader<'a> {
+    fn new(data: &[u8]) -> ClassFileReader {
+        ClassFileReader {
             buffer: Buffer::new(data),
             class_file: Default::default(),
         }
     }
 
-    fn parse(mut self) -> Result<ClassFile> {
+    fn read(mut self) -> Result<ClassFile> {
         self.check_magic_number()?;
         self.read_version()?;
         self.read_constants()?;
@@ -61,17 +61,17 @@ impl<'a> Parser<'a> {
         for i in 0..num - 1 {
             let tag = self.buffer.read_u8()?;
             let constant = match tag {
-                1 => self.parse_string_constant()?,
-                3 => self.parse_int_constant()?,
-                4 => self.parse_float_constant()?,
-                5 => self.parse_long_constant()?,
-                6 => self.parse_double_constant()?,
-                7 => self.parse_class_reference_constant()?,
-                8 => self.parse_string_reference_constant()?,
-                9 => self.parse_field_reference_constant()?,
-                10 => self.parse_method_reference_constant()?,
-                11 => self.parse_interface_method_reference_constant()?,
-                12 => self.parse_name_and_type_constant()?,
+                1 => self.read_string_constant()?,
+                3 => self.read_int_constant()?,
+                4 => self.read_float_constant()?,
+                5 => self.read_long_constant()?,
+                6 => self.read_double_constant()?,
+                7 => self.read_class_reference_constant()?,
+                8 => self.read_string_reference_constant()?,
+                9 => self.read_field_reference_constant()?,
+                10 => self.read_method_reference_constant()?,
+                11 => self.read_interface_method_reference_constant()?,
+                12 => self.read_name_and_type_constant()?,
                 _ => {
                     println!("Constant {} is of type {}", i, tag);
                     return Err(ClassReaderError::InvalidClassData(format!(
@@ -86,40 +86,40 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_string_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_string_constant(&mut self) -> Result<ConstantPoolEntry> {
         let len = self.buffer.read_u16()?;
         self.buffer
             .read_utf8(len as usize)
             .map(ConstantPoolEntry::String)
     }
 
-    fn parse_int_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_int_constant(&mut self) -> Result<ConstantPoolEntry> {
         self.buffer.read_i32().map(ConstantPoolEntry::Integer)
     }
 
-    fn parse_float_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_float_constant(&mut self) -> Result<ConstantPoolEntry> {
         self.buffer.read_f32().map(ConstantPoolEntry::Float)
     }
 
-    fn parse_long_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_long_constant(&mut self) -> Result<ConstantPoolEntry> {
         self.buffer.read_i64().map(ConstantPoolEntry::Long)
     }
 
-    fn parse_double_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_double_constant(&mut self) -> Result<ConstantPoolEntry> {
         self.buffer.read_f64().map(ConstantPoolEntry::Double)
     }
 
-    fn parse_class_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_class_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
         let fqn_string_index = self.buffer.read_u16()?;
         Ok(ConstantPoolEntry::ClassReference(fqn_string_index))
     }
 
-    fn parse_string_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_string_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
         let string_index = self.buffer.read_u16()?;
         Ok(ConstantPoolEntry::StringReference(string_index))
     }
 
-    fn parse_method_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_method_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
         let class_reference = self.buffer.read_u16()?;
         let name_and_type = self.buffer.read_u16()?;
         Ok(ConstantPoolEntry::MethodReference(
@@ -128,7 +128,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_interface_method_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_interface_method_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
         let class_reference = self.buffer.read_u16()?;
         let name_and_type = self.buffer.read_u16()?;
         Ok(ConstantPoolEntry::InterfaceMethodReference(
@@ -137,7 +137,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_field_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_field_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
         let class_reference = self.buffer.read_u16()?;
         let name_and_type = self.buffer.read_u16()?;
         Ok(ConstantPoolEntry::FieldReference(
@@ -146,7 +146,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_name_and_type_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_name_and_type_constant(&mut self) -> Result<ConstantPoolEntry> {
         let name = self.buffer.read_u16()?;
         let type_descriptor = self.buffer.read_u16()?;
         Ok(ConstantPoolEntry::NameAndTypeDescriptor(
@@ -259,7 +259,7 @@ pub fn read(path: &Path) -> Result<ClassFile> {
 }
 
 pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
-    Parser::new(buf).parse()
+    ClassFileReader::new(buf).read()
 }
 
 #[cfg(test)]
