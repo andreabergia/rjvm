@@ -1,8 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::attribute::Attribute;
-use crate::method_flags::MethodFlags;
+use crate::reader::{attribute::Attribute, method_flags::MethodFlags};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct ClassFileMethod {

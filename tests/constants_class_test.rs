@@ -1,7 +1,9 @@
 extern crate rjvm;
 
-use rjvm::class_file_field::{ClassFileField, FieldConstantValue};
-use rjvm::field_flags::FieldFlags;
+use rjvm::reader::{
+    class_file_field::{ClassFileField, FieldConstantValue},
+    field_flags::FieldFlags,
+};
 
 mod utils;
 

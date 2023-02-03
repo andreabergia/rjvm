@@ -3,18 +3,22 @@ use std::{fs::File, io::Read, path::Path};
 use log::warn;
 use result::prelude::*;
 
-use crate::attribute::Attribute;
-use crate::class_file_field::{ClassFileField, FieldConstantValue};
-use crate::class_file_method::{ClassFileMethod, ClassFileMethodCode};
-use crate::class_reader_error::ClassReaderError::InvalidClassData;
-use crate::constant_pool::ConstantPool;
-use crate::field_flags::FieldFlags;
-use crate::method_flags::MethodFlags;
-use crate::type_conversion::ToUsizeSafe;
 use crate::{
-    buffer::Buffer, class_access_flags::ClassAccessFlags, class_file::ClassFile,
-    class_file_version::ClassFileVersion, class_reader_error::Result,
-    constant_pool::ConstantPoolEntry,
+    reader::{
+        attribute::Attribute,
+        class_access_flags::ClassAccessFlags,
+        class_file::ClassFile,
+        class_file_field::{ClassFileField, FieldConstantValue},
+        class_file_method::{ClassFileMethod, ClassFileMethodCode},
+        class_file_version::ClassFileVersion,
+        class_reader_error::ClassReaderError::InvalidClassData,
+        class_reader_error::Result,
+        constant_pool::ConstantPool,
+        constant_pool::ConstantPoolEntry,
+        field_flags::FieldFlags,
+        method_flags::MethodFlags,
+    },
+    utils::{buffer::Buffer, type_conversion::ToUsizeSafe},
 };
 
 struct ClassFileReader<'a> {
@@ -384,8 +388,7 @@ pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
 
 #[cfg(test)]
 mod tests {
-    use crate::class_reader::read_buffer;
-    use crate::class_reader_error::ClassReaderError;
+    use crate::reader::{class_reader::read_buffer, class_reader_error::ClassReaderError};
 
     #[test]
     fn magic_number_is_required() {

@@ -1,11 +1,13 @@
 extern crate rjvm;
 
-use rjvm::class_file::ClassFile;
-use rjvm::class_file_field::ClassFileField;
-use rjvm::class_file_method::ClassFileMethod;
-use rjvm::field_flags::FieldFlags;
-use rjvm::method_flags::MethodFlags;
-use rjvm::{class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion};
+use rjvm::{
+    reader::class_file::ClassFile,
+    reader::class_file_field::ClassFileField,
+    reader::class_file_method::ClassFileMethod,
+    reader::field_flags::FieldFlags,
+    reader::method_flags::MethodFlags,
+    reader::{class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion},
+};
 
 mod utils;
 

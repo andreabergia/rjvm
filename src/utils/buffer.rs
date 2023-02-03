@@ -1,6 +1,6 @@
 use cesu8::from_java_cesu8;
 
-use crate::class_reader_error::{ClassReaderError, Result};
+use crate::reader::class_reader_error::{ClassReaderError, Result};
 
 pub struct Buffer<'a> {
     buffer: &'a [u8],
@@ -84,7 +84,7 @@ impl<'a> Buffer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::buffer::Buffer;
+    use crate::utils::buffer::Buffer;
 
     #[test]
     fn buffer_works() {

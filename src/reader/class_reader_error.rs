@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::constant_pool::InvalidConstantPoolIndexError;
+use crate::reader::constant_pool::InvalidConstantPoolIndexError;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ClassReaderError {

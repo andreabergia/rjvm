@@ -1,9 +1,8 @@
 use std::fmt;
 
-use crate::class_file_field::ClassFileField;
-use crate::class_file_method::ClassFileMethod;
-use crate::{
-    class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion,
+use crate::reader::{
+    class_access_flags::ClassAccessFlags, class_file_field::ClassFileField,
+    class_file_method::ClassFileMethod, class_file_version::ClassFileVersion,
     constant_pool::ConstantPool,
 };
 

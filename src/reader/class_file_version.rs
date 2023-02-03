@@ -1,5 +1,4 @@
-use crate::class_reader_error::ClassReaderError;
-use crate::class_reader_error::Result;
+use crate::reader::class_reader_error::{ClassReaderError, Result};
 
 #[derive(Debug, PartialEq, Default, strum_macros::Display)]
 #[allow(dead_code)]
@@ -29,7 +28,9 @@ impl ClassFileVersion {
 
 #[cfg(test)]
 mod tests {
-    use crate::class_file_version::ClassFileVersion;
+    use crate::reader::{
+        class_file_version::ClassFileVersion, class_reader_error::ClassReaderError,
+    };
 
     #[test]
     fn can_parse_known_versions() {
@@ -42,7 +43,7 @@ mod tests {
     #[test]
     fn can_parse_future_versions() {
         assert_eq!(
-            Err(crate::class_reader_error::ClassReaderError::UnsupportedVersion(62, 65535)),
+            Err(ClassReaderError::UnsupportedVersion(62, 65535)),
             ClassFileVersion::from(62, 65535),
         );
     }
