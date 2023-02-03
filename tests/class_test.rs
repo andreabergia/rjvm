@@ -1,10 +1,12 @@
+extern crate rjvm;
+
 use std::path::PathBuf;
 
+use rjvm::class_file_field::ClassFileField;
+use rjvm::field_flags::FieldFlags;
 use rjvm::{
     class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion, class_reader,
 };
-
-extern crate rjvm;
 
 #[test]
 fn can_read_class_file() {
@@ -23,5 +25,22 @@ fn can_read_class_file() {
     assert_eq!(
         vec!("java/lang/Cloneable", "java/io/Serializable"),
         class.interfaces
+    );
+    assert_eq!(
+        vec!(
+            ClassFileField {
+                flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
+                name: "real".to_string(),
+                type_descriptor: "D".to_string(),
+                attributes: vec![],
+            },
+            ClassFileField {
+                flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
+                name: "imag".to_string(),
+                type_descriptor: "D".to_string(),
+                attributes: vec![],
+            }
+        ),
+        class.fields
     );
 }

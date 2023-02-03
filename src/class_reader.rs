@@ -1,5 +1,8 @@
 use std::{fs::File, io::Read, path::Path};
 
+use crate::attribute::Attribute;
+use crate::class_file_field::ClassFileField;
+use crate::field_flags::FieldFlags;
 use crate::{
     buffer::Buffer,
     class_access_flags::ClassAccessFlags,
@@ -30,6 +33,7 @@ impl<'a> Parser<'a> {
         self.class_file.name = self.read_class_reference()?;
         self.class_file.superclass = self.read_class_reference()?;
         self.read_interfaces()?;
+        self.read_fields()?;
 
         Ok(self.class_file)
     }
@@ -170,11 +174,15 @@ impl<'a> Parser<'a> {
         if super_constant_idx == 0 {
             Ok(String::from(""))
         } else {
-            self.class_file
-                .constants
-                .text_of(super_constant_idx)
-                .map_err(|err| err.into())
+            self.read_string_reference(super_constant_idx)
         }
+    }
+
+    fn read_string_reference(&self, index: u16) -> Result<String> {
+        self.class_file
+            .constants
+            .text_of(index)
+            .map_err(|err| err.into())
     }
 
     fn read_interfaces(&mut self) -> Result<()> {
@@ -183,6 +191,60 @@ impl<'a> Parser<'a> {
             .map(|_| self.read_class_reference())
             .collect::<Result<Vec<String>>>()?;
         Ok(())
+    }
+
+    fn read_fields(&mut self) -> Result<()> {
+        let fields_count = self.buffer.read_u16()?;
+        self.class_file.fields = (0..fields_count)
+            .map(|_| self.read_field())
+            .collect::<Result<Vec<ClassFileField>>>()?;
+        Ok(())
+    }
+    fn read_field(&mut self) -> Result<ClassFileField> {
+        let flags = self.read_field_flags()?;
+        let name_constant_index = self.buffer.read_u16()?;
+        let name = self.read_string_reference(name_constant_index)?;
+        let type_constant_index = self.buffer.read_u16()?;
+        let type_descriptor = self.read_string_reference(type_constant_index)?;
+        let attributes = self.read_attributes()?;
+
+        Ok(ClassFileField {
+            flags,
+            name,
+            type_descriptor,
+            attributes,
+        })
+    }
+
+    fn read_field_flags(&mut self) -> Result<FieldFlags> {
+        let field_flags_bits = self.buffer.read_u16()?;
+        match FieldFlags::from_bits(field_flags_bits) {
+            Some(bitset) => Ok(bitset),
+            None => Err(ClassReaderError::InvalidClassData(format!(
+                "invalid class flags: {}",
+                field_flags_bits
+            ))),
+        }
+    }
+
+    fn read_attributes(&mut self) -> Result<Vec<Attribute>> {
+        let attributes_count = self.buffer.read_u16()?;
+        (0..attributes_count)
+            .map(|_| self.read_attribute())
+            .collect::<Result<Vec<Attribute>>>()
+    }
+
+    fn read_attribute(&mut self) -> Result<Attribute> {
+        let name_constant_index = self.buffer.read_u16()?;
+        let name = self.read_string_reference(name_constant_index)?;
+        let len = self.buffer.read_u32()?;
+        let bytes = self
+            .buffer
+            .read_bytes(usize::try_from(len).expect("usize should have at least 32 bits"))?;
+        Ok(Attribute {
+            name,
+            info: Vec::from(bytes),
+        })
     }
 }
 

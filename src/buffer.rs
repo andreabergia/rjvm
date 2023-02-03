@@ -15,7 +15,7 @@ impl<'a> Buffer<'a> {
         }
     }
 
-    fn advance(&mut self, size: usize) -> Result<&[u8]> {
+    fn advance(&mut self, size: usize) -> Result<&'a [u8]> {
         if self.position + size > self.buffer.len() {
             Err(ClassReaderError::InvalidClassData(
                 "class does not have expected length".to_string(),
@@ -70,6 +70,10 @@ impl<'a> Buffer<'a> {
                 })
             })
             .map(|cow_string| cow_string.into_owned())
+    }
+
+    pub fn read_bytes(&mut self, len: usize) -> Result<&'a [u8]> {
+        self.advance(len)
     }
 
     #[allow(dead_code)]
