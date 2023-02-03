@@ -1,8 +1,11 @@
 use std::{fs::File, io::Read, path::Path};
 
+use result::prelude::*;
+
 use crate::attribute::Attribute;
-use crate::class_file_field::ClassFileField;
+use crate::class_file_field::{ClassFileField, FieldConstantValue};
 use crate::class_file_method::ClassFileMethod;
+use crate::class_reader_error::ClassReaderError::InvalidClassData;
 use crate::field_flags::FieldFlags;
 use crate::method_flags::MethodFlags;
 use crate::{
@@ -60,15 +63,22 @@ impl<'a> ClassFileReader<'a> {
     }
 
     fn read_constants(&mut self) -> Result<()> {
-        let num = self.buffer.read_u16()?;
-        for i in 0..num - 1 {
+        let constants_count = self.buffer.read_u16()? - 1;
+        let mut i = 0;
+        while i < constants_count {
             let tag = self.buffer.read_u8()?;
             let constant = match tag {
-                1 => self.read_string_constant()?,
+                1 => self.read_utf8_constant()?,
                 3 => self.read_int_constant()?,
                 4 => self.read_float_constant()?,
-                5 => self.read_long_constant()?,
-                6 => self.read_double_constant()?,
+                5 => {
+                    i += 1;
+                    self.read_long_constant()?
+                }
+                6 => {
+                    i += 1;
+                    self.read_double_constant()?
+                }
                 7 => self.read_class_reference_constant()?,
                 8 => self.read_string_reference_constant()?,
                 9 => self.read_field_reference_constant()?,
@@ -84,16 +94,18 @@ impl<'a> ClassFileReader<'a> {
                 }
             };
             self.class_file.constants.add(constant);
+
+            i += 1;
         }
 
         Ok(())
     }
 
-    fn read_string_constant(&mut self) -> Result<ConstantPoolEntry> {
+    fn read_utf8_constant(&mut self) -> Result<ConstantPoolEntry> {
         let len = self.buffer.read_u16()?;
         self.buffer
             .read_utf8(len as usize)
-            .map(ConstantPoolEntry::String)
+            .map(ConstantPoolEntry::Utf8)
     }
 
     fn read_int_constant(&mut self) -> Result<ConstantPoolEntry> {
@@ -210,13 +222,15 @@ impl<'a> ClassFileReader<'a> {
         let name = self.read_string_reference(name_constant_index)?;
         let type_constant_index = self.buffer.read_u16()?;
         let type_descriptor = self.read_string_reference(type_constant_index)?;
-        let attributes = self.read_attributes()?;
+
+        let raw_attributes = self.read_raw_attributes()?;
+        let constant_value = self.extract_constant_value(raw_attributes)?;
 
         Ok(ClassFileField {
             flags,
             name,
             type_descriptor,
-            attributes,
+            constant_value,
         })
     }
 
@@ -229,6 +243,45 @@ impl<'a> ClassFileReader<'a> {
                 field_flags_bits
             ))),
         }
+    }
+
+    fn extract_constant_value(
+        &self,
+        raw_attributes: Vec<Attribute>,
+    ) -> Result<Option<FieldConstantValue>> {
+        raw_attributes
+            .iter()
+            .filter(|attr| attr.name == "ConstantValue")
+            .map(|attr| {
+                if attr.info.len() != std::mem::size_of::<u16>() {
+                    Err(InvalidClassData(
+                        "invalid attribute of type ConstantValue".to_string(),
+                    ))
+                } else {
+                    let attribute_bytes: &[u8] = &attr.info;
+                    let constant_index = u16::from_be_bytes(attribute_bytes.try_into().unwrap());
+                    self.class_file
+                        .constants
+                        .get(constant_index)
+                        .map_err(|err| err.into())
+                        .and_then(|entry| match entry {
+                            ConstantPoolEntry::StringReference(v) => {
+                                let referred_string = self.read_string_reference(*v)?;
+                                Ok(FieldConstantValue::String(referred_string))
+                            }
+                            ConstantPoolEntry::Integer(v) => Ok(FieldConstantValue::Int(*v)),
+                            ConstantPoolEntry::Float(v) => Ok(FieldConstantValue::Float(*v)),
+                            ConstantPoolEntry::Long(v) => Ok(FieldConstantValue::Long(*v)),
+                            ConstantPoolEntry::Double(v) => Ok(FieldConstantValue::Double(*v)),
+                            v => Err(InvalidClassData(format!(
+                                "invalid type for ConstantValue: {:?}",
+                                v
+                            ))),
+                        })
+                }
+            })
+            .next()
+            .invert()
     }
 
     fn read_methods(&mut self) -> Result<()> {
@@ -245,7 +298,7 @@ impl<'a> ClassFileReader<'a> {
         let name = self.read_string_reference(name_constant_index)?;
         let type_constant_index = self.buffer.read_u16()?;
         let type_descriptor = self.read_string_reference(type_constant_index)?;
-        let attributes = self.read_attributes()?;
+        let attributes = self.read_raw_attributes()?;
 
         Ok(ClassFileMethod {
             flags,
@@ -266,14 +319,14 @@ impl<'a> ClassFileReader<'a> {
         }
     }
 
-    fn read_attributes(&mut self) -> Result<Vec<Attribute>> {
+    fn read_raw_attributes(&mut self) -> Result<Vec<Attribute>> {
         let attributes_count = self.buffer.read_u16()?;
         (0..attributes_count)
-            .map(|_| self.read_attribute())
+            .map(|_| self.read_raw_attribute())
             .collect::<Result<Vec<Attribute>>>()
     }
 
-    fn read_attribute(&mut self) -> Result<Attribute> {
+    fn read_raw_attribute(&mut self) -> Result<Attribute> {
         let name_constant_index = self.buffer.read_u16()?;
         let name = self.read_string_reference(name_constant_index)?;
         let len = self.buffer.read_u32()?;

@@ -1,15 +1,8 @@
 extern crate rjvm;
 
-use std::path::PathBuf;
+use rjvm::class_file_field::{ClassFileField, FieldConstantValue};
 
-use rjvm::class_file::ClassFile;
-use rjvm::class_file_field::ClassFileField;
-use rjvm::class_file_method::ClassFileMethod;
 use rjvm::field_flags::FieldFlags;
-use rjvm::method_flags::MethodFlags;
-use rjvm::{
-    class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion, class_reader,
-};
 
 mod utils;
 
@@ -18,53 +11,39 @@ fn can_read_constants() {
     let class = utils::read_class_from_file("Constants");
 
     println!("Read class file: {}", class);
-    assert_eq!(ClassFileVersion::Jdk6, class.version);
-    assert_eq!(
-        ClassAccessFlags::PUBLIC | ClassAccessFlags::SUPER,
-        class.flags
-    );
-    assert_eq!("rjvm/Complex", class.name);
-    assert_eq!("java/lang/Object", class.superclass);
-    assert_eq!(
-        vec!("java/lang/Cloneable", "java/io/Serializable"),
-        class.interfaces
-    );
-
-    check_fields(&class);
-    check_methods(&class);
-}
-
-fn check_fields(class: &ClassFile) {
     assert_eq!(
         vec!(
             ClassFileField {
-                flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
-                name: "real".to_string(),
-                type_descriptor: "D".to_string(),
-                attributes: vec![],
+                flags: FieldFlags::PUBLIC | FieldFlags::STATIC | FieldFlags::FINAL,
+                name: "AN_INT".to_string(),
+                type_descriptor: "I".to_string(),
+                constant_value: Some(FieldConstantValue::Int(2023)),
             },
             ClassFileField {
-                flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
-                name: "imag".to_string(),
+                flags: FieldFlags::PROTECTED | FieldFlags::STATIC | FieldFlags::FINAL,
+                name: "A_FLOAT".to_string(),
+                type_descriptor: "F".to_string(),
+                constant_value: Some(FieldConstantValue::Float(20.23)),
+            },
+            ClassFileField {
+                flags: FieldFlags::PRIVATE | FieldFlags::STATIC | FieldFlags::FINAL,
+                name: "A_LONG".to_string(),
+                type_descriptor: "J".to_string(),
+                constant_value: Some(FieldConstantValue::Long(2023)),
+            },
+            ClassFileField {
+                flags: FieldFlags::PUBLIC | FieldFlags::STATIC | FieldFlags::FINAL,
+                name: "A_DOUBLE".to_string(),
                 type_descriptor: "D".to_string(),
-                attributes: vec![],
+                constant_value: Some(FieldConstantValue::Double(20.23)),
+            },
+            ClassFileField {
+                flags: FieldFlags::PUBLIC | FieldFlags::STATIC | FieldFlags::FINAL,
+                name: "A_STRING".to_string(),
+                type_descriptor: "Ljava/lang/String;".to_string(),
+                constant_value: Some(FieldConstantValue::String("2023".to_string())),
             }
         ),
         class.fields
     );
-}
-
-fn check_methods(class: &ClassFile) {
-    assert_eq!(5, class.methods.len());
-    check_method(&class.methods[0], MethodFlags::PUBLIC, "<init>", "(D)V");
-    check_method(&class.methods[1], MethodFlags::PUBLIC, "<init>", "(DD)V");
-    check_method(&class.methods[2], MethodFlags::PUBLIC, "getReal", "()D");
-    check_method(&class.methods[3], MethodFlags::PUBLIC, "getImag", "()D");
-    check_method(&class.methods[4], MethodFlags::PUBLIC, "abs", "()D");
-}
-
-fn check_method(method: &ClassFileMethod, flags: MethodFlags, name: &str, type_descriptor: &str) {
-    assert_eq!(method.flags, flags);
-    assert_eq!(method.name, name);
-    assert_eq!(method.type_descriptor, type_descriptor);
 }

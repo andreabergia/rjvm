@@ -10,3 +10,6 @@ test:
 
 lint:
     cargo clippy --fix --allow-dirty --allow-staged
+
+generate-test-classes:
+    cd ./tests/resources && ./compile.sh

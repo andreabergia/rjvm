@@ -39,11 +39,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "result"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "194d8e591e405d1eecf28819740abed6d719d1a2db87fc0bcdedee9a26d55560"
+
+[[package]]
 name = "rjvm"
 version = "0.1.0"
 dependencies = [
  "bitflags",
  "cesu8",
+ "result",
  "strum",
  "strum_macros",
  "thiserror",
