@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::class_file_field::ClassFileField;
+use crate::class_file_method::ClassFileMethod;
 use crate::{
     class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion,
     constant_pool::ConstantPool,
@@ -16,6 +17,7 @@ pub struct ClassFile {
     pub superclass: String,
     pub interfaces: Vec<String>,
     pub fields: Vec<ClassFileField>,
+    pub methods: Vec<ClassFileMethod>,
 }
 
 impl fmt::Display for ClassFile {
@@ -31,6 +33,10 @@ impl fmt::Display for ClassFile {
         writeln!(f, "fields:")?;
         for field in self.fields.iter() {
             writeln!(f, "  - {}", field)?;
+        }
+        writeln!(f, "methods:")?;
+        for method in self.methods.iter() {
+            writeln!(f, "  - {}", method)?;
         }
         Ok(())
     }

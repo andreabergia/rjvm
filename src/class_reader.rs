@@ -2,7 +2,9 @@ use std::{fs::File, io::Read, path::Path};
 
 use crate::attribute::Attribute;
 use crate::class_file_field::ClassFileField;
+use crate::class_file_method::ClassFileMethod;
 use crate::field_flags::FieldFlags;
+use crate::method_flags::MethodFlags;
 use crate::{
     buffer::Buffer,
     class_access_flags::ClassAccessFlags,
@@ -34,6 +36,7 @@ impl<'a> ClassFileReader<'a> {
         self.class_file.superclass = self.read_class_reference()?;
         self.read_interfaces()?;
         self.read_fields()?;
+        self.read_methods()?;
 
         Ok(self.class_file)
     }
@@ -158,8 +161,8 @@ impl<'a> ClassFileReader<'a> {
     fn read_access_flags(&mut self) -> Result<()> {
         let num = self.buffer.read_u16()?;
         match ClassAccessFlags::from_bits(num) {
-            Some(bitset) => {
-                self.class_file.flags = bitset;
+            Some(flags) => {
+                self.class_file.flags = flags;
                 Ok(())
             }
             None => Err(ClassReaderError::InvalidClassData(format!(
@@ -200,6 +203,7 @@ impl<'a> ClassFileReader<'a> {
             .collect::<Result<Vec<ClassFileField>>>()?;
         Ok(())
     }
+
     fn read_field(&mut self) -> Result<ClassFileField> {
         let flags = self.read_field_flags()?;
         let name_constant_index = self.buffer.read_u16()?;
@@ -219,10 +223,45 @@ impl<'a> ClassFileReader<'a> {
     fn read_field_flags(&mut self) -> Result<FieldFlags> {
         let field_flags_bits = self.buffer.read_u16()?;
         match FieldFlags::from_bits(field_flags_bits) {
-            Some(bitset) => Ok(bitset),
+            Some(flags) => Ok(flags),
             None => Err(ClassReaderError::InvalidClassData(format!(
-                "invalid class flags: {}",
+                "invalid field flags: {}",
                 field_flags_bits
+            ))),
+        }
+    }
+
+    fn read_methods(&mut self) -> Result<()> {
+        let methods_count = self.buffer.read_u16()?;
+        self.class_file.methods = (0..methods_count)
+            .map(|_| self.read_method())
+            .collect::<Result<Vec<ClassFileMethod>>>()?;
+        Ok(())
+    }
+
+    fn read_method(&mut self) -> Result<ClassFileMethod> {
+        let flags = self.read_method_flags()?;
+        let name_constant_index = self.buffer.read_u16()?;
+        let name = self.read_string_reference(name_constant_index)?;
+        let type_constant_index = self.buffer.read_u16()?;
+        let type_descriptor = self.read_string_reference(type_constant_index)?;
+        let attributes = self.read_attributes()?;
+
+        Ok(ClassFileMethod {
+            flags,
+            name,
+            type_descriptor,
+            attributes,
+        })
+    }
+
+    fn read_method_flags(&mut self) -> Result<MethodFlags> {
+        let method_flags_bits = self.buffer.read_u16()?;
+        match MethodFlags::from_bits(method_flags_bits) {
+            Some(flags) => Ok(flags),
+            None => Err(ClassReaderError::InvalidClassData(format!(
+                "invalid method flags: {}",
+                method_flags_bits
             ))),
         }
     }
