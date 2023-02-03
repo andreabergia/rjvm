@@ -13,3 +13,4 @@ pub mod class_reader_error;
 mod constant_pool;
 pub mod field_flags;
 pub mod method_flags;
+mod type_conversion;

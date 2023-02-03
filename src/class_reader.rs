@@ -5,16 +5,15 @@ use result::prelude::*;
 
 use crate::attribute::Attribute;
 use crate::class_file_field::{ClassFileField, FieldConstantValue};
-use crate::class_file_method::ClassFileMethod;
+use crate::class_file_method::{ClassFileMethod, ClassFileMethodCode};
 use crate::class_reader_error::ClassReaderError::InvalidClassData;
+use crate::constant_pool::ConstantPool;
 use crate::field_flags::FieldFlags;
 use crate::method_flags::MethodFlags;
+use crate::type_conversion::ToUsizeSafe;
 use crate::{
-    buffer::Buffer,
-    class_access_flags::ClassAccessFlags,
-    class_file::ClassFile,
-    class_file_version::ClassFileVersion,
-    class_reader_error::{ClassReaderError, Result},
+    buffer::Buffer, class_access_flags::ClassAccessFlags, class_file::ClassFile,
+    class_file_version::ClassFileVersion, class_reader_error::Result,
     constant_pool::ConstantPoolEntry,
 };
 
@@ -48,9 +47,7 @@ impl<'a> ClassFileReader<'a> {
     fn check_magic_number(&mut self) -> Result<()> {
         match self.buffer.read_u32() {
             Ok(0xCAFEBABE) => Ok(()),
-            Ok(_) => Err(ClassReaderError::InvalidClassData(
-                "invalid magic number".to_owned(),
-            )),
+            Ok(_) => Err(InvalidClassData("invalid magic number".to_owned())),
             Err(err) => Err(err),
         }
     }
@@ -88,7 +85,7 @@ impl<'a> ClassFileReader<'a> {
                 12 => self.read_name_and_type_constant()?,
                 _ => {
                     warn!("invalid entry in constant pool at index {} tag {}", i, tag);
-                    return Err(ClassReaderError::InvalidClassData(format!(
+                    return Err(InvalidClassData(format!(
                         "Unknown constant type: 0x{:X}",
                         tag
                     )));
@@ -178,10 +175,7 @@ impl<'a> ClassFileReader<'a> {
                 self.class_file.flags = flags;
                 Ok(())
             }
-            None => Err(ClassReaderError::InvalidClassData(format!(
-                "invalid class flags: {}",
-                num
-            ))),
+            None => Err(InvalidClassData(format!("invalid class flags: {}", num))),
         }
     }
 
@@ -195,10 +189,11 @@ impl<'a> ClassFileReader<'a> {
     }
 
     fn read_string_reference(&self, index: u16) -> Result<String> {
-        self.class_file
-            .constants
-            .text_of(index)
-            .map_err(|err| err.into())
+        Self::read_string_reference_from(&self.class_file.constants, index)
+    }
+
+    fn read_string_reference_from(constants_pool: &ConstantPool, index: u16) -> Result<String> {
+        constants_pool.text_of(index).map_err(|err| err.into())
     }
 
     fn read_interfaces(&mut self) -> Result<()> {
@@ -239,7 +234,7 @@ impl<'a> ClassFileReader<'a> {
         let field_flags_bits = self.buffer.read_u16()?;
         match FieldFlags::from_bits(field_flags_bits) {
             Some(flags) => Ok(flags),
-            None => Err(ClassReaderError::InvalidClassData(format!(
+            None => Err(InvalidClassData(format!(
                 "invalid field flags: {}",
                 field_flags_bits
             ))),
@@ -254,12 +249,12 @@ impl<'a> ClassFileReader<'a> {
             .iter()
             .filter(|attr| attr.name == "ConstantValue")
             .map(|attr| {
-                if attr.info.len() != std::mem::size_of::<u16>() {
+                if attr.bytes.len() != std::mem::size_of::<u16>() {
                     Err(InvalidClassData(
                         "invalid attribute of type ConstantValue".to_string(),
                     ))
                 } else {
-                    let attribute_bytes: &[u8] = &attr.info;
+                    let attribute_bytes: &[u8] = &attr.bytes;
                     let constant_index = u16::from_be_bytes(attribute_bytes.try_into().unwrap());
                     self.class_file
                         .constants
@@ -299,13 +294,15 @@ impl<'a> ClassFileReader<'a> {
         let name = self.read_string_reference(name_constant_index)?;
         let type_constant_index = self.buffer.read_u16()?;
         let type_descriptor = self.read_string_reference(type_constant_index)?;
-        let attributes = self.read_raw_attributes()?;
+        let raw_attributes = self.read_raw_attributes()?;
+        let code = self.extract_code(&raw_attributes)?;
 
         Ok(ClassFileMethod {
             flags,
             name,
             type_descriptor,
-            attributes,
+            attributes: raw_attributes,
+            code,
         })
     }
 
@@ -313,30 +310,62 @@ impl<'a> ClassFileReader<'a> {
         let method_flags_bits = self.buffer.read_u16()?;
         match MethodFlags::from_bits(method_flags_bits) {
             Some(flags) => Ok(flags),
-            None => Err(ClassReaderError::InvalidClassData(format!(
+            None => Err(InvalidClassData(format!(
                 "invalid method flags: {}",
                 method_flags_bits
             ))),
         }
     }
 
+    fn extract_code(&self, raw_attributes: &[Attribute]) -> Result<ClassFileMethodCode> {
+        raw_attributes
+            .iter()
+            .filter(|attr| attr.name == "Code")
+            .map(|attr| {
+                let mut buf = Buffer::new(&attr.bytes);
+                let max_stack = buf.read_u16()?;
+                let max_locals = buf.read_u16()?;
+                let code_length = buf.read_u32()?.to_usize_safe();
+                let code = Vec::from(buf.read_bytes(code_length)?);
+                let exception_table_length = buf.read_u16()?.to_usize_safe();
+                let exception_table = Vec::from(buf.read_bytes(exception_table_length)?);
+                let attributes =
+                    Self::read_raw_attributes_from(&self.class_file.constants, &mut buf)?;
+                Result::<ClassFileMethodCode>::Ok(ClassFileMethodCode {
+                    max_stack,
+                    max_locals,
+                    code,
+                    exception_table,
+                    attributes,
+                })
+            })
+            .next()
+            .invert()?
+            .ok_or_else(|| InvalidClassData("method is missing code attribute".to_string()))
+    }
+
     fn read_raw_attributes(&mut self) -> Result<Vec<Attribute>> {
-        let attributes_count = self.buffer.read_u16()?;
+        Self::read_raw_attributes_from(&self.class_file.constants, &mut self.buffer)
+    }
+
+    fn read_raw_attributes_from(
+        constants_pool: &ConstantPool,
+        buffer: &mut Buffer,
+    ) -> Result<Vec<Attribute>> {
+        let attributes_count = buffer.read_u16()?;
         (0..attributes_count)
-            .map(|_| self.read_raw_attribute())
+            .map(|_| Self::read_raw_attribute(constants_pool, buffer))
             .collect::<Result<Vec<Attribute>>>()
     }
 
-    fn read_raw_attribute(&mut self) -> Result<Attribute> {
-        let name_constant_index = self.buffer.read_u16()?;
-        let name = self.read_string_reference(name_constant_index)?;
-        let len = self.buffer.read_u32()?;
-        let bytes = self
-            .buffer
-            .read_bytes(usize::try_from(len).expect("usize should have at least 32 bits"))?;
+    fn read_raw_attribute(constants_pool: &ConstantPool, buffer: &mut Buffer) -> Result<Attribute> {
+        let name_constant_index = buffer.read_u16()?;
+        let name = Self::read_string_reference_from(constants_pool, name_constant_index)?;
+        let len = buffer.read_u32()?;
+        let bytes = buffer.read_bytes(len.to_usize_safe())?;
         Ok(Attribute {
             name,
-            info: Vec::from(bytes),
+            bytes: Vec::from(bytes),
         })
     }
 }
