@@ -1,6 +1,7 @@
 use std::{fs::File, io::Read, path::Path};
 
 use result::prelude::*;
+use tracing::warn;
 
 use crate::attribute::Attribute;
 use crate::class_file_field::{ClassFileField, FieldConstantValue};
@@ -47,9 +48,7 @@ impl<'a> ClassFileReader<'a> {
     fn check_magic_number(&mut self) -> Result<()> {
         match self.buffer.read_u32() {
             Ok(0xCAFEBABE) => Ok(()),
-            Ok(_) => Err(ClassReaderError::InvalidClassData(
-                "invalid magic number".to_owned(),
-            )),
+            Ok(_) => Err(InvalidClassData("invalid magic number".to_owned())),
             Err(err) => Err(err),
         }
     }
@@ -86,7 +85,7 @@ impl<'a> ClassFileReader<'a> {
                 11 => self.read_interface_method_reference_constant()?,
                 12 => self.read_name_and_type_constant()?,
                 _ => {
-                    println!("Constant {} is of type {}", i, tag);
+                    warn!("found invalid constant at index {} of type {}", i, tag);
                     return Err(ClassReaderError::InvalidClassData(format!(
                         "Unknown constant type: 0x{:X}",
                         tag
@@ -348,6 +347,7 @@ pub fn read(path: &Path) -> Result<ClassFile> {
     read_buffer(&buf)
 }
 
+#[tracing::instrument]
 pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
     ClassFileReader::new(buf).read()
 }

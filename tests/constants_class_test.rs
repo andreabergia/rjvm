@@ -1,16 +1,17 @@
 extern crate rjvm;
 
 use rjvm::class_file_field::{ClassFileField, FieldConstantValue};
-
 use rjvm::field_flags::FieldFlags;
+use tracing::{event, info, span, Level};
 
 mod utils;
 
 #[test]
 fn can_read_constants() {
+    utils::setup_tracing();
     let class = utils::read_class_from_file("Constants");
-
-    println!("Read class file: {}", class);
+    // event!(Level::INFO, %class, "read class file");
+    info!("read class file {}", class);
     assert_eq!(
         vec!(
             ClassFileField {

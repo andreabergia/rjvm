@@ -11,6 +11,7 @@ mod utils;
 
 #[test]
 fn can_read_pojo_class_file() {
+    utils::setup_tracing();
     let class = utils::read_class_from_file("Complex");
     println!("Read class file: {}", class);
     assert_eq!(ClassFileVersion::Jdk6, class.version);
