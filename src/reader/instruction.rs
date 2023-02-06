@@ -15,7 +15,11 @@ pub struct Instruction {
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{} {:?}", self.op_code, self.arguments)
+        if self.arguments.is_empty() {
+            write!(f, "{}", self.op_code)
+        } else {
+            write!(f, "{} {:?}", self.op_code, self.arguments)
+        }
     }
 }
 
