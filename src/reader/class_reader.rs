@@ -3,6 +3,7 @@ use std::{fs::File, io::Read, path::Path};
 use log::warn;
 use result::prelude::*;
 
+use crate::reader::instruction::Instruction;
 use crate::{
     reader::{
         attribute::Attribute,
@@ -330,7 +331,8 @@ impl<'a> ClassFileReader<'a> {
                 let max_stack = buf.read_u16()?;
                 let max_locals = buf.read_u16()?;
                 let code_length = buf.read_u32()?.to_usize_safe();
-                let code = Vec::from(buf.read_bytes(code_length)?);
+                let raw_code = buf.read_bytes(code_length)?;
+                let code = Instruction::parse_instructions(raw_code)?;
                 let exception_table_length = buf.read_u16()?.to_usize_safe();
                 let exception_table = Vec::from(buf.read_bytes(exception_table_length)?);
                 let attributes =

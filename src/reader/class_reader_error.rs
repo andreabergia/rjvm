@@ -1,16 +1,21 @@
 use thiserror::Error;
 
 use crate::reader::constant_pool::InvalidConstantPoolIndexError;
+use crate::reader::opcodes::OpCode;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ClassReaderError {
     #[error("generic I/O error: {0}")]
     IoError(String),
+
     #[error("invalid class file: {0}")]
     InvalidClassData(String),
 
     #[error("unsupported class file version {0}.{1}")]
     UnsupportedVersion(u16, u16),
+
+    #[error("unsupported instruction: {0}")]
+    UnsupportedInstruction(OpCode),
 }
 
 pub type Result<T> = std::result::Result<T, ClassReaderError>;

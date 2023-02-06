@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::reader::{attribute::Attribute, method_flags::MethodFlags};
+use crate::reader::{attribute::Attribute, instruction::Instruction, method_flags::MethodFlags};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct ClassFileMethod {
@@ -28,19 +28,21 @@ impl fmt::Display for ClassFileMethod {
 pub struct ClassFileMethodCode {
     pub max_stack: u16,
     pub max_locals: u16,
-    pub code: Vec<u8>,
+    pub code: Vec<Instruction>,
     pub exception_table: Vec<u8>, // TODO: replace with some proper struct
     pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
 }
 
 impl fmt::Display for ClassFileMethodCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "max_stack = {}, max_locals = {}, exception_table = {:?}, attributes = {:?}",
+            "max_stack = {}, max_locals = {}, exception_table = {:?}, attributes = {:?}, instructions:",
             self.max_stack, self.max_locals, self.exception_table, self.attributes
-        );
-        crate::vm::code_printer::print_code(self);
+        )?;
+        for instruction in self.code.iter() {
+            writeln!(f, "    {}", instruction)?;
+        }
         Ok(())
     }
 }

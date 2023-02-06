@@ -8,4 +8,6 @@ pub mod class_reader;
 pub mod class_reader_error;
 mod constant_pool;
 pub mod field_flags;
+pub mod instruction;
 pub mod method_flags;
+pub mod opcodes;
