@@ -1,9 +1,11 @@
+use int_enum::IntEnum;
 use InstructionLength::{Fixed, Variable};
 
 //noinspection SpellCheckingInspection
 #[repr(u8)]
 #[allow(non_camel_case_types)]
-enum OpCode {
+#[derive(Clone, Copy, Debug, Eq, PartialEq, IntEnum, strum_macros::Display)]
+pub enum OpCode {
     aaload = 0x32,
     aastore = 0x53,
     aconst_null = 0x01,
@@ -208,13 +210,13 @@ enum OpCode {
     wide = 0xc4,
 }
 
-enum InstructionLength {
-    Fixed(u8),
+pub enum InstructionLength {
+    Fixed(usize),
     Variable,
 }
 
 impl OpCode {
-    fn instruction_length(self) -> InstructionLength {
+    pub fn instruction_length(self) -> InstructionLength {
         match self {
             OpCode::aload => Fixed(1),
             OpCode::anewarray => Fixed(2),

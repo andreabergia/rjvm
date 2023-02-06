@@ -77,7 +77,7 @@ impl<'a> Buffer<'a> {
     }
 
     #[allow(dead_code)]
-    fn has_more_data(&self) -> bool {
+    pub fn has_more_data(&self) -> bool {
         self.position < self.buffer.len()
     }
 }

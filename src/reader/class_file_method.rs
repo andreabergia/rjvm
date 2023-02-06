@@ -37,8 +37,10 @@ impl fmt::Display for ClassFileMethodCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "max_stack = {}, max_locals = {}, code = {:?}, exception_table = {:?}, attributes = {:?}",
-            self.max_stack, self.max_locals, self.code, self.exception_table, self.attributes
-        )
+            "max_stack = {}, max_locals = {}, exception_table = {:?}, attributes = {:?}",
+            self.max_stack, self.max_locals, self.exception_table, self.attributes
+        );
+        crate::vm::code_printer::print_code(self);
+        Ok(())
     }
 }
