@@ -1,9 +1,11 @@
-use log::{debug, warn};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use log::{debug, warn};
+
 use crate::reader::class_file::ClassFile;
+use crate::reader::constant_pool::ConstantPoolEntry;
 use crate::reader::instruction::Instruction;
 use crate::reader::method_flags::MethodFlags;
 use crate::reader::opcodes::OpCode;
@@ -75,6 +77,24 @@ impl<'a> CallFrame<'a> {
                     self.stack.push(local);
                 }
 
+                OpCode::New => {
+                    let index_byte_1 = instruction.argument(0)?;
+                    let index_byte_2 = instruction.argument(1)?;
+                    let constant_index = ((index_byte_1 as u16) << 8) | index_byte_2 as u16;
+                    let constant = self.get_constant(constant_index)?;
+                    if let &ConstantPoolEntry::ClassReference(constant_index) = constant {
+                        let constant = self.get_constant(constant_index)?;
+                        if let ConstantPoolEntry::Utf8(new_object_class_name) = constant {
+                            warn!("Should create instance of object {}", new_object_class_name);
+                            return Err(VmError::NotImplemented);
+                        } else {
+                            return Err(VmError::ValidationException);
+                        }
+                    } else {
+                        return Err(VmError::ValidationException);
+                    }
+                }
+
                 _ => {
                     warn!("Unsupported op code: {}", instruction.op_code);
                     return Err(VmError::NotImplemented);
@@ -83,6 +103,14 @@ impl<'a> CallFrame<'a> {
         }
 
         Err(VmError::NullPointerException)
+    }
+
+    fn get_constant(&self, index: u16) -> Result<&ConstantPoolEntry, VmError> {
+        self.class_and_method
+            .class
+            .constants
+            .get(index)
+            .map_err(|_| VmError::ValidationException)
     }
 
     fn debug_start_execution(&self) {

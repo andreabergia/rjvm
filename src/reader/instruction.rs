@@ -6,6 +6,7 @@ use crate::reader::class_reader_error::ClassReaderError::UnsupportedInstruction;
 use crate::reader::opcodes::InstructionLength::Fixed;
 use crate::reader::opcodes::{InstructionLength, OpCode};
 use crate::utils::buffer::Buffer;
+use crate::vm::vm::VmError;
 
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
@@ -50,5 +51,12 @@ impl Instruction {
         }
 
         Ok(instructions)
+    }
+
+    pub fn argument(&self, index: usize) -> Result<u8, VmError> {
+        self.arguments
+            .get(index)
+            .ok_or(VmError::ValidationException)
+            .map(|byte_ref| *byte_ref)
     }
 }
