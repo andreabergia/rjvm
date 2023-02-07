@@ -9,8 +9,8 @@ use crate::utils::buffer::Buffer;
 
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
-    op_code: OpCode,
-    arguments: Vec<u8>,
+    pub op_code: OpCode,
+    pub arguments: Vec<u8>,
 }
 
 impl fmt::Display for Instruction {

@@ -1,13 +1,6 @@
 extern crate rjvm;
 
-use rjvm::{
-    reader::class_file::ClassFile,
-    reader::class_file_field::ClassFileField,
-    reader::class_file_method::ClassFileMethod,
-    reader::field_flags::FieldFlags,
-    reader::method_flags::MethodFlags,
-    reader::{class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion},
-};
+use rjvm::vm::class_and_method::ClassAndMethod;
 
 mod utils;
 
@@ -20,8 +13,16 @@ fn can_read_simple_main() {
     vm.load_class(class_main);
     vm.load_class(class_generator);
 
-    let main = vm
-        .find_class("rjvm/SimpleMain")
-        .map(|class| class.find_method("main", "([Ljava/lang/String;)V"));
-    assert!(main.is_some());
+    let main_method = vm.find_class("rjvm/SimpleMain").and_then(|class| {
+        class
+            .find_method("main", "([Ljava/lang/String;)V")
+            .map(|method| ClassAndMethod { class, method })
+    });
+    assert!(main_method.is_some());
+    let main_method = main_method.unwrap();
+
+    let mut stack = vm.new_stack();
+    let main_result = vm.invoke(&mut stack, &main_method, None, vec![]);
+    assert!(main_result.is_ok());
+    assert!(main_result.unwrap().is_none());
 }

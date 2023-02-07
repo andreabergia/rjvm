@@ -326,10 +326,10 @@ impl<'a> ClassFileReader<'a> {
                 let mut buf = Buffer::new(&attr.bytes);
                 let max_stack = buf.read_u16()?;
                 let max_locals = buf.read_u16()?;
-                let code_length = buf.read_u32()?.to_usize_safe();
+                let code_length = buf.read_u32()?.into_usize_safe();
                 let raw_code = buf.read_bytes(code_length)?;
                 let code = Instruction::parse_instructions(raw_code)?;
-                let exception_table_length = buf.read_u16()?.to_usize_safe();
+                let exception_table_length = buf.read_u16()?.into_usize_safe();
                 let exception_table = Vec::from(buf.read_bytes(exception_table_length)?);
                 let attributes =
                     Self::read_raw_attributes_from(&self.class_file.constants, &mut buf)?;
@@ -364,7 +364,7 @@ impl<'a> ClassFileReader<'a> {
         let name_constant_index = buffer.read_u16()?;
         let name = Self::read_string_reference_from(constants_pool, name_constant_index)?;
         let len = buffer.read_u32()?;
-        let bytes = buffer.read_bytes(len.to_usize_safe())?;
+        let bytes = buffer.read_bytes(len.into_usize_safe())?;
         Ok(Attribute {
             name,
             bytes: Vec::from(bytes),
