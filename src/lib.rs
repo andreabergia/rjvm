@@ -3,4 +3,4 @@ extern crate bitflags;
 
 pub mod reader;
 mod utils;
-mod vm;
+pub mod vm;

@@ -19,6 +19,19 @@ pub struct ClassFile {
     pub methods: Vec<ClassFileMethod>,
 }
 
+impl ClassFile {
+    pub fn find_method(
+        &self,
+        method_name: &str,
+        type_descriptor: &str,
+    ) -> Option<&ClassFileMethod> {
+        // TODO: replace linear search with something faster
+        self.methods
+            .iter()
+            .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
+    }
+}
+
 impl fmt::Display for ClassFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
