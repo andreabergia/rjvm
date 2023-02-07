@@ -43,11 +43,10 @@ impl Instruction {
                 InstructionLength::Variable => Err(UnsupportedInstruction(op_code)),
             }?;
 
-            let instruction = Instruction {
+            instructions.push(Instruction {
                 op_code,
                 arguments: Vec::from(arguments),
-            };
-            instructions.push(instruction);
+            });
         }
 
         Ok(instructions)
