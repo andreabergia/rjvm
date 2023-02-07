@@ -31,11 +31,11 @@ impl fmt::Display for ClassFile {
         writeln!(f, "interfaces: {:?}", self.interfaces)?;
         writeln!(f, "fields:")?;
         for field in self.fields.iter() {
-            writeln!(f, "  - {}", field)?;
+            writeln!(f, "  - {field}")?;
         }
         writeln!(f, "methods:")?;
         for method in self.methods.iter() {
-            writeln!(f, "  - {}", method)?;
+            writeln!(f, "  - {method}")?;
         }
         Ok(())
     }

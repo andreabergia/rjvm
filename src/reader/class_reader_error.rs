@@ -28,6 +28,6 @@ impl From<InvalidConstantPoolIndexError> for ClassReaderError {
 
 impl From<std::io::Error> for ClassReaderError {
     fn from(err: std::io::Error) -> Self {
-        Self::IoError(format!("{}", err))
+        Self::IoError(format!("{err}"))
     }
 }

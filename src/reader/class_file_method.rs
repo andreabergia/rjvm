@@ -41,7 +41,7 @@ impl fmt::Display for ClassFileMethodCode {
             self.max_stack, self.max_locals, self.exception_table, self.attributes
         )?;
         for instruction in self.code.iter() {
-            writeln!(f, "    {}", instruction)?;
+            writeln!(f, "    {instruction}")?;
         }
         Ok(())
     }

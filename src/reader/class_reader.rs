@@ -91,8 +91,7 @@ impl<'a> ClassFileReader<'a> {
                 _ => {
                     warn!("invalid entry in constant pool at index {} tag {}", i, tag);
                     return Err(InvalidClassData(format!(
-                        "Unknown constant type: 0x{:X}",
-                        tag
+                        "Unknown constant type: 0x{tag:X}"
                     )));
                 }
             };
@@ -180,7 +179,7 @@ impl<'a> ClassFileReader<'a> {
                 self.class_file.flags = flags;
                 Ok(())
             }
-            None => Err(InvalidClassData(format!("invalid class flags: {}", num))),
+            None => Err(InvalidClassData(format!("invalid class flags: {num}"))),
         }
     }
 
@@ -240,8 +239,7 @@ impl<'a> ClassFileReader<'a> {
         match FieldFlags::from_bits(field_flags_bits) {
             Some(flags) => Ok(flags),
             None => Err(InvalidClassData(format!(
-                "invalid field flags: {}",
-                field_flags_bits
+                "invalid field flags: {field_flags_bits}"
             ))),
         }
     }
@@ -275,8 +273,7 @@ impl<'a> ClassFileReader<'a> {
                             ConstantPoolEntry::Long(v) => Ok(FieldConstantValue::Long(*v)),
                             ConstantPoolEntry::Double(v) => Ok(FieldConstantValue::Double(*v)),
                             v => Err(InvalidClassData(format!(
-                                "invalid type for ConstantValue: {:?}",
-                                v
+                                "invalid type for ConstantValue: {v:?}"
                             ))),
                         })
                 }
@@ -316,8 +313,7 @@ impl<'a> ClassFileReader<'a> {
         match MethodFlags::from_bits(method_flags_bits) {
             Some(flags) => Ok(flags),
             None => Err(InvalidClassData(format!(
-                "invalid method flags: {}",
-                method_flags_bits
+                "invalid method flags: {method_flags_bits}"
             ))),
         }
     }

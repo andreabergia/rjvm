@@ -84,11 +84,11 @@ impl ConstantPool {
     fn fmt_entry(&self, idx: u16) -> Result<String, InvalidConstantPoolIndexError> {
         let entry = self.get(idx)?;
         let text = match entry {
-            ConstantPoolEntry::Utf8(ref s) => format!("String: \"{}\"", s),
-            ConstantPoolEntry::Integer(n) => format!("Integer: {}", n),
-            ConstantPoolEntry::Float(n) => format!("Float: {}", n),
-            ConstantPoolEntry::Long(n) => format!("Long: {}", n),
-            ConstantPoolEntry::Double(n) => format!("Double: {}", n),
+            ConstantPoolEntry::Utf8(ref s) => format!("String: \"{s}\""),
+            ConstantPoolEntry::Integer(n) => format!("Integer: {n}"),
+            ConstantPoolEntry::Float(n) => format!("Float: {n}"),
+            ConstantPoolEntry::Long(n) => format!("Long: {n}"),
+            ConstantPoolEntry::Double(n) => format!("Double: {n}"),
             ConstantPoolEntry::ClassReference(n) => {
                 format!("ClassReference: {} => ({})", n, self.fmt_entry(*n)?)
             }

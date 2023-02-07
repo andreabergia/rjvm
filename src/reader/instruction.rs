@@ -31,7 +31,7 @@ impl Instruction {
         while reader.has_more_data() {
             let op_byte = reader.read_u8()?;
             let op_code = OpCode::try_from(op_byte).map_err(|_| {
-                ClassReaderError::InvalidClassData(format!("invalid op code: {:#04x}", op_byte))
+                ClassReaderError::InvalidClassData(format!("invalid op code: {op_byte:#04x}"))
             })?;
             let arguments = match op_code.instruction_length() {
                 Fixed(arguments_len) => reader.read_bytes(arguments_len).map_err(|_| {
