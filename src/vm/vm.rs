@@ -14,14 +14,14 @@ use crate::vm::class_and_method::ClassAndMethod;
 use crate::vm::value::{ObjectRef, ObjectValue, Value};
 use crate::vm::vm_error::VmError;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Stack {
     frames: Vec<Rc<RefCell<CallFrame>>>,
 }
 
 impl Stack {
     pub fn new() -> Stack {
-        Stack { frames: Vec::new() }
+        Default::default()
     }
 
     pub fn add_frame(

@@ -30,7 +30,7 @@ impl ClassFile {
         self.methods
             .iter()
             .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
-            .map(|method_rc| method_rc.clone())
+            .cloned()
     }
 }
 
