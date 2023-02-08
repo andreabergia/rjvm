@@ -51,8 +51,10 @@ impl FieldType {
             'Z' => FieldType::Base(BaseType::Boolean),
             'L' => {
                 let class_name: String = chars.take_while_ref(|c| *c != ';').collect();
-                chars.next(); // Consume the ;
-                FieldType::Object(class_name)
+                match chars.next() {
+                    Some(';') => FieldType::Object(class_name),
+                    _ => return Err(InvalidTypeDescriptor(type_descriptor.to_string())),
+                }
             }
             '[' => {
                 let component_type = Self::parse_from(type_descriptor, chars)?;
@@ -75,6 +77,30 @@ mod tests {
         assert!(matches!(
             FieldType::parse(""),
             Err(ClassReaderError::InvalidTypeDescriptor(s)) if s.is_empty()
+        ));
+    }
+
+    #[test]
+    fn cannot_parse_invalid_primitive() {
+        assert!(matches!(
+            FieldType::parse("W"),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == "W"
+        ));
+    }
+
+    #[test]
+    fn cannot_parse_missing_semicolon() {
+        assert!(matches!(
+            FieldType::parse("Ljava/lang/String"),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == "Ljava/lang/String"
+        ));
+    }
+
+    #[test]
+    fn cannot_parse_invalid_array() {
+        assert!(matches!(
+            FieldType::parse("["),
+            Err(ClassReaderError::InvalidTypeDescriptor(s)) if s == "["
         ));
     }
 
