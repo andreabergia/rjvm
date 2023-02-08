@@ -2,17 +2,20 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use log::{debug, info, warn};
+use log::{debug, warn};
 
-use crate::reader::class_file::ClassFile;
-use crate::reader::constant_pool::{ConstantPool, ConstantPoolEntry};
-use crate::reader::instruction::Instruction;
-use crate::reader::method_flags::MethodFlags;
-use crate::reader::opcodes::OpCode;
-use crate::utils::type_conversion::ToUsizeSafe;
-use crate::vm::class_and_method::ClassAndMethod;
-use crate::vm::value::{ObjectRef, ObjectValue, Value};
-use crate::vm::vm_error::VmError;
+use crate::{
+    reader::{
+        class_file::ClassFile, constant_pool::ConstantPoolEntry, instruction::Instruction,
+        method_flags::MethodFlags, opcodes::OpCode,
+    },
+    utils::type_conversion::ToUsizeSafe,
+    vm::{
+        class_and_method::ClassAndMethod,
+        value::{ObjectRef, ObjectValue, Value},
+        vm_error::VmError,
+    },
+};
 
 #[derive(Debug, Default)]
 pub struct Stack {
