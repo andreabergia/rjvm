@@ -1,11 +1,9 @@
 extern crate rjvm;
 
-use rjvm::{
-    reader::{
-        class_file_field::{ClassFileField, FieldConstantValue},
-        field_flags::FieldFlags,
-    },
-    vm::type_descriptor::{BaseType, FieldType},
+use rjvm::reader::{
+    class_file_field::{ClassFileField, FieldConstantValue},
+    field_flags::FieldFlags,
+    field_type::{BaseType, FieldType},
 };
 
 mod utils;

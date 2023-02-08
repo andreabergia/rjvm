@@ -65,8 +65,10 @@ impl FieldType {
 
 #[cfg(test)]
 mod tests {
-    use crate::reader::class_reader_error::ClassReaderError;
-    use crate::vm::type_descriptor::{BaseType, FieldType};
+    use crate::reader::{
+        class_reader_error::ClassReaderError,
+        field_type::{BaseType, FieldType},
+    };
 
     #[test]
     fn cannot_parse_empty_descriptor() {

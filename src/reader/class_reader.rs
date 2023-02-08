@@ -4,8 +4,6 @@ use std::{fs::File, io::Read, path::Path};
 use log::warn;
 use result::prelude::*;
 
-use crate::reader::instruction::Instruction;
-use crate::vm::type_descriptor::FieldType;
 use crate::{
     reader::{
         attribute::Attribute,
@@ -19,6 +17,8 @@ use crate::{
         constant_pool::ConstantPool,
         constant_pool::ConstantPoolEntry,
         field_flags::FieldFlags,
+        field_type::FieldType,
+        instruction::Instruction,
         method_flags::MethodFlags,
     },
     utils::{buffer::Buffer, type_conversion::ToUsizeSafe},
