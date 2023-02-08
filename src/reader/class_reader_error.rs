@@ -19,6 +19,9 @@ pub enum ClassReaderError {
 
     #[error("validation error: {0}")]
     ValidationError(String),
+
+    #[error("Invalid type descriptor: {0}")]
+    InvalidTypeDescriptor(String),
 }
 
 pub type Result<T> = std::result::Result<T, ClassReaderError>;
