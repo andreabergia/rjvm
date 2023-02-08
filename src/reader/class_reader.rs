@@ -5,6 +5,7 @@ use log::warn;
 use result::prelude::*;
 
 use crate::reader::instruction::Instruction;
+use crate::vm::type_descriptor::FieldType;
 use crate::{
     reader::{
         attribute::Attribute,
@@ -222,7 +223,8 @@ impl<'a> ClassFileReader<'a> {
         let name_constant_index = self.buffer.read_u16()?;
         let name = self.read_string_reference(name_constant_index)?;
         let type_constant_index = self.buffer.read_u16()?;
-        let type_descriptor = self.read_string_reference(type_constant_index)?;
+        let type_descriptor_raw = self.read_string_reference(type_constant_index)?;
+        let type_descriptor = FieldType::parse(&type_descriptor_raw)?;
 
         let raw_attributes = self.read_raw_attributes()?;
         let constant_value = self.extract_constant_value(raw_attributes)?;

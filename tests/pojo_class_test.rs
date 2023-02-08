@@ -1,12 +1,12 @@
 extern crate rjvm;
 
 use rjvm::{
-    reader::class_file::ClassFile,
-    reader::class_file_field::ClassFileField,
-    reader::class_file_method::ClassFileMethod,
-    reader::field_flags::FieldFlags,
-    reader::method_flags::MethodFlags,
-    reader::{class_access_flags::ClassAccessFlags, class_file_version::ClassFileVersion},
+    reader::{
+        class_access_flags::ClassAccessFlags, class_file::ClassFile,
+        class_file_field::ClassFileField, class_file_method::ClassFileMethod,
+        class_file_version::ClassFileVersion, field_flags::FieldFlags, method_flags::MethodFlags,
+    },
+    vm::type_descriptor::{BaseType, FieldType},
 };
 
 mod utils;
@@ -36,13 +36,13 @@ fn check_fields(class: &ClassFile) {
             ClassFileField {
                 flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
                 name: "real".to_string(),
-                type_descriptor: "D".to_string(),
+                type_descriptor: FieldType::Base(BaseType::Double),
                 constant_value: None,
             },
             ClassFileField {
                 flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
                 name: "imag".to_string(),
-                type_descriptor: "D".to_string(),
+                type_descriptor: FieldType::Base(BaseType::Double),
                 constant_value: None,
             }
         ),

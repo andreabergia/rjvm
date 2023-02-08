@@ -6,15 +6,15 @@ use ClassReaderError::InvalidTypeDescriptor;
 
 use crate::reader::class_reader_error::ClassReaderError;
 
-#[derive(Debug, Clone, PartialEq)]
-enum FieldType {
+#[derive(Debug, Clone, PartialEq, strum_macros::Display)]
+pub enum FieldType {
     Base(BaseType),
     Object(String),
     Array(Box<FieldType>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-enum BaseType {
+#[derive(Debug, Clone, PartialEq, strum_macros::Display)]
+pub enum BaseType {
     Byte,
     Char,
     Double,
@@ -26,7 +26,7 @@ enum BaseType {
 }
 
 impl FieldType {
-    fn parse(type_descriptor: &str) -> Result<FieldType, ClassReaderError> {
+    pub fn parse(type_descriptor: &str) -> Result<FieldType, ClassReaderError> {
         let mut chars = type_descriptor.chars();
         let descriptor = Self::parse_from(type_descriptor, &mut chars)?;
         match chars.next() {
