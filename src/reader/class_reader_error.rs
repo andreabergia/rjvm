@@ -16,6 +16,9 @@ pub enum ClassReaderError {
 
     #[error("unsupported instruction: {0}")]
     UnsupportedInstruction(OpCode),
+
+    #[error("validation error: {0}")]
+    ValidationError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ClassReaderError>;

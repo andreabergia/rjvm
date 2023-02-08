@@ -6,7 +6,6 @@ use crate::reader::class_reader_error::ClassReaderError::UnsupportedInstruction;
 use crate::reader::opcodes::InstructionLength::Fixed;
 use crate::reader::opcodes::{InstructionLength, OpCode};
 use crate::utils::buffer::Buffer;
-use crate::vm::vm::VmError;
 
 #[derive(Debug, PartialEq)]
 pub struct Instruction {
@@ -53,11 +52,12 @@ impl Instruction {
         Ok(instructions)
     }
 
-    // TODO: remove vm error dependency
-    pub fn argument(&self, index: usize) -> Result<u8, VmError> {
+    pub fn argument(&self, index: usize) -> Result<u8, ClassReaderError> {
         self.arguments
             .get(index)
-            .ok_or(VmError::ValidationException)
+            .ok_or(ClassReaderError::ValidationError(
+                "invalid arguments of instruction".to_string(),
+            ))
             .map(|byte_ref| *byte_ref)
     }
 }

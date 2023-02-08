@@ -12,14 +12,7 @@ use crate::reader::opcodes::OpCode;
 use crate::utils::type_conversion::ToUsizeSafe;
 use crate::vm::class_and_method::ClassAndMethod;
 use crate::vm::value::{ObjectRef, ObjectValue, Value};
-
-#[derive(Debug)]
-pub enum VmError {
-    NullPointerException,
-    ClassNotFoundException,
-    ValidationException,
-    NotImplemented,
-}
+use crate::vm::vm_error::VmError;
 
 #[derive(Debug)]
 pub struct Stack {
@@ -39,7 +32,7 @@ impl Stack {
     ) -> Rc<RefCell<CallFrame>> {
         // TODO: verify local size with static method data
         let locals = receiver
-            .map(|v| Value::Object(v))
+            .map(Value::Object)
             .into_iter()
             .chain(args.into_iter())
             .collect();
@@ -189,7 +182,7 @@ impl Vm {
         let instance = self
             .classes
             .get(class_name)
-            .ok_or(VmError::ClassNotFoundException)
+            .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
             .map(|class| ObjectValue {
                 class: Rc::clone(class),
                 fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
