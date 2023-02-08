@@ -1,7 +1,10 @@
+use std::str::Chars;
+
+use itertools::Itertools;
+
 use ClassReaderError::InvalidTypeDescriptor;
 
 use crate::reader::class_reader_error::ClassReaderError;
-use crate::vm::type_descriptor::FieldType::Base;
 
 #[derive(Debug, Clone, PartialEq)]
 enum FieldType {
@@ -25,26 +28,38 @@ enum BaseType {
 impl FieldType {
     fn parse(type_descriptor: &str) -> Result<FieldType, ClassReaderError> {
         let mut chars = type_descriptor.chars();
+        let descriptor = Self::parse_from(type_descriptor, &mut chars)?;
+        match chars.next() {
+            None => Ok(descriptor),
+            Some(_) => Err(InvalidTypeDescriptor(type_descriptor.to_string())),
+        }
+    }
+
+    fn parse_from(type_descriptor: &str, chars: &mut Chars) -> Result<FieldType, ClassReaderError> {
         let first_char = chars
             .next()
             .ok_or(InvalidTypeDescriptor(type_descriptor.to_string()))?;
 
-        let descriptor = match first_char {
-            'B' => Base(BaseType::Byte),
-            'C' => Base(BaseType::Char),
-            'D' => Base(BaseType::Double),
-            'F' => Base(BaseType::Float),
-            'I' => Base(BaseType::Int),
-            'J' => Base(BaseType::Long),
-            'S' => Base(BaseType::Short),
-            'Z' => Base(BaseType::Boolean),
+        Ok(match first_char {
+            'B' => FieldType::Base(BaseType::Byte),
+            'C' => FieldType::Base(BaseType::Char),
+            'D' => FieldType::Base(BaseType::Double),
+            'F' => FieldType::Base(BaseType::Float),
+            'I' => FieldType::Base(BaseType::Int),
+            'J' => FieldType::Base(BaseType::Long),
+            'S' => FieldType::Base(BaseType::Short),
+            'Z' => FieldType::Base(BaseType::Boolean),
+            'L' => {
+                let class_name: String = chars.take_while_ref(|c| *c != ';').collect();
+                chars.next(); // Consume the ;
+                FieldType::Object(class_name)
+            }
+            '[' => {
+                let component_type = Self::parse_from(type_descriptor, chars)?;
+                FieldType::Array(Box::new(component_type))
+            }
             _ => return Err(InvalidTypeDescriptor(type_descriptor.to_string())),
-        };
-        if let Some(_) = chars.next() {
-            Err(InvalidTypeDescriptor(type_descriptor.to_string()))
-        } else {
-            Ok(descriptor)
-        }
+        })
     }
 }
 
@@ -73,6 +88,35 @@ mod tests {
         assert_eq!(
             Ok(FieldType::Base(BaseType::Boolean)),
             FieldType::parse("Z")
+        );
+    }
+
+    #[test]
+    fn can_parse_object_descriptors() {
+        assert_eq!(
+            Ok(FieldType::Object("rjvm/Test".to_string())),
+            FieldType::parse("Lrjvm/Test;")
+        );
+    }
+
+    #[test]
+    fn can_parse_array_description() {
+        assert_eq!(
+            Ok(FieldType::Array(Box::new(FieldType::Base(BaseType::Int)))),
+            FieldType::parse("[I")
+        );
+        assert_eq!(
+            Ok(FieldType::Array(Box::new(FieldType::Object(
+                "java/lang/String".to_string()
+            )))),
+            FieldType::parse("[Ljava/lang/String;")
+        );
+
+        assert_eq!(
+            Ok(FieldType::Array(Box::new(FieldType::Array(Box::new(
+                FieldType::Base(BaseType::Double)
+            ))))),
+            FieldType::parse("[[D")
         );
     }
 }
