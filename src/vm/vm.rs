@@ -79,7 +79,7 @@ impl CallFrame {
 
         let code = &self.class_and_method.method.code.code;
         for instruction in code {
-            self.debug_print_stack(instruction);
+            self.debug_print_status(instruction);
             self.pc += 1;
 
             match instruction.op_code {
@@ -139,11 +139,19 @@ impl CallFrame {
         )
     }
 
-    fn debug_print_stack(&self, instruction: &Instruction) {
+    fn debug_print_status(&self, instruction: &Instruction) {
         debug!(
-            "- pc: {}, stack: {:?}, next instruction: {}",
-            self.pc, self.stack, instruction
+            "FRAME STATUS: pc: {}, next instruction: {}",
+            self.pc, instruction
         );
+        debug!("  stack:");
+        for stack_entry in self.stack.iter() {
+            debug!("  - {:?}", stack_entry);
+        }
+        debug!("  locals:");
+        for local_variable in self.locals.iter() {
+            debug!("  - {:?}", local_variable);
+        }
     }
 }
 
