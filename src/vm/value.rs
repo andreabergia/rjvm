@@ -1,5 +1,6 @@
 use crate::reader::class_file::ClassFile;
 use std::cell::RefCell;
+use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
 #[derive(Debug, Default, Clone)]
@@ -19,10 +20,15 @@ pub enum Value {
     // TODO: array?
 }
 
-#[derive(Debug)]
 pub struct ObjectValue {
     pub class: Rc<ClassFile>,
     pub fields: Vec<Value>,
+}
+
+impl Debug for ObjectValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "class: {} fields {:?}", self.class.name, self.fields)
+    }
 }
 
 // TODO: do we need the RefCell? Can we live with only the Rc?
