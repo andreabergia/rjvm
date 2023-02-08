@@ -89,21 +89,11 @@ impl CallFrame {
                 }
 
                 OpCode::New => {
-                    let index_byte_1 = instruction.argument(0)?;
-                    let index_byte_2 = instruction.argument(1)?;
-                    let constant_index = ((index_byte_1 as u16) << 8) | index_byte_2 as u16;
-                    let constant = self.get_constant(constant_index)?;
-                    if let &ConstantPoolEntry::ClassReference(constant_index) = constant {
-                        let constant = self.get_constant(constant_index)?;
-                        if let ConstantPoolEntry::Utf8(new_object_class_name) = constant {
-                            let new_object = vm.new_object(new_object_class_name)?;
-                            self.stack.push(Value::Object(new_object));
-                        } else {
-                            return Err(VmError::ValidationException);
-                        }
-                    } else {
-                        return Err(VmError::ValidationException);
-                    }
+                    let constant_index = instruction.argument_u16(0)?;
+                    let new_object_class_name =
+                        self.get_constant_class_reference(constant_index)?;
+                    let new_object = vm.new_object(new_object_class_name)?;
+                    self.stack.push(Value::Object(new_object));
                 }
 
                 _ => {
@@ -116,12 +106,30 @@ impl CallFrame {
         Err(VmError::NullPointerException)
     }
 
-    fn get_constant(&self, index: u16) -> Result<&ConstantPoolEntry, VmError> {
+    fn get_constant(&self, constant_index: u16) -> Result<&ConstantPoolEntry, VmError> {
         self.class_and_method
             .class
             .constants
-            .get(index)
+            .get(constant_index)
             .map_err(|_| VmError::ValidationException)
+    }
+
+    fn get_constant_class_reference(&self, constant_index: u16) -> Result<&str, VmError> {
+        let constant = self.get_constant(constant_index)?;
+        if let &ConstantPoolEntry::ClassReference(constant_index) = constant {
+            self.get_constant_utf8(constant_index)
+        } else {
+            Err(VmError::ValidationException)
+        }
+    }
+
+    fn get_constant_utf8(&self, constant_index: u16) -> Result<&str, VmError> {
+        let constant = self.get_constant(constant_index)?;
+        if let ConstantPoolEntry::Utf8(string) = constant {
+            Ok(string)
+        } else {
+            Err(VmError::ValidationException)
+        }
     }
 
     fn debug_start_execution(&self) {
