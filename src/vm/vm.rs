@@ -29,17 +29,29 @@ impl Stack {
         class_and_method: ClassAndMethod,
         receiver: Option<ObjectRef>,
         args: Vec<Value>,
-    ) -> Rc<RefCell<CallFrame>> {
-        // TODO: verify local size with static method data
-        let locals = receiver
+    ) -> Result<Rc<RefCell<CallFrame>>, VmError> {
+        if class_and_method.method.flags.contains(MethodFlags::STATIC) {
+            if receiver.is_some() {
+                return Err(VmError::ValidationException);
+            }
+        } else if receiver.is_none() {
+            return Err(VmError::NullPointerException);
+        }
+
+        let mut locals: Vec<Value> = receiver
             .map(Value::Object)
             .into_iter()
             .chain(args.into_iter())
             .collect();
+
+        while locals.len() < class_and_method.method.code.max_locals.into_usize_safe() {
+            locals.push(Value::Uninitialized);
+        }
+
         let new_frame = CallFrame::new(class_and_method, locals);
         let new_frame = Rc::new(RefCell::new(new_frame));
         self.frames.push(Rc::clone(&new_frame));
-        new_frame
+        Ok(new_frame)
     }
 }
 
@@ -162,18 +174,9 @@ impl Vm {
         object: Option<ObjectRef>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, VmError> {
-        if object.is_none() {
-            if !class_and_method.method.flags.contains(MethodFlags::STATIC) {
-                return Err(VmError::NullPointerException);
-            }
-            println!("invoking static");
-
-            let frame = stack.add_frame(class_and_method, object, args);
-            let result = frame.borrow_mut().execute(self);
-            Ok(None)
-        } else {
-            Ok(None)
-        }
+        let frame = stack.add_frame(class_and_method, object, args)?;
+        let result = frame.borrow_mut().execute(self);
+        result
     }
 
     pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef, VmError> {
