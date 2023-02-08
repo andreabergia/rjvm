@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
+// TODO: do we need short/char/byte? What about boolean?
 #[derive(Debug, Default, Clone)]
 pub enum Value {
     #[default]

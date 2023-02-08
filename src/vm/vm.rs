@@ -96,6 +96,19 @@ impl CallFrame {
                     self.stack.push(Value::Object(new_object));
                 }
 
+                OpCode::Dup => {
+                    let stack_head = self.stack.last().ok_or(VmError::ValidationException)?;
+                    self.stack.push(stack_head.clone());
+                }
+
+                OpCode::Iconst_m1 => self.stack.push(Value::Int(-1)),
+                OpCode::Iconst_0 => self.stack.push(Value::Int(0)),
+                OpCode::Iconst_1 => self.stack.push(Value::Int(1)),
+                OpCode::Iconst_2 => self.stack.push(Value::Int(2)),
+                OpCode::Iconst_3 => self.stack.push(Value::Int(3)),
+                OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
+                OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
+
                 _ => {
                     warn!("Unsupported op code: {}", instruction.op_code);
                     return Err(VmError::NotImplemented);
