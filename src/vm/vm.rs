@@ -2,10 +2,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use log::{debug, warn};
+use log::{debug, info, warn};
 
 use crate::reader::class_file::ClassFile;
-use crate::reader::constant_pool::ConstantPoolEntry;
+use crate::reader::constant_pool::{ConstantPool, ConstantPoolEntry};
 use crate::reader::instruction::Instruction;
 use crate::reader::method_flags::MethodFlags;
 use crate::reader::opcodes::OpCode;
@@ -53,6 +53,13 @@ impl Stack {
         self.frames.push(Rc::clone(&new_frame));
         Ok(new_frame)
     }
+}
+
+#[derive(Debug)]
+struct MethodReference<'a> {
+    class_name: &'a str,
+    method_name: &'a str,
+    type_descriptor: &'a str,
 }
 
 #[derive(Debug)]
@@ -109,6 +116,18 @@ impl CallFrame {
                 OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
                 OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
 
+                OpCode::Invokespecial => {
+                    let constant_index = instruction.argument_u16(0)?;
+                    let method_reference = self.get_constant_method_reference(constant_index)?;
+                    warn!(
+                        "TODO: should invoke method {}.{} of type {}",
+                        method_reference.class_name,
+                        method_reference.method_name,
+                        method_reference.type_descriptor
+                    );
+                    return Err(VmError::NotImplemented);
+                }
+
                 _ => {
                     warn!("Unsupported op code: {}", instruction.op_code);
                     return Err(VmError::NotImplemented);
@@ -134,6 +153,33 @@ impl CallFrame {
         } else {
             Err(VmError::ValidationException)
         }
+    }
+
+    fn get_constant_method_reference(
+        &self,
+        constant_index: u16,
+    ) -> Result<MethodReference, VmError> {
+        let constant = self.get_constant(constant_index)?;
+        if let &ConstantPoolEntry::MethodReference(
+            class_name_index,
+            name_and_type_descriptor_index,
+        ) = constant
+        {
+            let class_name = self.get_constant_class_reference(class_name_index)?;
+            let constant = self.get_constant(name_and_type_descriptor_index)?;
+            if let &ConstantPoolEntry::NameAndTypeDescriptor(name_index, type_descriptor_index) =
+                constant
+            {
+                let method_name = self.get_constant_utf8(name_index)?;
+                let type_descriptor = self.get_constant_utf8(type_descriptor_index)?;
+                return Ok(MethodReference {
+                    class_name,
+                    method_name,
+                    type_descriptor,
+                });
+            }
+        }
+        Err(VmError::ValidationException)
     }
 
     fn get_constant_utf8(&self, constant_index: u16) -> Result<&str, VmError> {
