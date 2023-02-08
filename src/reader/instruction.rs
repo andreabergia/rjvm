@@ -53,6 +53,7 @@ impl Instruction {
         Ok(instructions)
     }
 
+    // TODO: remove vm error dependency
     pub fn argument(&self, index: usize) -> Result<u8, VmError> {
         self.arguments
             .get(index)

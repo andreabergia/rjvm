@@ -11,59 +11,65 @@ use crate::reader::method_flags::MethodFlags;
 use crate::reader::opcodes::OpCode;
 use crate::utils::type_conversion::ToUsizeSafe;
 use crate::vm::class_and_method::ClassAndMethod;
-use crate::vm::value::Value;
-
-#[derive(Debug, Default)]
-pub struct Vm {
-    classes: HashMap<String, ClassFile>,
-}
+use crate::vm::value::{ObjectRef, ObjectValue, Value};
 
 #[derive(Debug)]
 pub enum VmError {
     NullPointerException,
+    ClassNotFoundException,
     ValidationException,
     NotImplemented,
 }
 
-#[derive(Debug, Default)]
-pub struct Stack<'a> {
-    frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
+#[derive(Debug)]
+pub struct Stack {
+    frames: Vec<Rc<RefCell<CallFrame>>>,
 }
 
-impl<'a> Stack<'a> {
+impl Stack {
+    pub fn new() -> Stack {
+        Stack { frames: Vec::new() }
+    }
+
     pub fn add_frame(
         &mut self,
-        class_and_method: &'a ClassAndMethod,
-        receiver: Option<&'a Value>,
-        args: Vec<&'a Value>,
-    ) -> Rc<RefCell<CallFrame<'a>>> {
+        class_and_method: ClassAndMethod,
+        receiver: Option<ObjectRef>,
+        args: Vec<Value>,
+    ) -> Rc<RefCell<CallFrame>> {
         // TODO: verify local size with static method data
-        let locals = receiver.into_iter().chain(args.into_iter()).collect();
-        let new_frame = Rc::new(RefCell::new(CallFrame::new(class_and_method, locals)));
+        let locals = receiver
+            .map(|v| Value::Object(v))
+            .into_iter()
+            .chain(args.into_iter())
+            .collect();
+        let new_frame = CallFrame::new(class_and_method, locals);
+        let new_frame = Rc::new(RefCell::new(new_frame));
         self.frames.push(Rc::clone(&new_frame));
         new_frame
     }
 }
 
 #[derive(Debug)]
-pub struct CallFrame<'a> {
-    class_and_method: &'a ClassAndMethod<'a>,
+pub struct CallFrame {
+    class_and_method: ClassAndMethod,
     pc: usize,
-    locals: Vec<&'a Value>,
-    stack: Vec<&'a Value>,
+    locals: Vec<Value>,
+    stack: Vec<Value>,
 }
 
-impl<'a> CallFrame<'a> {
-    fn new(class_and_method: &'a ClassAndMethod, locals: Vec<&'a Value>) -> CallFrame<'a> {
+impl CallFrame {
+    fn new(class_and_method: ClassAndMethod, locals: Vec<Value>) -> CallFrame {
+        let max_stack_size = class_and_method.method.code.max_stack.into_usize_safe();
         CallFrame {
             class_and_method,
             pc: 0,
             locals,
-            stack: Vec::with_capacity(class_and_method.method.code.max_stack.into_usize_safe()),
+            stack: Vec::with_capacity(max_stack_size),
         }
     }
 
-    pub fn execute(&mut self) -> Result<Option<&'a Value>, VmError> {
+    pub fn execute(&mut self, vm: &mut Vm) -> Result<Option<Value>, VmError> {
         self.debug_start_execution();
 
         let code = &self.class_and_method.method.code.code;
@@ -73,8 +79,8 @@ impl<'a> CallFrame<'a> {
 
             match instruction.op_code {
                 OpCode::Aload_0 => {
-                    let local = *self.locals.get(0).ok_or(VmError::ValidationException)?;
-                    self.stack.push(local);
+                    let local = self.locals.get(0).ok_or(VmError::ValidationException)?;
+                    self.stack.push(local.clone());
                 }
 
                 OpCode::New => {
@@ -85,8 +91,8 @@ impl<'a> CallFrame<'a> {
                     if let &ConstantPoolEntry::ClassReference(constant_index) = constant {
                         let constant = self.get_constant(constant_index)?;
                         if let ConstantPoolEntry::Utf8(new_object_class_name) = constant {
-                            warn!("Should create instance of object {}", new_object_class_name);
-                            return Err(VmError::NotImplemented);
+                            let new_object = vm.new_object(new_object_class_name)?;
+                            self.stack.push(Value::Object(new_object));
                         } else {
                             return Err(VmError::ValidationException);
                         }
@@ -128,45 +134,68 @@ impl<'a> CallFrame<'a> {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Vm {
+    classes: HashMap<String, Rc<ClassFile>>,
+    heap: Vec<ObjectRef>,
+}
+
 impl Vm {
-    pub fn new_stack(&self) -> Stack {
-        Default::default()
+    pub fn new() -> Vm {
+        Vm {
+            classes: Default::default(),
+            heap: Vec::new(),
+        }
     }
 
-    pub fn invoke<'a>(
-        &self,
-        stack: &'a mut Stack<'a>,
-        class_and_method: &'a ClassAndMethod,
-        object: Option<&'a Value>,
-        args: Vec<&'a Value>,
-    ) -> Result<Option<&'a Value>, VmError> {
+    pub fn load_class(&mut self, class_file: ClassFile) {
+        let class_file = Rc::new(class_file);
+        self.classes.insert(class_file.name.clone(), class_file);
+    }
+
+    pub fn find_class(&self, class_name: &str) -> Option<Rc<ClassFile>> {
+        self.classes.get(class_name).map(Rc::clone)
+    }
+
+    // TODO: do we need it?
+    pub fn new_stack(&self) -> Stack {
+        Stack::new()
+    }
+
+    pub fn invoke(
+        &mut self,
+        stack: &mut Stack,
+        class_and_method: ClassAndMethod,
+        object: Option<ObjectRef>,
+        args: Vec<Value>,
+    ) -> Result<Option<Value>, VmError> {
         if object.is_none() {
             if !class_and_method.method.flags.contains(MethodFlags::STATIC) {
                 return Err(VmError::NullPointerException);
             }
             println!("invoking static");
 
-            let mut frame = stack.add_frame(class_and_method, object, args);
-            let result = frame.borrow_mut().execute();
-            result
+            let frame = stack.add_frame(class_and_method, object, args);
+            let result = frame.borrow_mut().execute(self);
+            Ok(None)
         } else {
             Ok(None)
         }
     }
-}
 
-impl Vm {
-    pub fn load_class(&mut self, class_file: ClassFile) {
-        self.classes.insert(class_file.name.clone(), class_file);
-    }
+    pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef, VmError> {
+        debug!("allocating new instance of {}", class_name);
 
-    pub fn find_class(&self, class_name: &str) -> Option<&ClassFile> {
-        self.classes.get(class_name)
-    }
-}
-
-impl Vm {
-    pub fn new() -> Vm {
-        Default::default()
+        let instance = self
+            .classes
+            .get(class_name)
+            .ok_or(VmError::ClassNotFoundException)
+            .map(|class| ObjectValue {
+                class: Rc::clone(class),
+                fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
+            })?;
+        let instance = Rc::new(RefCell::new(instance));
+        self.heap.push(instance.clone());
+        Ok(instance)
     }
 }

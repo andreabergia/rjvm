@@ -1,4 +1,5 @@
 use std::fmt;
+use std::rc::Rc;
 
 use crate::reader::{
     class_access_flags::ClassAccessFlags, class_file_field::ClassFileField,
@@ -16,7 +17,7 @@ pub struct ClassFile {
     pub superclass: String,
     pub interfaces: Vec<String>,
     pub fields: Vec<ClassFileField>,
-    pub methods: Vec<ClassFileMethod>,
+    pub methods: Vec<Rc<ClassFileMethod>>,
 }
 
 impl ClassFile {
@@ -24,11 +25,12 @@ impl ClassFile {
         &self,
         method_name: &str,
         type_descriptor: &str,
-    ) -> Option<&ClassFileMethod> {
+    ) -> Option<Rc<ClassFileMethod>> {
         // TODO: replace linear search with something faster
         self.methods
             .iter()
             .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
+            .map(|method_rc| method_rc.clone())
     }
 }
 
