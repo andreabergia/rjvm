@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::Formatter;
 use std::str::Chars;
 
 use itertools::Itertools;
@@ -6,11 +8,21 @@ use ClassReaderError::InvalidTypeDescriptor;
 
 use crate::reader::class_reader_error::ClassReaderError;
 
-#[derive(Debug, Clone, PartialEq, strum_macros::Display)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
     Base(BaseType),
     Object(String),
     Array(Box<FieldType>),
+}
+
+impl fmt::Display for FieldType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            FieldType::Base(base) => write!(f, "{base}"),
+            FieldType::Object(class) => f.write_str(class),
+            FieldType::Array(component_type) => write!(f, "{component_type}[]"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, strum_macros::Display)]
@@ -35,7 +47,10 @@ impl FieldType {
         }
     }
 
-   pub fn parse_from(type_descriptor: &str, chars: &mut Chars) -> Result<FieldType, ClassReaderError> {
+    pub fn parse_from(
+        type_descriptor: &str,
+        chars: &mut Chars,
+    ) -> Result<FieldType, ClassReaderError> {
         let first_char = chars
             .next()
             .ok_or(InvalidTypeDescriptor(type_descriptor.to_string()))?;
@@ -146,5 +161,23 @@ mod tests {
             ))))),
             FieldType::parse("[[D")
         );
+    }
+
+    #[test]
+    fn can_format_base_type() {
+        assert_eq!("Long", format!("{}", FieldType::parse("J").unwrap()));
+    }
+
+    #[test]
+    fn can_format_object() {
+        assert_eq!(
+            "java/lang/String",
+            format!("{}", FieldType::parse("Ljava/lang/String;").unwrap())
+        );
+    }
+
+    #[test]
+    fn can_format_array() {
+        assert_eq!("Int[]", format!("{}", FieldType::parse("[I").unwrap()));
     }
 }

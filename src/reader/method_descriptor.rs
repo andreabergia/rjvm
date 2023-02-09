@@ -1,13 +1,27 @@
-use std::str::Chars;
+use std::{fmt, fmt::Formatter, str::Chars};
 
-use crate::reader::class_reader_error::ClassReaderError;
-use crate::reader::class_reader_error::ClassReaderError::InvalidTypeDescriptor;
-use crate::reader::field_type::FieldType;
+use itertools::Itertools;
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::reader::{
+    class_reader_error::ClassReaderError,
+    class_reader_error::ClassReaderError::InvalidTypeDescriptor, field_type::FieldType,
+};
+
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct MethodDescriptor {
     pub parameters: Vec<FieldType>,
     pub return_type: Option<FieldType>,
+}
+
+impl fmt::Display for MethodDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("(")?;
+        f.write_str(&self.parameters.iter().join(", "))?;
+        match &self.return_type {
+            Some(field_type) => write!(f, ") -> {field_type}"),
+            None => f.write_str(") -> void"),
+        }
+    }
 }
 
 impl MethodDescriptor {
@@ -135,6 +149,25 @@ mod tests {
                 return_type: Some(FieldType::Array(Box::new(FieldType::Base(BaseType::Long)))),
             }),
             MethodDescriptor::parse("(Ljava/lang/String;I)[J"),
+        );
+    }
+
+    #[test]
+    fn can_format_void_to_void() {
+        assert_eq!(
+            "() -> void",
+            format!("{}", MethodDescriptor::parse("()V").unwrap())
+        );
+    }
+
+    #[test]
+    fn can_format_parameters_to_return_type() {
+        assert_eq!(
+            "(java/lang/String, Int) -> Long[]",
+            format!(
+                "{}",
+                MethodDescriptor::parse("(Ljava/lang/String;I)[J").unwrap()
+            )
         );
     }
 }
