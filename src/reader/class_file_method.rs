@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
+use crate::reader::method_descriptor::MethodDescriptor;
 use crate::reader::{attribute::Attribute, instruction::Instruction, method_flags::MethodFlags};
 
 #[derive(Debug, Default, PartialEq)]
@@ -8,6 +9,7 @@ pub struct ClassFileMethod {
     pub flags: MethodFlags,
     pub name: String,
     pub type_descriptor: String,
+    pub parsed_type_descriptor: MethodDescriptor,
     pub attributes: Vec<Attribute>,
     pub code: ClassFileMethodCode,
 }
@@ -17,7 +19,7 @@ impl fmt::Display for ClassFileMethod {
         writeln!(
             f,
             "{:?} {}: {}",
-            self.flags, self.name, self.type_descriptor,
+            self.flags, self.name, self.parsed_type_descriptor,
         )?;
         writeln!(f, "  code: {}", self.code)?;
         write!(f, "  raw_attributes: {:?}", self.attributes)

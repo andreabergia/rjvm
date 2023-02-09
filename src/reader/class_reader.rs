@@ -4,6 +4,7 @@ use std::{fs::File, io::Read, path::Path};
 use log::warn;
 use result::prelude::*;
 
+use crate::reader::method_descriptor::MethodDescriptor;
 use crate::{
     reader::{
         attribute::Attribute,
@@ -300,6 +301,7 @@ impl<'a> ClassFileReader<'a> {
         let name = self.read_string_reference(name_constant_index)?;
         let type_constant_index = self.buffer.read_u16()?;
         let type_descriptor = self.read_string_reference(type_constant_index)?;
+        let parsed_type_descriptor = MethodDescriptor::parse(&type_descriptor)?;
         let raw_attributes = self.read_raw_attributes()?;
         let code = self.extract_code(&raw_attributes)?;
 
@@ -307,6 +309,7 @@ impl<'a> ClassFileReader<'a> {
             flags,
             name,
             type_descriptor,
+            parsed_type_descriptor,
             attributes: raw_attributes,
             code,
         })
