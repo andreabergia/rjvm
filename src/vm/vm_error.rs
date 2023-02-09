@@ -10,6 +10,9 @@ pub enum VmError {
     #[error("class not found: {0}")]
     ClassNotFoundException(String),
 
+    #[error("method not found: {0}.{1}#{2}")]
+    MethodNotFoundException(String, String, String),
+    
     #[error("validation exception - invalid class file")]
     ValidationException,
 

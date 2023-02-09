@@ -122,11 +122,16 @@ impl CallFrame {
                 OpCode::Invokespecial => {
                     let constant_index = instruction.argument_u16(0)?;
                     let method_reference = self.get_constant_method_reference(constant_index)?;
+
+                    let class = vm.get_class(method_reference.class_name)?;
+                    let method = class.get_method(
+                        method_reference.method_name,
+                        method_reference.type_descriptor,
+                    )?;
+
                     warn!(
                         "TODO: should invoke method {}.{} of type {}",
-                        method_reference.class_name,
-                        method_reference.method_name,
-                        method_reference.type_descriptor
+                        class.name, method.name, method.parsed_type_descriptor,
                     );
                     return Err(VmError::NotImplemented);
                 }
@@ -240,6 +245,11 @@ impl Vm {
         self.classes.get(class_name).map(Rc::clone)
     }
 
+    pub fn get_class(&self, class_name: &str) -> Result<Rc<ClassFile>, VmError> {
+        self.find_class(class_name)
+            .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
+    }
+
     // TODO: do we need it?
     pub fn new_stack(&self) -> Stack {
         Stack::new()
@@ -260,14 +270,10 @@ impl Vm {
     pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef, VmError> {
         debug!("allocating new instance of {}", class_name);
 
-        let instance = self
-            .classes
-            .get(class_name)
-            .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
-            .map(|class| ObjectValue {
-                class: Rc::clone(class),
-                fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
-            })?;
+        let instance = self.get_class(class_name).map(|class| ObjectValue {
+            class: Rc::clone(&class),
+            fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
+        })?;
         let instance = Rc::new(RefCell::new(instance));
         self.heap.push(instance.clone());
         Ok(instance)
