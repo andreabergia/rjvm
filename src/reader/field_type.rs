@@ -35,7 +35,7 @@ impl FieldType {
         }
     }
 
-    fn parse_from(type_descriptor: &str, chars: &mut Chars) -> Result<FieldType, ClassReaderError> {
+   pub fn parse_from(type_descriptor: &str, chars: &mut Chars) -> Result<FieldType, ClassReaderError> {
         let first_char = chars
             .next()
             .ok_or(InvalidTypeDescriptor(type_descriptor.to_string()))?;
