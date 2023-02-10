@@ -126,8 +126,25 @@ impl CallFrame {
             self.pc += 1;
 
             match instruction.op_code {
+                OpCode::Aload => {
+                    let index = instruction.argument(0)?.into_usize_safe();
+                    let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+                    self.stack.push(local.clone());
+                }
                 OpCode::Aload_0 => {
                     let local = self.locals.get(0).ok_or(VmError::ValidationException)?;
+                    self.stack.push(local.clone());
+                }
+                OpCode::Aload_1 => {
+                    let local = self.locals.get(1).ok_or(VmError::ValidationException)?;
+                    self.stack.push(local.clone());
+                }
+                OpCode::Aload_2 => {
+                    let local = self.locals.get(2).ok_or(VmError::ValidationException)?;
+                    self.stack.push(local.clone());
+                }
+                OpCode::Aload_3 => {
+                    let local = self.locals.get(3).ok_or(VmError::ValidationException)?;
                     self.stack.push(local.clone());
                 }
 
