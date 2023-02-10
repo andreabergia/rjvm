@@ -80,6 +80,13 @@ struct MethodReference<'a> {
 }
 
 #[derive(Debug)]
+struct FieldReference<'a> {
+    class_name: &'a str,
+    field_name: &'a str,
+    type_descriptor: &'a str,
+}
+
+#[derive(Debug)]
 pub struct CallFrame {
     class_and_method: ClassAndMethod,
     pc: usize,
@@ -185,6 +192,21 @@ impl CallFrame {
                     self.stack.push(self.get_local_int(3)?.clone());
                 }
 
+                OpCode::Putfield => {
+                    let field_index = instruction.arguments_u16(0)?;
+                    let field_reference = self.get_constant_field_reference(field_index)?;
+
+                    // TODO: validate class? How do super classes work?
+                    let (index, field) = self
+                        .class_and_method
+                        .class
+                        .get_field(field_reference.field_name)?;
+
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.validate_type(Some(field.type_descriptor.clone()), &Some(value.clone()))?;
+                    self.locals[index] = value;
+                }
+
                 _ => {
                     warn!("Unsupported op code: {}", instruction.op_code);
                     return Err(VmError::NotImplemented);
@@ -232,6 +254,30 @@ impl CallFrame {
                 return Ok(MethodReference {
                     class_name,
                     method_name,
+                    type_descriptor,
+                });
+            }
+        }
+        Err(VmError::ValidationException)
+    }
+
+    fn get_constant_field_reference(&self, constant_index: u16) -> Result<FieldReference, VmError> {
+        let constant = self.get_constant(constant_index)?;
+        if let &ConstantPoolEntry::FieldReference(
+            class_name_index,
+            name_and_type_descriptor_index,
+        ) = constant
+        {
+            let class_name = self.get_constant_class_reference(class_name_index)?;
+            let constant = self.get_constant(name_and_type_descriptor_index)?;
+            if let &ConstantPoolEntry::NameAndTypeDescriptor(name_index, type_descriptor_index) =
+                constant
+            {
+                let field_name = self.get_constant_utf8(name_index)?;
+                let type_descriptor = self.get_constant_utf8(type_descriptor_index)?;
+                return Ok(FieldReference {
+                    class_name,
+                    field_name,
                     type_descriptor,
                 });
             }

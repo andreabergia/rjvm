@@ -12,7 +12,10 @@ pub enum VmError {
 
     #[error("method not found: {0}.{1}#{2}")]
     MethodNotFoundException(String, String, String),
-    
+
+    #[error("field not found: {0}.{1}")]
+    FieldNotFoundException(String, String),
+
     #[error("validation exception - invalid class file")]
     ValidationException,
 

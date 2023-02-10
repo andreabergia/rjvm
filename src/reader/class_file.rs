@@ -46,6 +46,22 @@ impl ClassFile {
                 type_descriptor.to_string(),
             ))
     }
+
+    pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
+        // TODO: replace linear search with something faster
+        self.fields
+            .iter()
+            .enumerate()
+            .find(|entry| entry.1.name == field_name)
+    }
+
+    pub fn get_field(&self, field_name: &str) -> Result<(usize, &ClassFileField), VmError> {
+        self.find_field(field_name)
+            .ok_or(VmError::FieldNotFoundException(
+                self.name.to_string(),
+                field_name.to_string(),
+            ))
+    }
 }
 
 impl fmt::Display for ClassFile {
