@@ -1,7 +1,5 @@
 extern crate rjvm;
 
-use rjvm::vm::class_and_method::ClassAndMethod;
-
 mod utils;
 
 #[test_log::test]
@@ -15,7 +13,7 @@ fn can_execute_real_code() {
         .find_class_method("rjvm/SimpleMain", "main", "([Ljava/lang/String;)V")
         .expect("should find main method");
 
-    let mut stack = vm.new_stack();
+    let mut stack = vm.allocate_stack();
     let main_result = vm.invoke(&mut stack, main_method, None, vec![]);
     print!("result: {main_result:?}");
     assert!(main_result.is_ok());

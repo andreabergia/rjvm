@@ -339,7 +339,7 @@ impl CallFrame {
 
     fn pop_int(stack: &mut Vec<Value>) -> Result<i32, VmError> {
         let value = stack.pop().ok_or(VmError::ValidationException)?;
-        Self::validate_type(Some(FieldType::Base(BaseType::Int)), &Some(value.clone()))?;
+        Self::validate_type(Some(Base(BaseType::Int)), &Some(value.clone()))?;
         match value {
             Value::Int(int) => Ok(int),
             _ => Err(VmError::ValidationException),
@@ -506,10 +506,7 @@ impl CallFrame {
     fn get_local_int(&self, index: usize) -> Result<&Value, VmError> {
         // TODO: short, char, byte should (probably?) to be modelled as int
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        Self::validate_type(
-            Some(FieldType::Base(BaseType::Int)),
-            &Some(variable.clone()),
-        )?;
+        Self::validate_type(Some(Base(BaseType::Int)), &Some(variable.clone()))?;
         Ok(variable)
     }
 
@@ -570,8 +567,13 @@ impl Vm {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
     }
-    
-    pub fn find_class_method(&self, class_name: &str, method_name: &str, method_type_descriptor: &str) -> Option<ClassAndMethod> {
+
+    pub fn find_class_method(
+        &self,
+        class_name: &str,
+        method_name: &str,
+        method_type_descriptor: &str,
+    ) -> Option<ClassAndMethod> {
         self.find_class(class_name).and_then(|class| {
             class
                 .find_method(method_name, method_type_descriptor)
@@ -580,7 +582,7 @@ impl Vm {
     }
 
     // TODO: do we need it?
-    pub fn new_stack(&self) -> Stack {
+    pub fn allocate_stack(&self) -> Stack {
         Stack::new()
     }
 
