@@ -1,15 +1,15 @@
 extern crate rjvm_reader;
 
+use rjvm_reader::utils;
 use rjvm_reader::{
     class_file_field::{ClassFileField, FieldConstantValue},
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
 };
-use rjvm_reader::utils;
 
 #[test_log::test]
 fn can_read_constants() {
-    let class = utils::read_class_from_file("rjvm/Constants");
+    let class = utils::read_class_from_bytes(include_bytes!("resources/rjvm/Constants.class"));
     assert_eq!(
         vec!(
             ClassFileField {

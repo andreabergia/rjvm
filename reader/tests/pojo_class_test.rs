@@ -9,11 +9,12 @@ use rjvm_reader::{
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
     method_flags::MethodFlags,
+    utils,
 };
 
 #[test_log::test]
 fn can_read_pojo_class_file() {
-    let class = rjvm_reader::utils::read_class_from_file("rjvm/Complex");
+    let class = utils::read_class_from_bytes(include_bytes!("resources/rjvm/Complex.class"));
     assert_eq!(ClassFileVersion::Jdk6, class.version);
     assert_eq!(
         ClassAccessFlags::PUBLIC | ClassAccessFlags::SUPER,
