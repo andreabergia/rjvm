@@ -61,7 +61,7 @@ impl Instruction {
             .map(|byte_ref| *byte_ref)
     }
 
-    pub fn argument_u16(&self, index: usize) -> Result<u16, ClassReaderError> {
+    pub fn arguments_u16(&self, index: usize) -> Result<u16, ClassReaderError> {
         let index_byte_1 = self.argument(index)? as u16;
         let index_byte_2 = self.argument(index + 1)? as u16;
         Ok((index_byte_1 << 8) | index_byte_2)

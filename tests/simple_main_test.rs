@@ -5,7 +5,7 @@ use rjvm::vm::class_and_method::ClassAndMethod;
 mod utils;
 
 #[test_log::test]
-fn can_read_simple_main() {
+fn can_execute_real_code() {
     let class_simple_main = utils::read_class_from_file("rjvm/SimpleMain");
     let class_generator = utils::read_class_from_file("rjvm/SimpleMain$Generator");
     let class_java_lang_object = utils::read_class_from_file("jre-8-rt/java/lang/Object");

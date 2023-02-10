@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use log::{debug, warn};
 
-use crate::reader::field_type::FieldType;
+use crate::reader::field_type::{BaseType, FieldType};
 use crate::vm::value::Value::Object;
 use crate::{
     reader::{
@@ -125,7 +125,7 @@ impl CallFrame {
                 }
 
                 OpCode::New => {
-                    let constant_index = instruction.argument_u16(0)?;
+                    let constant_index = instruction.arguments_u16(0)?;
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
                     let new_object = vm.new_object(new_object_class_name)?;
@@ -154,7 +154,7 @@ impl CallFrame {
                     let method_return_type = class_and_method.return_type();
                     let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-                    self.validate_return_type(method_return_type, &result)?;
+                    self.validate_type(method_return_type, &result)?;
                     if let Some(value) = result {
                         self.stack.push(value);
                     }
@@ -166,6 +166,23 @@ impl CallFrame {
                     }
                     self.debug_done_execution(None);
                     return Ok(None);
+                }
+
+                OpCode::Iload => {
+                    let index = instruction.argument(0)?.into_usize_safe();
+                    self.stack.push(self.get_local_int(index)?.clone());
+                }
+                OpCode::Iload_0 => {
+                    self.stack.push(self.get_local_int(0)?.clone());
+                }
+                OpCode::Iload_1 => {
+                    self.stack.push(self.get_local_int(1)?.clone());
+                }
+                OpCode::Iload_2 => {
+                    self.stack.push(self.get_local_int(2)?.clone());
+                }
+                OpCode::Iload_3 => {
+                    self.stack.push(self.get_local_int(3)?.clone());
                 }
 
                 _ => {
@@ -236,7 +253,7 @@ impl CallFrame {
         vm: &Vm,
         instruction: &Instruction,
     ) -> Result<ClassAndMethod, VmError> {
-        let constant_index = instruction.argument_u16(0)?;
+        let constant_index = instruction.arguments_u16(0)?;
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
         let class = vm.get_class(method_reference.class_name)?;
@@ -285,20 +302,20 @@ impl CallFrame {
         }
     }
 
-    fn validate_return_type(
+    fn validate_type(
         &self,
-        method_return_type: Option<FieldType>,
-        result: &Option<Value>,
+        expected_type: Option<FieldType>,
+        value: &Option<Value>,
     ) -> Result<(), VmError> {
-        match method_return_type {
-            None => match result {
+        match expected_type {
+            None => match value {
                 None => Ok(()),
                 Some(_) => Err(VmError::ValidationException),
             },
-            Some(method_return_type) => match result {
+            Some(expected_type) => match value {
                 None => Err(VmError::ValidationException),
-                Some(result) => {
-                    if result.matches_type(method_return_type) {
+                Some(value) => {
+                    if value.matches_type(expected_type) {
                         Ok(())
                     } else {
                         Err(VmError::ValidationException)
@@ -306,6 +323,16 @@ impl CallFrame {
                 }
             },
         }
+    }
+
+    fn get_local_int(&self, index: usize) -> Result<&Value, VmError> {
+        // TODO: short, char, byte should (probably?) to be modelled as int
+        let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        self.validate_type(
+            Some(FieldType::Base(BaseType::Int)),
+            &Some(variable.clone()),
+        )?;
+        Ok(variable)
     }
 
     fn debug_start_execution(&self) {
