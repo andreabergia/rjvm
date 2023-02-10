@@ -5,8 +5,6 @@ use log::info;
 use crate::reader::class_file::ClassFile;
 use crate::reader::class_reader;
 
-pub mod buffer;
-
 pub fn read_class_from_file(file: &str) -> ClassFile {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests/resources");

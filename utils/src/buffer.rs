@@ -1,11 +1,21 @@
 use cesu8::from_java_cesu8;
-
-use crate::reader::class_reader_error::{ClassReaderError, Result};
+use thiserror::Error;
 
 pub struct Buffer<'a> {
     buffer: &'a [u8],
     position: usize,
 }
+
+#[derive(Error, Debug, PartialEq)]
+pub enum BufferError {
+    #[error("unexpected end of class file")]
+    UnexpectedEndOfClassFile,
+
+    #[error("invalid cesu8 string")]
+    InvalidCesu8String,
+}
+
+type Result<T> = std::result::Result<T, BufferError>;
 
 impl<'a> Buffer<'a> {
     pub fn new(data: &'a [u8]) -> Self {
@@ -17,9 +27,7 @@ impl<'a> Buffer<'a> {
 
     fn advance(&mut self, size: usize) -> Result<&'a [u8]> {
         if self.position + size > self.buffer.len() {
-            Err(ClassReaderError::InvalidClassData(
-                "class does not have expected length".to_string(),
-            ))
+            Err(BufferError::UnexpectedEndOfClassFile)
         } else {
             let slice = &self.buffer[self.position..self.position + size];
             self.position += size;
@@ -64,11 +72,7 @@ impl<'a> Buffer<'a> {
 
     pub fn read_utf8(&mut self, len: usize) -> Result<String> {
         self.advance(len)
-            .and_then(|bytes| {
-                from_java_cesu8(bytes).map_err(|_| {
-                    ClassReaderError::InvalidClassData("invalid utf8 data".to_string())
-                })
-            })
+            .and_then(|bytes| from_java_cesu8(bytes).map_err(|_| BufferError::InvalidCesu8String))
             .map(|cow_string| cow_string.into_owned())
     }
 
@@ -84,7 +88,7 @@ impl<'a> Buffer<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::buffer::Buffer;
+    use crate::buffer::Buffer;
 
     #[test]
     fn buffer_works() {

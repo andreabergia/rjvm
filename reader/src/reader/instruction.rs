@@ -5,7 +5,7 @@ use crate::reader::class_reader_error::ClassReaderError;
 use crate::reader::class_reader_error::ClassReaderError::UnsupportedInstruction;
 use crate::reader::opcodes::InstructionLength::Fixed;
 use crate::reader::opcodes::{InstructionLength, OpCode};
-use crate::utils::buffer::Buffer;
+use rjvm_utils::buffer::Buffer;
 
 #[derive(Debug, PartialEq)]
 pub struct Instruction {

@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use crate::reader::constant_pool::InvalidConstantPoolIndexError;
 use crate::reader::opcodes::OpCode;
+use rjvm_utils::buffer::BufferError;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ClassReaderError {
@@ -35,5 +36,18 @@ impl From<InvalidConstantPoolIndexError> for ClassReaderError {
 impl From<std::io::Error> for ClassReaderError {
     fn from(err: std::io::Error) -> Self {
         Self::IoError(format!("{err}"))
+    }
+}
+
+impl From<BufferError> for ClassReaderError {
+    fn from(err: BufferError) -> Self {
+        match err {
+            BufferError::UnexpectedEndOfClassFile => {
+                Self::InvalidClassData("unexpected end of class file".to_string())
+            }
+            BufferError::InvalidCesu8String => {
+                Self::InvalidClassData("invalid cesu8 string".to_string())
+            }
+        }
     }
 }

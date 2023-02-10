@@ -5,26 +5,23 @@ use log::warn;
 use result::prelude::*;
 
 use crate::reader::method_descriptor::MethodDescriptor;
-use crate::{
-    reader::{
-        attribute::Attribute,
-        class_access_flags::ClassAccessFlags,
-        class_file::ClassFile,
-        class_file_field::{ClassFileField, FieldConstantValue},
-        class_file_method::{ClassFileMethod, ClassFileMethodCode},
-        class_file_version::ClassFileVersion,
-        class_reader_error::ClassReaderError::InvalidClassData,
-        class_reader_error::Result,
-        constant_pool::ConstantPool,
-        constant_pool::ConstantPoolEntry,
-        field_flags::FieldFlags,
-        field_type::FieldType,
-        instruction::Instruction,
-        method_flags::MethodFlags,
-    },
-    utils::buffer::Buffer,
+use crate::reader::{
+    attribute::Attribute,
+    class_access_flags::ClassAccessFlags,
+    class_file::ClassFile,
+    class_file_field::{ClassFileField, FieldConstantValue},
+    class_file_method::{ClassFileMethod, ClassFileMethodCode},
+    class_file_version::ClassFileVersion,
+    class_reader_error::ClassReaderError::InvalidClassData,
+    class_reader_error::Result,
+    constant_pool::ConstantPool,
+    constant_pool::ConstantPoolEntry,
+    field_flags::FieldFlags,
+    field_type::FieldType,
+    instruction::Instruction,
+    method_flags::MethodFlags,
 };
-use rjvm_utils::type_conversion::ToUsizeSafe;
+use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
 struct ClassFileReader<'a> {
     buffer: Buffer<'a>,
@@ -57,7 +54,7 @@ impl<'a> ClassFileReader<'a> {
         match self.buffer.read_u32() {
             Ok(0xCAFEBABE) => Ok(()),
             Ok(_) => Err(InvalidClassData("invalid magic number".to_owned())),
-            Err(err) => Err(err),
+            Err(err) => Err(err.into()),
         }
     }
 
@@ -112,22 +109,35 @@ impl<'a> ClassFileReader<'a> {
         self.buffer
             .read_utf8(len as usize)
             .map(ConstantPoolEntry::Utf8)
+            .map_err(|err| err.into())
     }
 
     fn read_int_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_i32().map(ConstantPoolEntry::Integer)
+        self.buffer
+            .read_i32()
+            .map(ConstantPoolEntry::Integer)
+            .map_err(|err| err.into())
     }
 
     fn read_float_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_f32().map(ConstantPoolEntry::Float)
+        self.buffer
+            .read_f32()
+            .map(ConstantPoolEntry::Float)
+            .map_err(|err| err.into())
     }
 
     fn read_long_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_i64().map(ConstantPoolEntry::Long)
+        self.buffer
+            .read_i64()
+            .map(ConstantPoolEntry::Long)
+            .map_err(|err| err.into())
     }
 
     fn read_double_constant(&mut self) -> Result<ConstantPoolEntry> {
-        self.buffer.read_f64().map(ConstantPoolEntry::Double)
+        self.buffer
+            .read_f64()
+            .map(ConstantPoolEntry::Double)
+            .map_err(|err| err.into())
     }
 
     fn read_class_reference_constant(&mut self) -> Result<ConstantPoolEntry> {
