@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use log::{debug, warn};
 
+use crate::reader::field_type::FieldType;
 use crate::vm::value::Value::Object;
 use crate::{
     reader::{
@@ -121,44 +122,17 @@ impl CallFrame {
                 OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
 
                 OpCode::Invokespecial => {
-                    let constant_index = instruction.argument_u16(0)?;
-                    let method_reference = self.get_constant_method_reference(constant_index)?;
+                    let class_and_method = self.get_method_to_invoke(vm, instruction)?;
+                    let (receiver, params, new_stack_len) =
+                        self.get_method_receiver_and_params(&class_and_method)?;
+                    self.stack.truncate(new_stack_len);
 
-                    let class = vm.get_class(method_reference.class_name)?;
-                    let method = class.get_method(
-                        method_reference.method_name,
-                        method_reference.type_descriptor,
-                    )?;
-                    let class_and_method = ClassAndMethod { class, method };
+                    let method_return_type = class_and_method.return_type();
+                    let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-                    let stack_len = self.stack.len();
-                    let num_params = class_and_method.num_arguments();
-                    if stack_len < (1 + num_params) {
-                        return Err(VmError::ValidationException);
-                    }
-
-                    let receiver = self.get_object_from_stack(
-                        stack_len - num_params - 1,
-                        &class_and_method.class,
-                    )?;
-                    let params = Vec::from(&self.stack[stack_len - num_params..stack_len]);
-                    self.stack.truncate(stack_len - num_params - 1);
-
-                    let method_return_type = class_and_method
-                        .method
-                        .parsed_type_descriptor
-                        .return_type
-                        .clone();
-                    let result = vm.invoke(stack, class_and_method, Some(receiver), params)?;
-                    if method_return_type.is_none() {
-                        if result.is_some() {
-                            return Err(VmError::ValidationException);
-                        }
-                    } else {
-                        if result.is_none() {
-                            return Err(VmError::ValidationException);
-                        }
-                        self.stack.push(result.unwrap());
+                    self.validate_return_type(method_return_type, &result)?;
+                    if let Some(value) = result {
+                        self.stack.push(value);
                     }
                 }
 
@@ -225,6 +199,45 @@ impl CallFrame {
         }
     }
 
+    fn get_method_to_invoke(
+        &self,
+        vm: &Vm,
+        instruction: &Instruction,
+    ) -> Result<ClassAndMethod, VmError> {
+        let constant_index = instruction.argument_u16(0)?;
+        let method_reference = self.get_constant_method_reference(constant_index)?;
+
+        let class = vm.get_class(method_reference.class_name)?;
+        let method = class.get_method(
+            method_reference.method_name,
+            method_reference.type_descriptor,
+        )?;
+        Ok(ClassAndMethod { class, method })
+    }
+
+    fn get_method_receiver_and_params(
+        &self,
+        class_and_method: &ClassAndMethod,
+    ) -> Result<(Option<ObjectRef>, Vec<Value>, usize), VmError> {
+        let cur_stack_len = self.stack.len();
+        let num_params = class_and_method.num_arguments();
+        if cur_stack_len < (1 + num_params) {
+            return Err(VmError::ValidationException);
+        }
+
+        let receiver =
+            if class_and_method.is_static() {
+                None
+            } else {
+                Some(self.get_object_from_stack(
+                    cur_stack_len - num_params - 1,
+                    &class_and_method.class,
+                )?)
+            };
+        let params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
+        Ok((receiver, params, cur_stack_len - num_params - 1))
+    }
+
     fn get_object_from_stack(
         &self,
         index: usize,
@@ -240,6 +253,29 @@ impl CallFrame {
                 }
             }
             _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn validate_return_type(
+        &self,
+        method_return_type: Option<FieldType>,
+        result: &Option<Value>,
+    ) -> Result<(), VmError> {
+        match method_return_type {
+            None => match result {
+                None => Ok(()),
+                Some(_) => Err(VmError::ValidationException),
+            },
+            Some(method_return_type) => match result {
+                None => Err(VmError::ValidationException),
+                Some(result) => {
+                    if result.matches_type(method_return_type) {
+                        Ok(())
+                    } else {
+                        Err(VmError::ValidationException)
+                    }
+                }
+            },
         }
     }
 

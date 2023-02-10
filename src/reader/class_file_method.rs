@@ -26,6 +26,12 @@ impl fmt::Display for ClassFileMethod {
     }
 }
 
+impl ClassFileMethod {
+    pub fn is_static(&self) -> bool {
+        self.flags.contains(MethodFlags::STATIC)
+    }
+}
+
 #[derive(Debug, Default, PartialEq)]
 pub struct ClassFileMethodCode {
     pub max_stack: u16,
