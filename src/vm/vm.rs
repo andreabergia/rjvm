@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use log::{debug, warn};
+use log::{debug, info, warn};
 
 use crate::reader::field_type::FieldType::Base;
 use crate::reader::field_type::{BaseType, FieldType};
@@ -48,6 +48,7 @@ impl Stack {
         if class_and_method.is_native() {
             return Err(VmError::NotImplemented);
         };
+
         let code = &class_and_method.method.code.as_ref().unwrap();
 
         let mut locals: Vec<Value> = receiver
@@ -198,6 +199,21 @@ impl CallFrame {
                 OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
 
                 OpCode::Invokespecial => {
+                    let class_and_method = self.get_method_to_invoke(vm, instruction)?;
+                    let (receiver, params, new_stack_len) =
+                        self.get_method_receiver_and_params(&class_and_method)?;
+                    self.stack.truncate(new_stack_len);
+
+                    let method_return_type = class_and_method.return_type();
+                    let result = vm.invoke(stack, class_and_method, receiver, params)?;
+
+                    Self::validate_type(method_return_type, &result)?;
+                    if let Some(value) = result {
+                        self.stack.push(value);
+                    }
+                }
+
+                OpCode::Invokestatic => {
                     let class_and_method = self.get_method_to_invoke(vm, instruction)?;
                     let (receiver, params, new_stack_len) =
                         self.get_method_receiver_and_params(&class_and_method)?;
@@ -428,22 +444,26 @@ impl CallFrame {
         class_and_method: &ClassAndMethod,
     ) -> Result<(Option<ObjectRef>, Vec<Value>, usize), VmError> {
         let cur_stack_len = self.stack.len();
+        let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
         let num_params = class_and_method.num_arguments();
-        if cur_stack_len < (1 + num_params) {
+        if cur_stack_len < (receiver_count + num_params) {
             return Err(VmError::ValidationException);
         }
 
-        let receiver =
-            if class_and_method.is_static() {
-                None
-            } else {
-                Some(self.get_object_from_stack(
-                    cur_stack_len - num_params - 1,
-                    &class_and_method.class,
-                )?)
-            };
+        let receiver = if class_and_method.is_static() {
+            None
+        } else {
+            Some(self.get_object_from_stack(
+                cur_stack_len - num_params - receiver_count,
+                &class_and_method.class,
+            )?)
+        };
         let params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
-        Ok((receiver, params, cur_stack_len - num_params - 1))
+        Ok((
+            receiver,
+            params,
+            cur_stack_len - num_params - receiver_count,
+        ))
     }
 
     fn get_object_from_stack(
@@ -563,6 +583,18 @@ impl Vm {
         object: Option<ObjectRef>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, VmError> {
+        if class_and_method.method.is_native() {
+            if class_and_method.class.name == "rjvm/SimpleMain"
+                && class_and_method.method.name == "tempPrint"
+            {
+                let arg = args.get(0).ok_or(VmError::ValidationException)?;
+                info!("TEMP implementation of native method: printing value {arg:?}");
+                return Ok(None);
+            } else {
+                return Err(VmError::NotImplemented);
+            }
+        }
+
         let frame = stack.add_frame(class_and_method, object, args)?;
         let result = frame.borrow_mut().execute(self, stack);
         stack.pop_frame()?;

@@ -3,9 +3,11 @@ package rjvm;
 public class SimpleMain {
     public static void main(String[] args) {
         Generator g = new Generator(0, 3);
-        g.next();
-        g.next();
+        tempPrint(g.next());
+        tempPrint(g.next());
     }
+
+    private static native void tempPrint(int value);
 
     static class Generator {
         private int curr;
