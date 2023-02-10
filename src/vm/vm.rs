@@ -131,6 +131,29 @@ impl CallFrame {
                     self.stack.push(local.clone());
                 }
 
+                OpCode::Astore => {
+                    let index = instruction.argument(0)?.into_usize_safe();
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    // TODO: validate is object
+                    self.locals[index] = value;
+                }
+                OpCode::Astore_0 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[0] = value;
+                }
+                OpCode::Astore_1 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[1] = value;
+                }
+                OpCode::Astore_2 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[2] = value;
+                }
+                OpCode::Astore_3 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[3] = value;
+                }
+
                 OpCode::New => {
                     let constant_index = instruction.arguments_u16(0)?;
                     let new_object_class_name =
