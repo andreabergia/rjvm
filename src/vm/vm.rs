@@ -1,9 +1,11 @@
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use log::{debug, warn};
 
+use crate::reader::field_type::FieldType::Base;
 use crate::reader::field_type::{BaseType, FieldType};
 use crate::vm::value::Value::Object;
 use crate::{
@@ -183,6 +185,9 @@ impl CallFrame {
                     let stack_head = self.stack.last().ok_or(VmError::ValidationException)?;
                     self.stack.push(stack_head.clone());
                 }
+                OpCode::Pop => {
+                    self.stack.pop().ok_or(VmError::ValidationException)?;
+                }
 
                 OpCode::Iconst_m1 => self.stack.push(Value::Int(-1)),
                 OpCode::Iconst_0 => self.stack.push(Value::Int(0)),
@@ -201,7 +206,23 @@ impl CallFrame {
                     let method_return_type = class_and_method.return_type();
                     let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-                    self.validate_type(method_return_type, &result)?;
+                    Self::validate_type(method_return_type, &result)?;
+                    if let Some(value) = result {
+                        self.stack.push(value);
+                    }
+                }
+
+                OpCode::Invokevirtual => {
+                    // TODO: should actually go through superclasses to find the correct method
+                    let class_and_method = self.get_method_to_invoke(vm, instruction)?;
+                    let (receiver, params, new_stack_len) =
+                        self.get_method_receiver_and_params(&class_and_method)?;
+                    self.stack.truncate(new_stack_len);
+
+                    let method_return_type = class_and_method.return_type();
+                    let result = vm.invoke(stack, class_and_method, receiver, params)?;
+
+                    Self::validate_type(method_return_type, &result)?;
                     if let Some(value) = result {
                         self.stack.push(value);
                     }
@@ -213,6 +234,14 @@ impl CallFrame {
                     }
                     self.debug_done_execution(None);
                     return Ok(None);
+                }
+                OpCode::Ireturn => {
+                    if !self.class_and_method.returns(Base(BaseType::Int)) {
+                        return Err(VmError::ValidationException);
+                    }
+                    let result = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.debug_done_execution(Some(&result));
+                    return Ok(Some(result));
                 }
 
                 OpCode::Iload => {
@@ -243,8 +272,43 @@ impl CallFrame {
                         .get_field(field_reference.field_name)?;
 
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.validate_type(Some(field.type_descriptor.clone()), &Some(value.clone()))?;
-                    self.locals[index] = value;
+                    Self::validate_type(Some(field.type_descriptor.clone()), &Some(value.clone()))?;
+                    let object = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    if let Object(object_ref) = object {
+                        object_ref.borrow_mut().fields[index] = value;
+                    } else {
+                        return Err(VmError::ValidationException);
+                    }
+                }
+
+                OpCode::Getfield => {
+                    let field_index = instruction.arguments_u16(0)?;
+                    let field_reference = self.get_constant_field_reference(field_index)?;
+
+                    // TODO: validate class? How do super classes work?
+                    let (index, field) = self
+                        .class_and_method
+                        .class
+                        .get_field(field_reference.field_name)?;
+
+                    let object = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    if let Object(object_ref) = object {
+                        let object_ref: &RefCell<ObjectValue> = object_ref.borrow();
+                        let field_value = object_ref.borrow().fields[index].clone();
+                        Self::validate_type(
+                            Some(field.type_descriptor.clone()),
+                            &Some(field_value.clone()),
+                        )?;
+                        self.stack.push(field_value);
+                    } else {
+                        return Err(VmError::ValidationException);
+                    }
+                }
+
+                OpCode::Iadd => {
+                    let i1 = Self::pop_int(&mut self.stack)?;
+                    let i2 = Self::pop_int(&mut self.stack)?;
+                    self.stack.push(Value::Int(i1 + i2));
                 }
 
                 _ => {
@@ -255,6 +319,15 @@ impl CallFrame {
         }
 
         Err(VmError::NullPointerException)
+    }
+
+    fn pop_int(stack: &mut Vec<Value>) -> Result<i32, VmError> {
+        let value = stack.pop().ok_or(VmError::ValidationException)?;
+        Self::validate_type(Some(FieldType::Base(BaseType::Int)), &Some(value.clone()))?;
+        match value {
+            Value::Int(int) => Ok(int),
+            _ => Err(VmError::ValidationException),
+        }
     }
 
     fn get_constant(&self, constant_index: u16) -> Result<&ConstantPoolEntry, VmError> {
@@ -389,7 +462,6 @@ impl CallFrame {
     }
 
     fn validate_type(
-        &self,
         expected_type: Option<FieldType>,
         value: &Option<Value>,
     ) -> Result<(), VmError> {
@@ -414,7 +486,7 @@ impl CallFrame {
     fn get_local_int(&self, index: usize) -> Result<&Value, VmError> {
         // TODO: short, char, byte should (probably?) to be modelled as int
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        self.validate_type(
+        Self::validate_type(
             Some(FieldType::Base(BaseType::Int)),
             &Some(variable.clone()),
         )?;

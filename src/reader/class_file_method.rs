@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
+use crate::reader::field_type::FieldType;
 use crate::reader::method_descriptor::MethodDescriptor;
 use crate::reader::{attribute::Attribute, instruction::Instruction, method_flags::MethodFlags};
 
@@ -36,9 +37,13 @@ impl ClassFileMethod {
     pub fn is_native(&self) -> bool {
         self.flags.contains(MethodFlags::NATIVE)
     }
-    
+
     pub fn is_void(&self) -> bool {
         self.parsed_type_descriptor.return_type.is_none()
+    }
+
+    pub fn returns(&self, expected_type: FieldType) -> bool {
+        self.parsed_type_descriptor.return_type == Some(expected_type)
     }
 }
 
