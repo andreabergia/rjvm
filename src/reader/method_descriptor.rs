@@ -78,6 +78,10 @@ impl MethodDescriptor {
             _ => Err(InvalidTypeDescriptor(descriptor.to_string())),
         }
     }
+
+    pub fn num_arguments(&self) -> usize {
+        self.parameters.len()
+    }
 }
 
 #[cfg(test)]
@@ -168,6 +172,16 @@ mod tests {
                 "{}",
                 MethodDescriptor::parse("(Ljava/lang/String;I)[J").unwrap()
             )
+        );
+    }
+
+    #[test]
+    fn can_get_num_arguments() {
+        assert_eq!(
+            2,
+            MethodDescriptor::parse("(Ljava/lang/String;I)[J")
+                .unwrap()
+                .num_arguments(),
         );
     }
 }

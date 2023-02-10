@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use log::{debug, warn};
 
+use crate::vm::value::Value::Object;
 use crate::{
     reader::{
         class_file::ClassFile, constant_pool::ConstantPoolEntry, instruction::Instruction,
@@ -42,7 +43,7 @@ impl Stack {
         }
 
         let mut locals: Vec<Value> = receiver
-            .map(Value::Object)
+            .map(Object)
             .into_iter()
             .chain(args.into_iter())
             .collect();
@@ -84,7 +85,7 @@ impl CallFrame {
         }
     }
 
-    pub fn execute(&mut self, vm: &mut Vm) -> Result<Option<Value>, VmError> {
+    pub fn execute(&mut self, vm: &mut Vm, stack: &mut Stack) -> Result<Option<Value>, VmError> {
         self.debug_start_execution();
 
         let code = &self.class_and_method.method.code.code;
@@ -103,7 +104,7 @@ impl CallFrame {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
                     let new_object = vm.new_object(new_object_class_name)?;
-                    self.stack.push(Value::Object(new_object));
+                    self.stack.push(Object(new_object));
                 }
 
                 OpCode::Dup => {
@@ -128,12 +129,37 @@ impl CallFrame {
                         method_reference.method_name,
                         method_reference.type_descriptor,
                     )?;
+                    let class_and_method = ClassAndMethod { class, method };
 
-                    warn!(
-                        "TODO: should invoke method {}.{} of type {}",
-                        class.name, method.name, method.parsed_type_descriptor,
-                    );
-                    return Err(VmError::NotImplemented);
+                    let stack_len = self.stack.len();
+                    let num_params = class_and_method.num_arguments();
+                    if stack_len < (1 + num_params) {
+                        return Err(VmError::ValidationException);
+                    }
+
+                    let receiver = self.get_object_from_stack(
+                        stack_len - num_params - 1,
+                        &class_and_method.class,
+                    )?;
+                    let params = Vec::from(&self.stack[stack_len - num_params..stack_len]);
+                    self.stack.truncate(stack_len - num_params - 1);
+
+                    let method_return_type = class_and_method
+                        .method
+                        .parsed_type_descriptor
+                        .return_type
+                        .clone();
+                    let result = vm.invoke(stack, class_and_method, Some(receiver), params)?;
+                    if method_return_type.is_none() {
+                        if result.is_some() {
+                            return Err(VmError::ValidationException);
+                        }
+                    } else {
+                        if result.is_none() {
+                            return Err(VmError::ValidationException);
+                        }
+                        self.stack.push(result.unwrap());
+                    }
                 }
 
                 _ => {
@@ -196,6 +222,24 @@ impl CallFrame {
             Ok(string)
         } else {
             Err(VmError::ValidationException)
+        }
+    }
+
+    fn get_object_from_stack(
+        &self,
+        index: usize,
+        expected_class: &ClassFile,
+    ) -> Result<ObjectRef, VmError> {
+        let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
+        match receiver {
+            Object(object) => {
+                if object.borrow().class.name != expected_class.name {
+                    Err(VmError::ValidationException)
+                } else {
+                    Ok(object.clone())
+                }
+            }
+            _ => Err(VmError::ValidationException),
         }
     }
 
@@ -263,7 +307,7 @@ impl Vm {
         args: Vec<Value>,
     ) -> Result<Option<Value>, VmError> {
         let frame = stack.add_frame(class_and_method, object, args)?;
-        let result = frame.borrow_mut().execute(self);
+        let result = frame.borrow_mut().execute(self, stack);
         result
     }
 

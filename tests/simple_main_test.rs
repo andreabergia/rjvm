@@ -23,6 +23,7 @@ fn can_read_simple_main() {
 
     let mut stack = vm.new_stack();
     let main_result = vm.invoke(&mut stack, main_method, None, vec![]);
+    print!("result: {main_result:?}");
     assert!(main_result.is_ok());
     assert!(main_result.unwrap().is_none());
 }
