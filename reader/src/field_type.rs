@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use ClassReaderError::InvalidTypeDescriptor;
 
-use crate::reader::class_reader_error::ClassReaderError;
+use crate::class_reader_error::ClassReaderError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
@@ -82,7 +82,7 @@ impl FieldType {
 
 #[cfg(test)]
 mod tests {
-    use crate::reader::{
+    use crate::{
         class_reader_error::ClassReaderError,
         field_type::{BaseType, FieldType},
     };

@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use log::info;
 
-use crate::reader::class_file::ClassFile;
-use crate::reader::class_reader;
+use crate::class_file::ClassFile;
+use crate::class_reader;
 
 pub fn read_class_from_file(file: &str) -> ClassFile {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

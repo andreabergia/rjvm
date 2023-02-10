@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
 
-use rjvm_reader::reader::class_file::ClassFile;
-use rjvm_reader::reader::field_type::{BaseType, FieldType};
+use rjvm_reader::class_file::ClassFile;
+use rjvm_reader::field_type::{BaseType, FieldType};
 
 // TODO: do we need short/char/byte? What about boolean?
 #[derive(Debug, Default, Clone)]

@@ -2,7 +2,7 @@ use std::{fmt, fmt::Formatter, str::Chars};
 
 use itertools::Itertools;
 
-use crate::reader::{
+use crate::{
     class_reader_error::ClassReaderError,
     class_reader_error::ClassReaderError::InvalidTypeDescriptor, field_type::FieldType,
 };
@@ -86,9 +86,9 @@ impl MethodDescriptor {
 
 #[cfg(test)]
 mod tests {
-    use crate::reader::class_reader_error::ClassReaderError;
-    use crate::reader::field_type::{BaseType, FieldType};
-    use crate::reader::method_descriptor::MethodDescriptor;
+    use crate::class_reader_error::ClassReaderError;
+    use crate::field_type::{BaseType, FieldType};
+    use crate::method_descriptor::MethodDescriptor;
 
     #[test]
     fn cannot_parse_empty_descriptor() {

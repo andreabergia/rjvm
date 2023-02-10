@@ -4,8 +4,7 @@ use std::{fs::File, io::Read, path::Path};
 use log::warn;
 use result::prelude::*;
 
-use crate::reader::method_descriptor::MethodDescriptor;
-use crate::reader::{
+use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
@@ -19,6 +18,7 @@ use crate::reader::{
     field_flags::FieldFlags,
     field_type::FieldType,
     instruction::Instruction,
+    method_descriptor::MethodDescriptor,
     method_flags::MethodFlags,
 };
 use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
@@ -408,7 +408,7 @@ pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
 
 #[cfg(test)]
 mod tests {
-    use crate::reader::{class_reader::read_buffer, class_reader_error::ClassReaderError};
+    use crate::{class_reader::read_buffer, class_reader_error::ClassReaderError};
 
     #[test]
     fn magic_number_is_required() {

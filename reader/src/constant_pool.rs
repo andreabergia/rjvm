@@ -181,7 +181,7 @@ impl From<InvalidConstantPoolIndexError> for fmt::Error {
 
 #[cfg(test)]
 mod tests {
-    use crate::reader::constant_pool::{
+    use crate::constant_pool::{
         ConstantPool, ConstantPoolEntry, InvalidConstantPoolIndexError,
     };
 

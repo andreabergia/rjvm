@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::reader::{field_flags::FieldFlags, field_type::FieldType};
+use crate::{field_flags::FieldFlags, field_type::FieldType};
 
 #[derive(Debug, PartialEq)]
 pub struct ClassFileField {

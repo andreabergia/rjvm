@@ -1,9 +1,10 @@
 use std::fmt;
 use std::fmt::Formatter;
 
-use crate::reader::field_type::FieldType;
-use crate::reader::method_descriptor::MethodDescriptor;
-use crate::reader::{attribute::Attribute, instruction::Instruction, method_flags::MethodFlags};
+use crate::{
+    attribute::Attribute, field_type::FieldType, instruction::Instruction,
+    method_descriptor::MethodDescriptor, method_flags::MethodFlags,
+};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct ClassFileMethod {

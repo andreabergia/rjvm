@@ -5,16 +5,16 @@ use std::rc::Rc;
 
 use log::{debug, info, warn};
 
-use rjvm_reader::reader::class_file::ClassFile;
-use rjvm_reader::reader::class_file_field::ClassFileField;
-use rjvm_reader::reader::class_file_method::ClassFileMethod;
-use rjvm_reader::reader::constant_pool::ConstantPoolEntry;
-use rjvm_reader::reader::field_type::BaseType;
-use rjvm_reader::reader::field_type::FieldType;
-use rjvm_reader::reader::field_type::FieldType::Base;
-use rjvm_reader::reader::instruction::Instruction;
-use rjvm_reader::reader::method_flags::MethodFlags;
-use rjvm_reader::reader::opcodes::OpCode;
+use rjvm_reader::class_file::ClassFile;
+use rjvm_reader::class_file_field::ClassFileField;
+use rjvm_reader::class_file_method::ClassFileMethod;
+use rjvm_reader::constant_pool::ConstantPoolEntry;
+use rjvm_reader::field_type::BaseType;
+use rjvm_reader::field_type::FieldType;
+use rjvm_reader::field_type::FieldType::Base;
+use rjvm_reader::instruction::Instruction;
+use rjvm_reader::method_flags::MethodFlags;
+use rjvm_reader::opcodes::OpCode;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::class_and_method::ClassAndMethod;

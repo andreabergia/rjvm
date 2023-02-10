@@ -1,6 +1,6 @@
 extern crate rjvm_reader;
 
-use rjvm_reader::reader::{
+use rjvm_reader::{
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
     class_file_field::ClassFileField,
