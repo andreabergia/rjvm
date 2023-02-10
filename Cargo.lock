@@ -302,13 +302,9 @@ dependencies = [
 name = "rjvm_vm"
 version = "0.1.0"
 dependencies = [
- "bitflags",
- "cesu8",
  "env_logger",
  "int-enum",
- "itertools",
  "log",
- "result",
  "rjvm_reader",
  "rjvm_utils",
  "strum",
