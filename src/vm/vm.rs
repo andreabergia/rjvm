@@ -63,6 +63,13 @@ impl Stack {
         self.frames.push(Rc::clone(&new_frame));
         Ok(new_frame)
     }
+
+    pub fn pop_frame(&mut self) -> Result<(), VmError> {
+        self.frames
+            .pop()
+            .map(|_| ())
+            .ok_or(VmError::ValidationException)
+    }
 }
 
 #[derive(Debug)]
@@ -151,6 +158,14 @@ impl CallFrame {
                     if let Some(value) = result {
                         self.stack.push(value);
                     }
+                }
+
+                OpCode::Return => {
+                    if !self.class_and_method.is_void() {
+                        return Err(VmError::ValidationException);
+                    }
+                    self.debug_done_execution(None);
+                    return Ok(None);
                 }
 
                 _ => {
@@ -258,7 +273,7 @@ impl CallFrame {
     fn get_object_from_stack(
         &self,
         index: usize,
-        expected_class: &ClassFile,
+        _expected_class: &ClassFile,
     ) -> Result<ObjectRef, VmError> {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
@@ -314,6 +329,13 @@ impl CallFrame {
             debug!("  - {:?}", local_variable);
         }
     }
+
+    fn debug_done_execution(&self, result: Option<&Value>) {
+        debug!(
+            "completed execution of method {}::{} - result is {:?}",
+            self.class_and_method.class.name, self.class_and_method.method.name, result
+        )
+    }
 }
 
 #[derive(Debug, Default)]
@@ -358,6 +380,7 @@ impl Vm {
     ) -> Result<Option<Value>, VmError> {
         let frame = stack.add_frame(class_and_method, object, args)?;
         let result = frame.borrow_mut().execute(self, stack);
+        stack.pop_frame()?;
         result
     }
 

@@ -36,6 +36,10 @@ impl ClassFileMethod {
     pub fn is_native(&self) -> bool {
         self.flags.contains(MethodFlags::NATIVE)
     }
+    
+    pub fn is_void(&self) -> bool {
+        self.parsed_type_descriptor.return_type.is_none()
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]

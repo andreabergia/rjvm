@@ -25,4 +25,8 @@ impl ClassAndMethod {
     pub fn is_native(&self) -> bool {
         self.method.is_native()
     }
+    
+    pub fn is_void(&self) -> bool {
+        self.method.is_void()
+    }
 }
