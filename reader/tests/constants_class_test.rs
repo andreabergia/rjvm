@@ -5,8 +5,7 @@ use rjvm_reader::reader::{
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
 };
-
-mod utils;
+use rjvm_reader::utils;
 
 #[test_log::test]
 fn can_read_constants() {

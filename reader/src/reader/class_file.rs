@@ -6,7 +6,6 @@ use crate::reader::{
     class_file_method::ClassFileMethod, class_file_version::ClassFileVersion,
     constant_pool::ConstantPool,
 };
-use crate::vm::vm_error::VmError;
 
 /// Represents the content of a .class file.
 #[derive(Debug, Default)]
@@ -34,33 +33,12 @@ impl ClassFile {
             .cloned()
     }
 
-    pub fn get_method(
-        &self,
-        method_name: &str,
-        type_descriptor: &str,
-    ) -> Result<Rc<ClassFileMethod>, VmError> {
-        self.find_method(method_name, type_descriptor)
-            .ok_or(VmError::MethodNotFoundException(
-                self.name.to_string(),
-                method_name.to_string(),
-                type_descriptor.to_string(),
-            ))
-    }
-
     pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
         // TODO: replace linear search with something faster
         self.fields
             .iter()
             .enumerate()
             .find(|entry| entry.1.name == field_name)
-    }
-
-    pub fn get_field(&self, field_name: &str) -> Result<(usize, &ClassFileField), VmError> {
-        self.find_field(field_name)
-            .ok_or(VmError::FieldNotFoundException(
-                self.name.to_string(),
-                field_name.to_string(),
-            ))
     }
 }
 

@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "utils",
-    "reader"
+    "reader",
+    "vm"
 ]

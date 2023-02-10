@@ -5,21 +5,24 @@ use std::rc::Rc;
 
 use log::{debug, info, warn};
 
-use crate::reader::field_type::FieldType::Base;
-use crate::reader::field_type::{BaseType, FieldType};
-use crate::vm::value::Value::Object;
-use crate::{
-    reader::{
-        class_file::ClassFile, constant_pool::ConstantPoolEntry, instruction::Instruction,
-        method_flags::MethodFlags, opcodes::OpCode,
-    },
-    vm::{
-        class_and_method::ClassAndMethod,
-        value::{ObjectRef, ObjectValue, Value},
-        vm_error::VmError,
-    },
-};
+use rjvm_reader::reader::class_file::ClassFile;
+use rjvm_reader::reader::class_file_field::ClassFileField;
+use rjvm_reader::reader::class_file_method::ClassFileMethod;
+use rjvm_reader::reader::constant_pool::ConstantPoolEntry;
+use rjvm_reader::reader::field_type::BaseType;
+use rjvm_reader::reader::field_type::FieldType;
+use rjvm_reader::reader::field_type::FieldType::Base;
+use rjvm_reader::reader::instruction::Instruction;
+use rjvm_reader::reader::method_flags::MethodFlags;
+use rjvm_reader::reader::opcodes::OpCode;
 use rjvm_utils::type_conversion::ToUsizeSafe;
+
+use crate::class_and_method::ClassAndMethod;
+use crate::value::ObjectRef;
+use crate::value::ObjectValue;
+use crate::value::Value;
+use crate::value::Value::Object;
+use crate::vm_error::VmError;
 
 #[derive(Debug, Default)]
 pub struct Stack {
@@ -282,10 +285,8 @@ impl CallFrame {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
                     // TODO: validate class? How do super classes work?
-                    let (index, field) = self
-                        .class_and_method
-                        .class
-                        .get_field(field_reference.field_name)?;
+                    let (index, field) =
+                        Self::get_field(&self.class_and_method.class, field_reference.field_name)?;
 
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
                     Self::validate_type(Some(field.type_descriptor.clone()), &Some(value.clone()))?;
@@ -302,10 +303,8 @@ impl CallFrame {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
                     // TODO: validate class? How do super classes work?
-                    let (index, field) = self
-                        .class_and_method
-                        .class
-                        .get_field(field_reference.field_name)?;
+                    let (index, field) =
+                        Self::get_field(&self.class_and_method.class, field_reference.field_name)?;
 
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
@@ -335,6 +334,18 @@ impl CallFrame {
         }
 
         Err(VmError::NullPointerException)
+    }
+
+    fn get_field<'a>(
+        class: &'a ClassFile,
+        field_name: &str,
+    ) -> Result<(usize, &'a ClassFileField), VmError> {
+        class
+            .find_field(field_name)
+            .ok_or(VmError::FieldNotFoundException(
+                class.name.to_string(),
+                field_name.to_string(),
+            ))
     }
 
     fn pop_int(stack: &mut Vec<Value>) -> Result<i32, VmError> {
@@ -432,11 +443,26 @@ impl CallFrame {
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
         let class = vm.get_class(method_reference.class_name)?;
-        let method = class.get_method(
+        let method = Self::get_method(
+            &class,
             method_reference.method_name,
             method_reference.type_descriptor,
         )?;
         Ok(ClassAndMethod { class, method })
+    }
+
+    fn get_method(
+        class: &ClassFile,
+        method_name: &str,
+        type_descriptor: &str,
+    ) -> Result<Rc<ClassFileMethod>, VmError> {
+        class
+            .find_method(method_name, type_descriptor)
+            .ok_or(VmError::MethodNotFoundException(
+                class.name.to_string(),
+                method_name.to_string(),
+                type_descriptor.to_string(),
+            ))
     }
 
     fn get_method_receiver_and_params(

@@ -1,6 +1,6 @@
-use crate::reader::class_file::ClassFile;
-use crate::reader::class_file_method::ClassFileMethod;
-use crate::reader::field_type::FieldType;
+use rjvm_reader::reader::class_file::ClassFile;
+use rjvm_reader::reader::class_file_method::ClassFileMethod;
+use rjvm_reader::reader::field_type::FieldType;
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]

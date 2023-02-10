@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::reader::class_reader_error::ClassReaderError;
+use rjvm_reader::reader::class_reader_error::ClassReaderError;
 
 #[derive(Debug, Error)]
 pub enum VmError {
