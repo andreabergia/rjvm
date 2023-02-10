@@ -1,10 +1,10 @@
-extern crate rjvm;
+extern crate rjvm_reader;
 
 mod utils;
 
 #[test_log::test]
 fn can_execute_real_code() {
-    let mut vm = rjvm::vm::Vm::new();
+    let mut vm = rjvm_reader::vm::Vm::new();
     vm.load_class(utils::read_class_from_file("rjvm/SimpleMain"));
     vm.load_class(utils::read_class_from_file("rjvm/SimpleMain$Generator"));
     vm.load_class(utils::read_class_from_file("jre-8-rt/java/lang/Object"));

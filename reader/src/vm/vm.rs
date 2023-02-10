@@ -13,13 +13,13 @@ use crate::{
         class_file::ClassFile, constant_pool::ConstantPoolEntry, instruction::Instruction,
         method_flags::MethodFlags, opcodes::OpCode,
     },
-    utils::type_conversion::ToUsizeSafe,
     vm::{
         class_and_method::ClassAndMethod,
         value::{ObjectRef, ObjectValue, Value},
         vm_error::VmError,
     },
 };
+use rjvm_utils::type_conversion::ToUsizeSafe;
 
 #[derive(Debug, Default)]
 pub struct Stack {

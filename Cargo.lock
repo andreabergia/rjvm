@@ -264,7 +264,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "194d8e591e405d1eecf28819740abed6d719d1a2db87fc0bcdedee9a26d55560"
 
 [[package]]
-name = "rjvm"
+name = "rjvm_reader"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "cesu8",
+ "env_logger",
+ "int-enum",
+ "itertools",
+ "log",
+ "result",
+ "rjvm_utils",
+ "strum",
+ "strum_macros",
+ "test-log",
+ "thiserror",
+]
+
+[[package]]
+name = "rjvm_utils"
 version = "0.1.0"
 dependencies = [
  "bitflags",

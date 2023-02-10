@@ -22,8 +22,9 @@ use crate::{
         instruction::Instruction,
         method_flags::MethodFlags,
     },
-    utils::{buffer::Buffer, type_conversion::ToUsizeSafe},
+    utils::buffer::Buffer,
 };
+use rjvm_utils::type_conversion::ToUsizeSafe;
 
 struct ClassFileReader<'a> {
     buffer: Buffer<'a>,

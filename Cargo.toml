@@ -1,2 +1,5 @@
 [workspace]
-members = ["reader"]
+members = [
+    "utils",
+    "reader"
+]

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use log::info;
-use rjvm::reader::class_file::ClassFile;
-use rjvm::reader::class_reader;
+use rjvm_reader::reader::class_file::ClassFile;
+use rjvm_reader::reader::class_reader;
 
 pub fn read_class_from_file(file: &str) -> ClassFile {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
