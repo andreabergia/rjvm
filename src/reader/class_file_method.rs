@@ -23,7 +23,7 @@ impl fmt::Display for ClassFileMethod {
             self.flags, self.name, self.parsed_type_descriptor,
         )?;
         if let Some(code) = &self.code {
-            writeln!(f, "  code: {}", code)?;
+            writeln!(f, "  code: {code}")?;
         }
         write!(f, "  raw_attributes: {:?}", self.attributes)
     }
