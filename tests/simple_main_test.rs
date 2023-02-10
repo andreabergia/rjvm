@@ -6,22 +6,14 @@ mod utils;
 
 #[test_log::test]
 fn can_execute_real_code() {
-    let class_simple_main = utils::read_class_from_file("rjvm/SimpleMain");
-    let class_generator = utils::read_class_from_file("rjvm/SimpleMain$Generator");
-    let class_java_lang_object = utils::read_class_from_file("jre-8-rt/java/lang/Object");
-
     let mut vm = rjvm::vm::Vm::new();
-    vm.load_class(class_simple_main);
-    vm.load_class(class_generator);
-    vm.load_class(class_java_lang_object);
+    vm.load_class(utils::read_class_from_file("rjvm/SimpleMain"));
+    vm.load_class(utils::read_class_from_file("rjvm/SimpleMain$Generator"));
+    vm.load_class(utils::read_class_from_file("jre-8-rt/java/lang/Object"));
 
-    let main_method = vm.find_class("rjvm/SimpleMain").and_then(|class| {
-        class
-            .find_method("main", "([Ljava/lang/String;)V")
-            .map(|method| ClassAndMethod { class, method })
-    });
-    assert!(main_method.is_some());
-    let main_method = main_method.unwrap();
+    let main_method = vm
+        .find_class_method("rjvm/SimpleMain", "main", "([Ljava/lang/String;)V")
+        .expect("should find main method");
 
     let mut stack = vm.new_stack();
     let main_result = vm.invoke(&mut stack, main_method, None, vec![]);

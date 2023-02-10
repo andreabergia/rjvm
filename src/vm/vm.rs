@@ -570,6 +570,14 @@ impl Vm {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
     }
+    
+    pub fn find_class_method(&self, class_name: &str, method_name: &str, method_type_descriptor: &str) -> Option<ClassAndMethod> {
+        self.find_class(class_name).and_then(|class| {
+            class
+                .find_method(method_name, method_type_descriptor)
+                .map(|method| ClassAndMethod { class, method })
+        })
+    }
 
     // TODO: do we need it?
     pub fn new_stack(&self) -> Stack {
