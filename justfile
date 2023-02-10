@@ -15,7 +15,7 @@ clean:
     cargo clean
 
 generate-test-classes:
-    cd ./tests/resources && ./compile.sh
+    cd ./reader/tests/resources && ./compile.sh
 
 count-lines:
-    wc -l {src,tests}/**/*.rs {src,tests}/*.rs tests/resources/**/*.java
+    wc -l */{src,tests}/**/*.rs */{src,tests}/*.rs */tests/resources/**/*.java
