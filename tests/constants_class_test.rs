@@ -10,7 +10,7 @@ mod utils;
 
 #[test_log::test]
 fn can_read_constants() {
-    let class = utils::read_class_from_file("Constants");
+    let class = utils::read_class_from_file("rjvm/Constants");
     assert_eq!(
         vec!(
             ClassFileField {

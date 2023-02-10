@@ -15,7 +15,7 @@ mod utils;
 
 #[test_log::test]
 fn can_read_pojo_class_file() {
-    let class = utils::read_class_from_file("Complex");
+    let class = utils::read_class_from_file("rjvm/Complex");
     assert_eq!(ClassFileVersion::Jdk6, class.version);
     assert_eq!(
         ClassAccessFlags::PUBLIC | ClassAccessFlags::SUPER,

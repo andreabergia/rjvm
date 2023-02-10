@@ -303,7 +303,11 @@ impl<'a> ClassFileReader<'a> {
         let type_descriptor = self.read_string_reference(type_constant_index)?;
         let parsed_type_descriptor = MethodDescriptor::parse(&type_descriptor)?;
         let raw_attributes = self.read_raw_attributes()?;
-        let code = self.extract_code(&raw_attributes)?;
+        let code = if flags.contains(MethodFlags::NATIVE) {
+            None
+        } else {
+            Some(self.extract_code(&raw_attributes)?)
+        };
 
         Ok(ClassFileMethod {
             flags,

@@ -21,4 +21,8 @@ impl ClassAndMethod {
     pub fn is_static(&self) -> bool {
         self.method.is_static()
     }
+
+    pub fn is_native(&self) -> bool {
+        self.method.is_native()
+    }
 }

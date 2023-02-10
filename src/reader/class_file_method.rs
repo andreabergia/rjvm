@@ -11,7 +11,7 @@ pub struct ClassFileMethod {
     pub type_descriptor: String,
     pub parsed_type_descriptor: MethodDescriptor,
     pub attributes: Vec<Attribute>,
-    pub code: ClassFileMethodCode,
+    pub code: Option<ClassFileMethodCode>,
 }
 
 impl fmt::Display for ClassFileMethod {
@@ -21,7 +21,9 @@ impl fmt::Display for ClassFileMethod {
             "{:?} {}: {}",
             self.flags, self.name, self.parsed_type_descriptor,
         )?;
-        writeln!(f, "  code: {}", self.code)?;
+        if let Some(code) = &self.code {
+            writeln!(f, "  code: {}", code)?;
+        }
         write!(f, "  raw_attributes: {:?}", self.attributes)
     }
 }
@@ -29,6 +31,10 @@ impl fmt::Display for ClassFileMethod {
 impl ClassFileMethod {
     pub fn is_static(&self) -> bool {
         self.flags.contains(MethodFlags::STATIC)
+    }
+
+    pub fn is_native(&self) -> bool {
+        self.flags.contains(MethodFlags::NATIVE)
     }
 }
 

@@ -6,12 +6,14 @@ mod utils;
 
 #[test_log::test]
 fn can_read_simple_main() {
-    let class_main = utils::read_class_from_file("SimpleMain");
-    let class_generator = utils::read_class_from_file("SimpleMain$Generator");
+    let class_simple_main = utils::read_class_from_file("rjvm/SimpleMain");
+    let class_generator = utils::read_class_from_file("rjvm/SimpleMain$Generator");
+    let class_java_lang_object = utils::read_class_from_file("jre-8-rt/java/lang/Object");
 
     let mut vm = rjvm::vm::Vm::new();
-    vm.load_class(class_main);
+    vm.load_class(class_simple_main);
     vm.load_class(class_generator);
+    vm.load_class(class_java_lang_object);
 
     let main_method = vm.find_class("rjvm/SimpleMain").and_then(|class| {
         class

@@ -43,13 +43,18 @@ impl Stack {
             return Err(VmError::NullPointerException);
         }
 
+        if class_and_method.is_native() {
+            return Err(VmError::NotImplemented);
+        };
+        let code = &class_and_method.method.code.as_ref().unwrap();
+
         let mut locals: Vec<Value> = receiver
             .map(Object)
             .into_iter()
             .chain(args.into_iter())
             .collect();
 
-        while locals.len() < class_and_method.method.code.max_locals.into_usize_safe() {
+        while locals.len() < code.max_locals.into_usize_safe() {
             locals.push(Value::Uninitialized);
         }
 
@@ -77,7 +82,13 @@ pub struct CallFrame {
 
 impl CallFrame {
     fn new(class_and_method: ClassAndMethod, locals: Vec<Value>) -> CallFrame {
-        let max_stack_size = class_and_method.method.code.max_stack.into_usize_safe();
+        let max_stack_size = class_and_method
+            .method
+            .code
+            .as_ref()
+            .expect("method is not native")
+            .max_stack
+            .into_usize_safe();
         CallFrame {
             class_and_method,
             pc: 0,
@@ -89,7 +100,13 @@ impl CallFrame {
     pub fn execute(&mut self, vm: &mut Vm, stack: &mut Stack) -> Result<Option<Value>, VmError> {
         self.debug_start_execution();
 
-        let code = &self.class_and_method.method.code.code;
+        let code = &self
+            .class_and_method
+            .method
+            .code
+            .as_ref()
+            .expect("method is not native")
+            .code;
         for instruction in code {
             self.debug_print_status(instruction);
             self.pc += 1;
@@ -246,11 +263,8 @@ impl CallFrame {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
             Object(object) => {
-                if object.borrow().class.name != expected_class.name {
-                    Err(VmError::ValidationException)
-                } else {
-                    Ok(object.clone())
-                }
+                // TODO: here we should check "instanceof" the expected class of a subclass
+                Ok(object.clone())
             }
             _ => Err(VmError::ValidationException),
         }
