@@ -16,7 +16,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
   - [ ] annotations
   - [ ] other code attributes
 - [ ] execution
-  - [] data types
+  - [ ] data types
       - [ ] primitives
         - [x] int
         - [ ] short
@@ -28,6 +28,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
         - [ ] boolean
         - [x] object
         - [ ] arrays
+  - [x] new object instances creation
   - [x] static methods invocation
   - [ ] virtual methods invocation
   - [ ] modelling of super classes
