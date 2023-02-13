@@ -6,7 +6,10 @@ build:
     cargo build
 
 test:
-    RUST_LOG=trace cargo test -- --nocapture
+    RUST_LOG=trace cargo nextest run
+
+test-verbose:
+    RUST_LOG=trace cargo nextest run --no-capture
 
 lint:
     cargo clippy --fix --allow-dirty --allow-staged
