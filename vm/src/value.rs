@@ -1,8 +1,9 @@
 use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use std::rc::Rc;
+use std::sync::Arc;
 
-use rjvm_reader::class_file::ClassFile;
+use crate::class::Class;
 use rjvm_reader::field_type::{BaseType, FieldType};
 
 // TODO: do we need short/char/byte? What about boolean?
@@ -24,7 +25,7 @@ pub enum Value {
 }
 
 pub struct ObjectValue {
-    pub class: Rc<ClassFile>,
+    pub class: Arc<Class>,
     pub fields: Vec<Value>,
 }
 

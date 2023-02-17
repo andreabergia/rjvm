@@ -5,7 +5,7 @@ use crate::class::{Class, ClassResolver};
 
 // TODO: class loaders should be a hierarchy
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ClassLoader {
     classes: HashMap<String, Arc<Class>>,
 }

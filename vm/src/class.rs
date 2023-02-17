@@ -46,7 +46,7 @@ impl Class {
             })
             .collect();
 
-        let class = Class {
+        Ok(Class {
             name: class_file.name,
             constants: class_file.constants,
             flags: class_file.flags,
@@ -54,7 +54,26 @@ impl Class {
             interfaces: interfaces?,
             fields: class_file.fields,
             methods: class_file.methods,
-        };
-        Ok(class)
+        })
+    }
+
+    pub fn find_method(
+        &self,
+        method_name: &str,
+        type_descriptor: &str,
+    ) -> Option<Rc<ClassFileMethod>> {
+        // TODO: replace linear search with something faster
+        self.methods
+            .iter()
+            .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
+            .cloned()
+    }
+
+    pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
+        // TODO: replace linear search with something faster
+        self.fields
+            .iter()
+            .enumerate()
+            .find(|entry| entry.1.name == field_name)
     }
 }

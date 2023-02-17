@@ -1,17 +1,23 @@
 use rjvm_reader::utils;
 use rjvm_vm::vm::Vm;
 
-fn load_class_from_bytes(vm: &mut Vm, bytes: &[u8]) {
+fn load_class(vm: &mut Vm, bytes: &[u8]) {
     let class_file = utils::read_class_from_bytes(bytes);
-    vm.load_class(class_file);
+    vm.load_class(class_file).unwrap();
 }
 
 #[test_log::test]
 fn can_execute_real_code() {
     let mut vm = Vm::new();
-    load_class_from_bytes(&mut vm, include_bytes!("resources/rjvm/SimpleMain.class"));
-    load_class_from_bytes(&mut vm, include_bytes!("resources/rjvm/SimpleMain$Generator.class"));
-    load_class_from_bytes(&mut vm, include_bytes!("resources/jre-8-rt/java/lang/Object.class"));
+    load_class(
+        &mut vm,
+        include_bytes!("resources/jre-8-rt/java/lang/Object.class"),
+    );
+    load_class(&mut vm, include_bytes!("resources/rjvm/SimpleMain.class"));
+    load_class(
+        &mut vm,
+        include_bytes!("resources/rjvm/SimpleMain$Generator.class"),
+    );
 
     let main_method = vm
         .find_class_method("rjvm/SimpleMain", "main", "([Ljava/lang/String;)V")

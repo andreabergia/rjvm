@@ -20,28 +20,6 @@ pub struct ClassFile {
     pub methods: Vec<Rc<ClassFileMethod>>,
 }
 
-impl ClassFile {
-    pub fn find_method(
-        &self,
-        method_name: &str,
-        type_descriptor: &str,
-    ) -> Option<Rc<ClassFileMethod>> {
-        // TODO: replace linear search with something faster
-        self.methods
-            .iter()
-            .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
-            .cloned()
-    }
-
-    pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
-        // TODO: replace linear search with something faster
-        self.fields
-            .iter()
-            .enumerate()
-            .find(|entry| entry.1.name == field_name)
-    }
-}
-
 impl fmt::Display for ClassFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Class {} ", self.name,)?;

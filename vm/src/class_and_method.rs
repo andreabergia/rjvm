@@ -1,11 +1,12 @@
-use rjvm_reader::class_file::ClassFile;
+use crate::class::Class;
 use rjvm_reader::class_file_method::ClassFileMethod;
 use rjvm_reader::field_type::FieldType;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ClassAndMethod {
-    pub class: Rc<ClassFile>,
+    pub class: Arc<Class>,
     pub method: Rc<ClassFileMethod>,
 }
 

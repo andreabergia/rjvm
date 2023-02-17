@@ -1,28 +1,28 @@
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use log::{debug, info, warn};
 
-use rjvm_reader::class_file::ClassFile;
-use rjvm_reader::class_file_field::ClassFileField;
-use rjvm_reader::class_file_method::ClassFileMethod;
-use rjvm_reader::constant_pool::ConstantPoolEntry;
-use rjvm_reader::field_type::BaseType;
-use rjvm_reader::field_type::FieldType;
-use rjvm_reader::field_type::FieldType::Base;
-use rjvm_reader::instruction::Instruction;
-use rjvm_reader::method_flags::MethodFlags;
-use rjvm_reader::opcodes::OpCode;
+use rjvm_reader::{
+    class_file::ClassFile, class_file_field::ClassFileField, class_file_method::ClassFileMethod,
+    constant_pool::ConstantPoolEntry, field_type::BaseType, field_type::FieldType,
+    field_type::FieldType::Base, instruction::Instruction, method_flags::MethodFlags,
+    opcodes::OpCode,
+};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::class_and_method::ClassAndMethod;
-use crate::value::ObjectRef;
-use crate::value::ObjectValue;
-use crate::value::Value;
-use crate::value::Value::Object;
-use crate::vm_error::VmError;
+use crate::{
+    class::{Class, ClassResolver},
+    class_and_method::ClassAndMethod,
+    class_loader::ClassLoader,
+    value::ObjectRef,
+    value::ObjectValue,
+    value::Value,
+    value::Value::Object,
+    vm_error::VmError,
+};
 
 #[derive(Debug, Default)]
 pub struct Stack {
@@ -337,7 +337,7 @@ impl CallFrame {
     }
 
     fn get_field<'a>(
-        class: &'a ClassFile,
+        class: &'a Class,
         field_name: &str,
     ) -> Result<(usize, &'a ClassFileField), VmError> {
         class
@@ -452,7 +452,7 @@ impl CallFrame {
     }
 
     fn get_method(
-        class: &ClassFile,
+        class: &Class,
         method_name: &str,
         type_descriptor: &str,
     ) -> Result<Rc<ClassFileMethod>, VmError> {
@@ -495,7 +495,7 @@ impl CallFrame {
     fn get_object_from_stack(
         &self,
         index: usize,
-        _expected_class: &ClassFile,
+        _expected_class: &Class,
     ) -> Result<ObjectRef, VmError> {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
@@ -568,28 +568,26 @@ impl CallFrame {
 
 #[derive(Debug, Default)]
 pub struct Vm {
-    classes: HashMap<String, Rc<ClassFile>>,
+    class_loader: ClassLoader,
     heap: Vec<ObjectRef>,
 }
 
 impl Vm {
     pub fn new() -> Vm {
-        Vm {
-            classes: Default::default(),
-            heap: Vec::new(),
-        }
+        Default::default()
     }
 
-    pub fn load_class(&mut self, class_file: ClassFile) {
-        let class_file = Rc::new(class_file);
-        self.classes.insert(class_file.name.clone(), class_file);
+    pub fn load_class(&mut self, class_file: ClassFile) -> Result<(), VmError> {
+        let class = Class::new(class_file, &self.class_loader)?;
+        self.class_loader.register_class(class);
+        Ok(())
     }
 
-    pub fn find_class(&self, class_name: &str) -> Option<Rc<ClassFile>> {
-        self.classes.get(class_name).map(Rc::clone)
+    pub fn find_class(&self, class_name: &str) -> Option<Arc<Class>> {
+        self.class_loader.find_class(class_name)
     }
 
-    pub fn get_class(&self, class_name: &str) -> Result<Rc<ClassFile>, VmError> {
+    pub fn get_class(&self, class_name: &str) -> Result<Arc<Class>, VmError> {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
     }
@@ -641,7 +639,7 @@ impl Vm {
         debug!("allocating new instance of {}", class_name);
 
         let instance = self.get_class(class_name).map(|class| ObjectValue {
-            class: Rc::clone(&class),
+            class: Arc::clone(&class),
             fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
         })?;
         let instance = Rc::new(RefCell::new(instance));
