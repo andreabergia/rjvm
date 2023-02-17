@@ -6,7 +6,6 @@ use result::prelude::*;
 
 use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
-use crate::class_reader_error::ClassReaderError;
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,

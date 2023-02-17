@@ -3,11 +3,10 @@ use std::sync::Arc;
 
 use result::prelude::*;
 
-use rjvm_reader::class_access_flags::ClassAccessFlags;
-use rjvm_reader::class_file::ClassFile;
-use rjvm_reader::class_file_field::ClassFileField;
-use rjvm_reader::class_file_method::ClassFileMethod;
-use rjvm_reader::constant_pool::ConstantPool;
+use rjvm_reader::{
+    class_access_flags::ClassAccessFlags, class_file::ClassFile, class_file_field::ClassFileField,
+    class_file_method::ClassFileMethod, constant_pool::ConstantPool,
+};
 
 use crate::vm_error::VmError;
 
