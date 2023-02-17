@@ -21,7 +21,10 @@ fn can_read_pojo_class_file() {
         class.flags
     );
     assert_eq!("rjvm/Complex", class.name);
-    assert_eq!("java/lang/Object", class.superclass);
+    assert_eq!(
+        "java/lang/Object",
+        class.superclass.as_ref().expect("a valid superclass")
+    );
     assert_eq!(
         vec!("java/lang/Cloneable", "java/io/Serializable"),
         class.interfaces

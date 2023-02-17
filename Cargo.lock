@@ -305,6 +305,7 @@ dependencies = [
  "env_logger",
  "int-enum",
  "log",
+ "result",
  "rjvm_reader",
  "rjvm_utils",
  "strum",

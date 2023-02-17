@@ -14,7 +14,7 @@ pub struct ClassFile {
     pub constants: ConstantPool,
     pub flags: ClassAccessFlags,
     pub name: String,
-    pub superclass: String,
+    pub superclass: Option<String>,
     pub interfaces: Vec<String>,
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<Rc<ClassFileMethod>>,
@@ -44,11 +44,11 @@ impl ClassFile {
 
 impl fmt::Display for ClassFile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(
-            f,
-            "Class {} (extends {}), version: {}",
-            self.name, self.superclass, self.version
-        )?;
+        write!(f, "Class {} ", self.name,)?;
+        if let Some(superclass) = self.superclass.as_ref() {
+            write!(f, "(extends {}) ", superclass)?;
+        }
+        writeln!(f, "version: {}", self.version)?;
         write!(f, "{}", self.constants)?;
         writeln!(f, "flags: {:?}", self.flags)?;
         writeln!(f, "interfaces: {:?}", self.interfaces)?;

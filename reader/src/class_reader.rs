@@ -4,6 +4,9 @@ use std::{fs::File, io::Read, path::Path};
 use log::warn;
 use result::prelude::*;
 
+use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
+
+use crate::class_reader_error::ClassReaderError;
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
@@ -21,7 +24,6 @@ use crate::{
     method_descriptor::MethodDescriptor,
     method_flags::MethodFlags,
 };
-use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
 struct ClassFileReader<'a> {
     buffer: Buffer<'a>,
@@ -42,7 +44,7 @@ impl<'a> ClassFileReader<'a> {
         self.read_constants()?;
         self.read_access_flags()?;
         self.class_file.name = self.read_class_reference()?;
-        self.class_file.superclass = self.read_class_reference()?;
+        self.class_file.superclass = self.read_class_reference_optional()?;
         self.read_interfaces()?;
         self.read_fields()?;
         self.read_methods()?;
@@ -198,11 +200,16 @@ impl<'a> ClassFileReader<'a> {
     }
 
     fn read_class_reference(&mut self) -> Result<String> {
+        let class_constant_idx = self.buffer.read_u16()?;
+        self.read_string_reference(class_constant_idx)
+    }
+
+    fn read_class_reference_optional(&mut self) -> Result<Option<String>> {
         let super_constant_idx = self.buffer.read_u16()?;
         if super_constant_idx == 0 {
-            Ok(String::from(""))
+            Ok(None)
         } else {
-            self.read_string_reference(super_constant_idx)
+            Ok(Some(self.read_string_reference(super_constant_idx)?))
         }
     }
 
