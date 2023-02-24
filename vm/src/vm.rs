@@ -12,8 +12,8 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::class::{ClassPtr, ClassResolver};
-use crate::class_loader::ClassArena;
+use crate::class::ClassPtr;
+use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::{
     class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::ObjectRef,
     value::ObjectValue, value::Value, value::Value::Object, vm_error::VmError,
@@ -563,7 +563,7 @@ impl CallFrame {
 
 #[derive(Debug, Default)]
 pub struct Vm {
-    class_arena: ClassArena,
+    class_allocator: ClassAllocator,
     class_loader: ClassLoader,
     heap: Vec<ObjectRef>,
 }
@@ -574,8 +574,9 @@ impl Vm {
     }
 
     pub fn load_class(&mut self, class_file: ClassFile) -> Result<(), VmError> {
-        let class = Class::new(class_file, &self.class_loader)?;
-        let class = self.class_arena.allocate(class);
+        let class = self
+            .class_allocator
+            .allocate(class_file, &self.class_loader)?;
         self.class_loader.register_class(class);
         Ok(())
     }

@@ -2,14 +2,10 @@ use std::ops::Deref;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use result::prelude::*;
-
 use rjvm_reader::{
-    class_access_flags::ClassAccessFlags, class_file::ClassFile, class_file_field::ClassFileField,
+    class_access_flags::ClassAccessFlags, class_file_field::ClassFileField,
     class_file_method::ClassFileMethod, constant_pool::ConstantPool,
 };
-
-use crate::vm_error::VmError;
 
 #[derive(Debug)]
 pub struct Class {
@@ -39,46 +35,14 @@ impl Deref for ClassPtr {
     type Target = Class;
 
     fn deref(&self) -> &Self::Target {
+        // SAFETY: The pointer is of type NonNull.
+        // Classes should never be moved because they should only be allocated by ClassAllocator,
+        // that by design will never move objects.
         unsafe { self.inner.as_ref() }
     }
 }
 
-pub trait ClassResolver {
-    fn find_class(&self, name: &str) -> Option<ClassPtr>;
-}
-
 impl Class {
-    pub fn new(class_file: ClassFile, resolver: &impl ClassResolver) -> Result<Class, VmError> {
-        let superclass = class_file
-            .superclass
-            .as_ref()
-            .map(|superclass_name| {
-                resolver
-                    .find_class(superclass_name)
-                    .ok_or(VmError::ClassNotFoundException(superclass_name.clone()))
-            })
-            .invert()?;
-        let interfaces: Result<Vec<ClassPtr>, VmError> = class_file
-            .interfaces
-            .iter()
-            .map(|interface_name| {
-                resolver
-                    .find_class(interface_name)
-                    .ok_or(VmError::ClassNotFoundException(interface_name.clone()))
-            })
-            .collect();
-
-        Ok(Class {
-            name: class_file.name,
-            constants: class_file.constants,
-            flags: class_file.flags,
-            superclass,
-            interfaces: interfaces?,
-            fields: class_file.fields,
-            methods: class_file.methods,
-        })
-    }
-
     pub fn find_method(
         &self,
         method_name: &str,
