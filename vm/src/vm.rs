@@ -1,7 +1,6 @@
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use log::{debug, info, warn};
 
@@ -13,15 +12,11 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::class::{ClassPtr, ClassResolver};
+use crate::class_loader::ClassArena;
 use crate::{
-    class::{Class, ClassResolver},
-    class_and_method::ClassAndMethod,
-    class_loader::ClassLoader,
-    value::ObjectRef,
-    value::ObjectValue,
-    value::Value,
-    value::Value::Object,
-    vm_error::VmError,
+    class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::ObjectRef,
+    value::ObjectValue, value::Value, value::Value::Object, vm_error::VmError,
 };
 
 #[derive(Debug, Default)]
@@ -444,7 +439,7 @@ impl CallFrame {
 
         let class = vm.get_class(method_reference.class_name)?;
         let method = Self::get_method(
-            &class,
+            class.clone(),
             method_reference.method_name,
             method_reference.type_descriptor,
         )?;
@@ -452,7 +447,7 @@ impl CallFrame {
     }
 
     fn get_method(
-        class: &Class,
+        class: ClassPtr,
         method_name: &str,
         type_descriptor: &str,
     ) -> Result<Rc<ClassFileMethod>, VmError> {
@@ -568,6 +563,7 @@ impl CallFrame {
 
 #[derive(Debug, Default)]
 pub struct Vm {
+    class_arena: ClassArena,
     class_loader: ClassLoader,
     heap: Vec<ObjectRef>,
 }
@@ -579,15 +575,16 @@ impl Vm {
 
     pub fn load_class(&mut self, class_file: ClassFile) -> Result<(), VmError> {
         let class = Class::new(class_file, &self.class_loader)?;
+        let class = self.class_arena.allocate(class);
         self.class_loader.register_class(class);
         Ok(())
     }
 
-    pub fn find_class(&self, class_name: &str) -> Option<Arc<Class>> {
+    pub fn find_class(&self, class_name: &str) -> Option<ClassPtr> {
         self.class_loader.find_class(class_name)
     }
 
-    pub fn get_class(&self, class_name: &str) -> Result<Arc<Class>, VmError> {
+    pub fn get_class(&self, class_name: &str) -> Result<ClassPtr, VmError> {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
     }
@@ -639,7 +636,7 @@ impl Vm {
         debug!("allocating new instance of {}", class_name);
 
         let instance = self.get_class(class_name).map(|class| ObjectValue {
-            class: Arc::clone(&class),
+            class: class.clone(),
             fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
         })?;
         let instance = Rc::new(RefCell::new(instance));

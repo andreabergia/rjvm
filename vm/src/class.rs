@@ -1,5 +1,6 @@
+use std::ops::Deref;
+use std::ptr::NonNull;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use result::prelude::*;
 
@@ -15,14 +16,35 @@ pub struct Class {
     pub name: String,
     pub constants: ConstantPool,
     pub flags: ClassAccessFlags,
-    pub superclass: Option<Arc<Class>>,
-    pub interfaces: Vec<Arc<Class>>,
+    pub superclass: Option<ClassPtr>,
+    pub interfaces: Vec<ClassPtr>,
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<Rc<ClassFileMethod>>,
 }
 
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+pub struct ClassPtr {
+    inner: NonNull<Class>,
+}
+
+impl ClassPtr {
+    pub fn new(class: &mut Class) -> Self {
+        let inner = NonNull::new(class).unwrap();
+        Self { inner }
+    }
+}
+
+impl Deref for ClassPtr {
+    type Target = Class;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.inner.as_ref() }
+    }
+}
+
 pub trait ClassResolver {
-    fn find_class(&self, name: &str) -> Option<Arc<Class>>;
+    fn find_class(&self, name: &str) -> Option<ClassPtr>;
 }
 
 impl Class {
@@ -36,7 +58,7 @@ impl Class {
                     .ok_or(VmError::ClassNotFoundException(superclass_name.clone()))
             })
             .invert()?;
-        let interfaces: Result<Vec<Arc<Class>>, VmError> = class_file
+        let interfaces: Result<Vec<ClassPtr>, VmError> = class_file
             .interfaces
             .iter()
             .map(|interface_name| {
