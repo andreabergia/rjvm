@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,9 +13,11 @@ use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::class::ClassRef;
 use crate::class_allocator::{ClassAllocator, ClassResolver};
+use crate::gc::ObjectAllocator;
+use crate::value::ObjectRef;
 use crate::{
-    class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::ObjectRef,
-    value::ObjectValue, value::Value, value::Value::Object, vm_error::VmError,
+    class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::Value,
+    value::Value::Object, vm_error::VmError,
 };
 
 #[derive(Debug, Default)]
@@ -32,8 +33,8 @@ impl<'a> Stack<'a> {
     pub fn add_frame(
         &mut self,
         class_and_method: ClassAndMethod<'a>,
-        receiver: Option<ObjectRef>,
-        args: Vec<Value>,
+        receiver: Option<ObjectRef<'a>>,
+        args: Vec<Value<'a>>,
     ) -> Result<Rc<RefCell<CallFrame<'a>>>, VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
@@ -49,7 +50,7 @@ impl<'a> Stack<'a> {
 
         let code = &class_and_method.method.code.as_ref().unwrap();
 
-        let mut locals: Vec<Value> = receiver
+        let mut locals: Vec<Value<'a>> = receiver
             .map(Object)
             .into_iter()
             .chain(args.into_iter())
@@ -91,12 +92,12 @@ struct FieldReference<'a> {
 pub struct CallFrame<'a> {
     class_and_method: ClassAndMethod<'a>,
     pc: usize,
-    locals: Vec<Value>,
-    stack: Vec<Value>,
+    locals: Vec<Value<'a>>,
+    stack: Vec<Value<'a>>,
 }
 
 impl<'a> CallFrame<'a> {
-    fn new(class_and_method: ClassAndMethod<'a>, locals: Vec<Value>) -> Self {
+    fn new(class_and_method: ClassAndMethod<'a>, locals: Vec<Value<'a>>) -> Self {
         let max_stack_size = class_and_method
             .method
             .code
@@ -116,7 +117,7 @@ impl<'a> CallFrame<'a> {
         &mut self,
         vm: &mut Vm<'a>,
         stack: &mut Stack<'a>,
-    ) -> Result<Option<Value>, VmError> {
+    ) -> Result<Option<Value<'a>>, VmError> {
         self.debug_start_execution();
 
         let code = &self
@@ -295,7 +296,7 @@ impl<'a> CallFrame<'a> {
                     )?;
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
-                        object_ref.borrow_mut().fields[index] = value;
+                        object_ref.set_field(index, value);
                     } else {
                         return Err(VmError::ValidationException);
                     }
@@ -311,8 +312,7 @@ impl<'a> CallFrame<'a> {
 
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
-                        let object_ref: &RefCell<ObjectValue> = object_ref.borrow();
-                        let field_value = object_ref.borrow().fields[index].clone();
+                        let field_value = object_ref.get_field(index);
                         Self::validate_type(
                             Some(field.type_descriptor.clone()),
                             &Some(field_value.clone()),
@@ -352,7 +352,7 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn pop_int(stack: &mut Vec<Value>, vm: &Vm) -> Result<i32, VmError> {
+    fn pop_int(stack: &mut Vec<Value<'a>>, vm: &Vm) -> Result<i32, VmError> {
         let value = stack.pop().ok_or(VmError::ValidationException)?;
         Self::validate_type(Some(Base(BaseType::Int)), &Some(value.clone()), vm)?;
         match value {
@@ -472,7 +472,7 @@ impl<'a> CallFrame<'a> {
     fn get_method_receiver_and_params(
         &self,
         class_and_method: &ClassAndMethod<'a>,
-    ) -> Result<(Option<ObjectRef>, Vec<Value>, usize), VmError> {
+    ) -> Result<(Option<ObjectRef<'a>>, Vec<Value<'a>>, usize), VmError> {
         let cur_stack_len = self.stack.len();
         let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
         let num_params = class_and_method.num_arguments();
@@ -500,7 +500,7 @@ impl<'a> CallFrame<'a> {
         &self,
         index: usize,
         _expected_class: &Class,
-    ) -> Result<ObjectRef, VmError> {
+    ) -> Result<ObjectRef<'a>, VmError> {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
             Object(object) => {
@@ -513,7 +513,7 @@ impl<'a> CallFrame<'a> {
 
     fn validate_type(
         expected_type: Option<FieldType>,
-        value: &Option<Value>,
+        value: &Option<Value<'a>>,
         vm: &Vm,
     ) -> Result<(), VmError> {
         match expected_type {
@@ -534,11 +534,11 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn get_local_int(&self, index: usize, vm: &Vm) -> Result<&Value, VmError> {
+    fn get_local_int(&self, index: usize, vm: &Vm) -> Result<Value<'a>, VmError> {
         // TODO: short, char, byte should (probably?) to be modelled as int
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
         Self::validate_type(Some(Base(BaseType::Int)), &Some(variable.clone()), vm)?;
-        Ok(variable)
+        Ok(variable.clone())
     }
 
     fn debug_start_execution(&self) {
@@ -575,7 +575,7 @@ impl<'a> CallFrame<'a> {
 pub struct Vm<'a> {
     class_allocator: ClassAllocator<'a>,
     class_loader: ClassLoader<'a>,
-    heap: Vec<ObjectRef>,
+    object_allocator: ObjectAllocator<'a>,
 }
 
 impl<'a> Vm<'a> {
@@ -622,9 +622,9 @@ impl<'a> Vm<'a> {
         &mut self,
         stack: &mut Stack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<ObjectRef>,
-        args: Vec<Value>,
-    ) -> Result<Option<Value>, VmError> {
+        object: Option<ObjectRef<'a>>,
+        args: Vec<Value<'a>>,
+    ) -> Result<Option<Value<'a>>, VmError> {
         if class_and_method.method.is_native() {
             return if class_and_method.class.name == "rjvm/SimpleMain"
                 && class_and_method.method.name == "tempPrint"
@@ -643,15 +643,18 @@ impl<'a> Vm<'a> {
         result
     }
 
-    pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef, VmError> {
+    pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef<'a>, VmError> {
         debug!("allocating new instance of {}", class_name);
 
-        let instance = self.get_class(class_name).map(|class| ObjectValue {
-            class_id: class.id,
-            fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
-        })?;
-        let instance = Rc::new(RefCell::new(instance));
-        self.heap.push(instance.clone());
+        let class = self.get_class(class_name)?;
+        let instance = self.object_allocator.allocate(class);
         Ok(instance)
+    }
+
+    pub fn debug_stats(&self) {
+        debug!(
+            "VM classes={:?}, objects = {:?}",
+            self.class_allocator, self.object_allocator
+        )
     }
 }

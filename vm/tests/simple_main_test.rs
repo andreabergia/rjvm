@@ -1,4 +1,5 @@
 use rjvm_reader::utils;
+use rjvm_vm::value::{ObjectRef, ObjectValue, Value};
 use rjvm_vm::vm::Vm;
 
 fn load_class<'a>(vm: &mut Vm<'a>, bytes: &[u8]) {
@@ -25,6 +26,8 @@ fn can_execute_real_code() {
 
     let mut stack = vm.allocate_stack();
     let main_result = vm.invoke(&mut stack, main_method, None, vec![]);
+    vm.debug_stats();
+
     print!("result: {main_result:?}");
     assert!(main_result.is_ok());
     assert!(main_result.unwrap().is_none());

@@ -1,15 +1,14 @@
 use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
-use std::rc::Rc;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::class::ClassId;
+use crate::class::{Class, ClassId};
 use crate::class_allocator::ClassResolver;
 
 // TODO: do we need short/char/byte? What about boolean?
 #[derive(Debug, Default, Clone)]
-pub enum Value {
+pub enum Value<'a> {
     #[default]
     Uninitialized,
     Byte(i8),
@@ -20,21 +19,41 @@ pub enum Value {
     Float(i32),
     Double(i64),
     Boolean(bool),
-    Object(ObjectRef),
+    Object(ObjectRef<'a>),
     // TODO: return address?
     // TODO: array?
 }
 
-pub struct ObjectValue {
+pub struct ObjectValue<'a> {
     pub class_id: ClassId,
-    pub fields: Vec<Value>,
+    fields: RefCell<Vec<Value<'a>>>,
 }
 
-impl Value {
-    pub fn matches_type<'a>(
+impl<'a> ObjectValue<'a> {
+    pub fn new(class: &Class<'a>) -> Self {
+        let fields = class.fields.iter().map(|_| Value::Uninitialized).collect();
+        Self {
+            class_id: class.id,
+            fields: RefCell::new(fields),
+        }
+    }
+
+    pub fn set_field(&self, index: usize, value: Value<'a>) {
+        self.fields.borrow_mut()[index] = value;
+    }
+
+    pub fn get_field(&self, index: usize) -> Value<'a> {
+        self.fields.borrow()[index].clone()
+    }
+}
+
+pub type ObjectRef<'a> = &'a ObjectValue<'a>;
+
+impl<'a> Value<'a> {
+    pub fn matches_type<'b>(
         &self,
         expected_type: FieldType,
-        class_resolver: &impl ClassResolver<'a>,
+        class_resolver: &impl ClassResolver<'b>,
     ) -> bool {
         match self {
             Value::Uninitialized => false,
@@ -75,7 +94,7 @@ impl Value {
                 // TODO: with multiple class loaders, we should check the class identity,
                 //  not the name, since the same class could be loaded by multiple class loader
                 FieldType::Object(class_name) => {
-                    let value_class = class_resolver.find_class_by_id(object_ref.borrow().class_id);
+                    let value_class = class_resolver.find_class_by_id(object_ref.class_id);
                     if let Some(class_ref) = value_class {
                         class_ref.name == class_name
                     } else {
@@ -88,11 +107,8 @@ impl Value {
     }
 }
 
-impl Debug for ObjectValue {
+impl<'a> Debug for ObjectValue<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "class: {} fields {:?}", self.class_id, self.fields)
     }
 }
-
-// TODO: do we need the RefCell? Can we live with only the Rc?
-pub type ObjectRef = Rc<RefCell<ObjectValue>>;
