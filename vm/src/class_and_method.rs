@@ -3,11 +3,11 @@ use std::rc::Rc;
 use rjvm_reader::class_file_method::ClassFileMethod;
 use rjvm_reader::field_type::FieldType;
 
-use crate::class::Class;
+use crate::class::ClassRef;
 
 #[derive(Debug, Clone)]
 pub struct ClassAndMethod<'a> {
-    pub class: &'a Class<'a>,
+    pub class: ClassRef<'a>,
     pub method: Rc<ClassFileMethod>,
 }
 

@@ -6,10 +6,11 @@ use typed_arena::Arena;
 
 use rjvm_reader::class_file::ClassFile;
 
+use crate::class::ClassRef;
 use crate::{class::Class, vm_error::VmError};
 
 pub trait ClassResolver<'a> {
-    fn find_class(&self, name: &str) -> Option<&'a Class<'a>>;
+    fn find_class(&self, name: &str) -> Option<ClassRef<'a>>;
 }
 
 pub struct ClassAllocator<'a> {
@@ -35,7 +36,7 @@ impl<'a> ClassAllocator<'a> {
         &'b self,
         class_file: ClassFile,
         resolver: &impl ClassResolver<'a>,
-    ) -> Result<&'a Class<'a>, VmError> {
+    ) -> Result<ClassRef<'a>, VmError> {
         let class = Self::new_class(class_file, resolver)?;
         let class_ref = self.arena.alloc(class);
 

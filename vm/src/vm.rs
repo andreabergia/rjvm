@@ -12,6 +12,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::class::ClassRef;
 use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::{
     class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::ObjectRef,
@@ -284,7 +285,7 @@ impl<'a> CallFrame<'a> {
 
                     // TODO: validate class? How do super classes work?
                     let (index, field) =
-                        Self::get_field(&self.class_and_method.class, field_reference.field_name)?;
+                        Self::get_field(self.class_and_method.class, field_reference.field_name)?;
 
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
                     Self::validate_type(Some(field.type_descriptor.clone()), &Some(value.clone()))?;
@@ -302,7 +303,7 @@ impl<'a> CallFrame<'a> {
 
                     // TODO: validate class? How do super classes work?
                     let (index, field) =
-                        Self::get_field(&self.class_and_method.class, field_reference.field_name)?;
+                        Self::get_field(self.class_and_method.class, field_reference.field_name)?;
 
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
@@ -442,7 +443,7 @@ impl<'a> CallFrame<'a> {
 
         let class = vm.get_class(method_reference.class_name)?;
         let method = Self::get_method(
-            class.clone(),
+            class,
             method_reference.method_name,
             method_reference.type_descriptor,
         )?;
@@ -479,7 +480,7 @@ impl<'a> CallFrame<'a> {
         } else {
             Some(self.get_object_from_stack(
                 cur_stack_len - num_params - receiver_count,
-                &class_and_method.class,
+                class_and_method.class,
             )?)
         };
         let params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
@@ -584,11 +585,11 @@ impl<'a> Vm<'a> {
         Ok(())
     }
 
-    pub fn find_class<'b>(&'b self, class_name: &str) -> Option<&'a Class<'a>> {
+    pub fn find_class<'b>(&'b self, class_name: &str) -> Option<ClassRef<'a>> {
         self.class_loader.find_class(class_name)
     }
 
-    pub fn get_class(&self, class_name: &str) -> Result<&'a Class<'a>, VmError> {
+    pub fn get_class(&self, class_name: &str) -> Result<ClassRef<'a>, VmError> {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
     }
@@ -619,15 +620,15 @@ impl<'a> Vm<'a> {
         args: Vec<Value>,
     ) -> Result<Option<Value>, VmError> {
         if class_and_method.method.is_native() {
-            if class_and_method.class.name == "rjvm/SimpleMain"
+            return if class_and_method.class.name == "rjvm/SimpleMain"
                 && class_and_method.method.name == "tempPrint"
             {
                 let arg = args.get(0).ok_or(VmError::ValidationException)?;
                 info!("TEMP implementation of native method: printing value {arg:?}");
-                return Ok(None);
+                Ok(None)
             } else {
-                return Err(VmError::NotImplemented);
-            }
+                Err(VmError::NotImplemented)
+            };
         }
 
         let frame = stack.add_frame(class_and_method, object, args)?;

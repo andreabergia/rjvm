@@ -10,11 +10,13 @@ pub struct Class<'a> {
     pub name: String,
     pub constants: ConstantPool,
     pub flags: ClassAccessFlags,
-    pub superclass: Option<&'a Class<'a>>,
-    pub interfaces: Vec<&'a Class<'a>>,
+    pub superclass: Option<ClassRef<'a>>,
+    pub interfaces: Vec<ClassRef<'a>>,
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<Rc<ClassFileMethod>>,
 }
+
+pub type ClassRef<'a> = &'a Class<'a>;
 
 impl<'a> Class<'a> {
     pub fn find_method(
