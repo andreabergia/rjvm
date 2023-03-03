@@ -19,6 +19,7 @@ clean:
 
 generate-test-classes:
     cd ./reader/tests/resources && ./compile.sh
+    cd ./vm/tests/resources && ./compile.sh
 
 count-lines:
     wc -l */{src,tests}/**/*.rs */{src,tests}/*.rs */tests/resources/**/*.java
