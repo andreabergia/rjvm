@@ -6,18 +6,17 @@ use typed_arena::Arena;
 
 use rjvm_reader::class_file::ClassFile;
 
-use crate::class::{Class, ClassPtr};
-use crate::vm_error::VmError;
+use crate::{class::Class, vm_error::VmError};
 
-pub trait ClassResolver {
-    fn find_class(&self, name: &str) -> Option<ClassPtr>;
+pub trait ClassResolver<'a> {
+    fn find_class(&self, name: &str) -> Option<&'a Class<'a>>;
 }
 
-pub struct ClassAllocator {
-    arena: Arena<Class>,
+pub struct ClassAllocator<'a> {
+    arena: Arena<Class<'a>>,
 }
 
-impl Default for ClassAllocator {
+impl<'a> Default for ClassAllocator<'a> {
     fn default() -> Self {
         Self {
             arena: Arena::with_capacity(100),
@@ -25,24 +24,35 @@ impl Default for ClassAllocator {
     }
 }
 
-impl fmt::Debug for ClassAllocator {
+impl<'a> fmt::Debug for ClassAllocator<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "class_allocator={{len={}}}", self.arena.len())
     }
 }
 
-impl ClassAllocator {
-    pub fn allocate(
-        &mut self,
+impl<'a> ClassAllocator<'a> {
+    pub fn allocate<'b>(
+        &'b self,
         class_file: ClassFile,
-        resolver: &impl ClassResolver,
-    ) -> Result<ClassPtr, VmError> {
+        resolver: &impl ClassResolver<'a>,
+    ) -> Result<&'a Class<'a>, VmError> {
         let class = Self::new_class(class_file, resolver)?;
         let class_ref = self.arena.alloc(class);
-        Ok(ClassPtr::new(class_ref))
+
+        // SAFETY: our reference class_ref is alive only for 'b.
+        // However we actually know that the arena will keep the value alive for 'a,
+        // and I cannot find a way to convince the compiler of this fact. Thus
+        // we use this pointer "trick" to make the compiler happy
+        unsafe {
+            let class_ptr: *const Class<'a> = class_ref;
+            Ok(&*class_ptr)
+        }
     }
 
-    fn new_class(class_file: ClassFile, resolver: &impl ClassResolver) -> Result<Class, VmError> {
+    fn new_class(
+        class_file: ClassFile,
+        resolver: &impl ClassResolver<'a>,
+    ) -> Result<Class<'a>, VmError> {
         let superclass = class_file
             .superclass
             .as_ref()
@@ -52,7 +62,7 @@ impl ClassAllocator {
                     .ok_or(VmError::ClassNotFoundException(superclass_name.clone()))
             })
             .invert()?;
-        let interfaces: Result<Vec<ClassPtr>, VmError> = class_file
+        let interfaces: Result<Vec<&Class>, VmError> = class_file
             .interfaces
             .iter()
             .map(|interface_name| {

@@ -12,7 +12,6 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::class::ClassPtr;
 use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::{
     class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::ObjectRef,
@@ -20,21 +19,21 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct Stack {
-    frames: Vec<Rc<RefCell<CallFrame>>>,
+pub struct Stack<'a> {
+    frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
 }
 
-impl Stack {
-    pub fn new() -> Stack {
+impl<'a> Stack<'a> {
+    pub fn new() -> Self {
         Default::default()
     }
 
     pub fn add_frame(
         &mut self,
-        class_and_method: ClassAndMethod,
+        class_and_method: ClassAndMethod<'a>,
         receiver: Option<ObjectRef>,
         args: Vec<Value>,
-    ) -> Result<Rc<RefCell<CallFrame>>, VmError> {
+    ) -> Result<Rc<RefCell<CallFrame<'a>>>, VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
                 return Err(VmError::ValidationException);
@@ -88,15 +87,15 @@ struct FieldReference<'a> {
 }
 
 #[derive(Debug)]
-pub struct CallFrame {
-    class_and_method: ClassAndMethod,
+pub struct CallFrame<'a> {
+    class_and_method: ClassAndMethod<'a>,
     pc: usize,
     locals: Vec<Value>,
     stack: Vec<Value>,
 }
 
-impl CallFrame {
-    fn new(class_and_method: ClassAndMethod, locals: Vec<Value>) -> CallFrame {
+impl<'a> CallFrame<'a> {
+    fn new(class_and_method: ClassAndMethod<'a>, locals: Vec<Value>) -> Self {
         let max_stack_size = class_and_method
             .method
             .code
@@ -112,7 +111,11 @@ impl CallFrame {
         }
     }
 
-    pub fn execute(&mut self, vm: &mut Vm, stack: &mut Stack) -> Result<Option<Value>, VmError> {
+    pub fn execute(
+        &mut self,
+        vm: &mut Vm<'a>,
+        stack: &mut Stack<'a>,
+    ) -> Result<Option<Value>, VmError> {
         self.debug_start_execution();
 
         let code = &self
@@ -331,7 +334,7 @@ impl CallFrame {
         Err(VmError::NullPointerException)
     }
 
-    fn get_field<'a>(
+    fn get_field(
         class: &'a Class,
         field_name: &str,
     ) -> Result<(usize, &'a ClassFileField), VmError> {
@@ -431,9 +434,9 @@ impl CallFrame {
 
     fn get_method_to_invoke(
         &self,
-        vm: &Vm,
+        vm: &Vm<'a>,
         instruction: &Instruction,
-    ) -> Result<ClassAndMethod, VmError> {
+    ) -> Result<ClassAndMethod<'a>, VmError> {
         let constant_index = instruction.arguments_u16(0)?;
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
@@ -447,7 +450,7 @@ impl CallFrame {
     }
 
     fn get_method(
-        class: ClassPtr,
+        class: &Class<'a>,
         method_name: &str,
         type_descriptor: &str,
     ) -> Result<Rc<ClassFileMethod>, VmError> {
@@ -462,7 +465,7 @@ impl CallFrame {
 
     fn get_method_receiver_and_params(
         &self,
-        class_and_method: &ClassAndMethod,
+        class_and_method: &ClassAndMethod<'a>,
     ) -> Result<(Option<ObjectRef>, Vec<Value>, usize), VmError> {
         let cur_stack_len = self.stack.len();
         let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
@@ -562,14 +565,14 @@ impl CallFrame {
 }
 
 #[derive(Debug, Default)]
-pub struct Vm {
-    class_allocator: ClassAllocator,
-    class_loader: ClassLoader,
+pub struct Vm<'a> {
+    class_allocator: ClassAllocator<'a>,
+    class_loader: ClassLoader<'a>,
     heap: Vec<ObjectRef>,
 }
 
-impl Vm {
-    pub fn new() -> Vm {
+impl<'a> Vm<'a> {
+    pub fn new() -> Self {
         Default::default()
     }
 
@@ -581,11 +584,11 @@ impl Vm {
         Ok(())
     }
 
-    pub fn find_class(&self, class_name: &str) -> Option<ClassPtr> {
+    pub fn find_class<'b>(&'b self, class_name: &str) -> Option<&'a Class<'a>> {
         self.class_loader.find_class(class_name)
     }
 
-    pub fn get_class(&self, class_name: &str) -> Result<ClassPtr, VmError> {
+    pub fn get_class(&self, class_name: &str) -> Result<&'a Class<'a>, VmError> {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
     }
@@ -595,7 +598,7 @@ impl Vm {
         class_name: &str,
         method_name: &str,
         method_type_descriptor: &str,
-    ) -> Option<ClassAndMethod> {
+    ) -> Option<ClassAndMethod<'a>> {
         self.find_class(class_name).and_then(|class| {
             class
                 .find_method(method_name, method_type_descriptor)
@@ -604,14 +607,14 @@ impl Vm {
     }
 
     // TODO: do we need it?
-    pub fn allocate_stack(&self) -> Stack {
+    pub fn allocate_stack(&self) -> Stack<'a> {
         Stack::new()
     }
 
     pub fn invoke(
         &mut self,
-        stack: &mut Stack,
-        class_and_method: ClassAndMethod,
+        stack: &mut Stack<'a>,
+        class_and_method: ClassAndMethod<'a>,
         object: Option<ObjectRef>,
         args: Vec<Value>,
     ) -> Result<Option<Value>, VmError> {
@@ -637,7 +640,8 @@ impl Vm {
         debug!("allocating new instance of {}", class_name);
 
         let instance = self.get_class(class_name).map(|class| ObjectValue {
-            class: class.clone(),
+            // TODO
+            // class: class.clone(),
             fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
         })?;
         let instance = Rc::new(RefCell::new(instance));

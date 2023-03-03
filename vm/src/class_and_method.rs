@@ -1,16 +1,17 @@
 use std::rc::Rc;
 
-use crate::class::ClassPtr;
 use rjvm_reader::class_file_method::ClassFileMethod;
 use rjvm_reader::field_type::FieldType;
 
+use crate::class::Class;
+
 #[derive(Debug, Clone)]
-pub struct ClassAndMethod {
-    pub class: ClassPtr,
+pub struct ClassAndMethod<'a> {
+    pub class: &'a Class<'a>,
     pub method: Rc<ClassFileMethod>,
 }
 
-impl ClassAndMethod {
+impl<'a> ClassAndMethod<'a> {
     pub fn num_arguments(&self) -> usize {
         self.method.parsed_type_descriptor.num_arguments()
     }

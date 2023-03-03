@@ -1,23 +1,23 @@
 use std::collections::HashMap;
 
-use crate::class::ClassPtr;
+use crate::class::Class;
 use crate::class_allocator::ClassResolver;
 
 // TODO: class loaders should be a hierarchy
 
 #[derive(Debug, Default)]
-pub struct ClassLoader {
-    classes: HashMap<String, ClassPtr>,
+pub struct ClassLoader<'a> {
+    classes: HashMap<String, &'a Class<'a>>,
 }
 
-impl ClassResolver for ClassLoader {
-    fn find_class(&self, name: &str) -> Option<ClassPtr> {
+impl<'a> ClassResolver<'a> for ClassLoader<'a> {
+    fn find_class<'b>(&'b self, name: &str) -> Option<&'a Class<'a>> {
         self.classes.get(name).cloned()
     }
 }
 
-impl ClassLoader {
-    pub fn register_class(&mut self, class: ClassPtr) {
+impl<'a> ClassLoader<'a> {
+    pub fn register_class(&mut self, class: &'a Class<'a>) {
         self.classes.insert(class.name.clone(), class);
     }
 }

@@ -1,5 +1,3 @@
-use std::ops::Deref;
-use std::ptr::NonNull;
 use std::rc::Rc;
 
 use rjvm_reader::{
@@ -8,41 +6,17 @@ use rjvm_reader::{
 };
 
 #[derive(Debug)]
-pub struct Class {
+pub struct Class<'a> {
     pub name: String,
     pub constants: ConstantPool,
     pub flags: ClassAccessFlags,
-    pub superclass: Option<ClassPtr>,
-    pub interfaces: Vec<ClassPtr>,
+    pub superclass: Option<&'a Class<'a>>,
+    pub interfaces: Vec<&'a Class<'a>>,
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<Rc<ClassFileMethod>>,
 }
 
-#[derive(Debug, Clone)]
-#[repr(transparent)]
-pub struct ClassPtr {
-    inner: NonNull<Class>,
-}
-
-impl ClassPtr {
-    pub fn new(class: &mut Class) -> Self {
-        let inner = NonNull::new(class).unwrap();
-        Self { inner }
-    }
-}
-
-impl Deref for ClassPtr {
-    type Target = Class;
-
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: The pointer is of type NonNull.
-        // Classes should never be moved because they should only be allocated by ClassAllocator,
-        // that by design will never move objects.
-        unsafe { self.inner.as_ref() }
-    }
-}
-
-impl Class {
+impl<'a> Class<'a> {
     pub fn find_method(
         &self,
         method_name: &str,
