@@ -10,7 +10,8 @@ use crate::class::{ClassId, ClassRef};
 use crate::{class::Class, vm_error::VmError};
 
 pub trait ClassResolver<'a> {
-    fn find_class(&self, name: &str) -> Option<ClassRef<'a>>;
+    fn find_class_by_id(&self, id: ClassId) -> Option<ClassRef<'a>>;
+    fn find_class_by_name(&self, name: &str) -> Option<ClassRef<'a>>;
 }
 
 pub struct ClassAllocator<'a> {
@@ -66,7 +67,7 @@ impl<'a> ClassAllocator<'a> {
             .as_ref()
             .map(|superclass_name| {
                 resolver
-                    .find_class(superclass_name)
+                    .find_class_by_name(superclass_name)
                     .ok_or(VmError::ClassNotFoundException(superclass_name.clone()))
             })
             .invert()?;
@@ -75,7 +76,7 @@ impl<'a> ClassAllocator<'a> {
             .iter()
             .map(|interface_name| {
                 resolver
-                    .find_class(interface_name)
+                    .find_class_by_name(interface_name)
                     .ok_or(VmError::ClassNotFoundException(interface_name.clone()))
             })
             .collect();

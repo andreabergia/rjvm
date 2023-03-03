@@ -4,6 +4,9 @@ use std::rc::Rc;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
+use crate::class::ClassId;
+use crate::class_allocator::ClassResolver;
+
 // TODO: do we need short/char/byte? What about boolean?
 #[derive(Debug, Default, Clone)]
 pub enum Value {
@@ -23,12 +26,16 @@ pub enum Value {
 }
 
 pub struct ObjectValue {
-    // pub class: ClassPtr,
+    pub class_id: ClassId,
     pub fields: Vec<Value>,
 }
 
 impl Value {
-    pub fn matches_type(&self, expected_type: FieldType) -> bool {
+    pub fn matches_type<'a>(
+        &self,
+        expected_type: FieldType,
+        class_resolver: &impl ClassResolver<'a>,
+    ) -> bool {
         match self {
             Value::Uninitialized => false,
             Value::Byte(_) => match expected_type {
@@ -64,24 +71,26 @@ impl Value {
                 _ => false,
             },
 
-            Value::Object(_) => true,
-            // Value::Object(object_ref) => match expected_type {
-            //     // TODO: with multiple class loaders, we should check the class identity,
-            //     //  not the name, since the same class could be loaded by multiple class loader
-            //     FieldType::Object(class_name) => {
-            //         object_ref.borrow().class.name == class_name
-            //     }
-            //     _ => false,
-            // },
+            Value::Object(object_ref) => match expected_type {
+                // TODO: with multiple class loaders, we should check the class identity,
+                //  not the name, since the same class could be loaded by multiple class loader
+                FieldType::Object(class_name) => {
+                    let value_class = class_resolver.find_class_by_id(object_ref.borrow().class_id);
+                    if let Some(class_ref) = value_class {
+                        class_ref.name == class_name
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            },
         }
     }
 }
 
 impl Debug for ObjectValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // TODO
-        // write!(f, "class: {} fields {:?}", self.class.name, self.fields)
-        write!(f, "class: ?? fields {:?}", self.fields)
+        write!(f, "class: {} fields {:?}", self.class_id, self.fields)
     }
 }
 

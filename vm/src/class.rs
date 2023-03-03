@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::Formatter;
 use std::rc::Rc;
 
 use rjvm_reader::{
@@ -5,8 +7,14 @@ use rjvm_reader::{
     class_file_method::ClassFileMethod, constant_pool::ConstantPool,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassId(u64);
+
+impl fmt::Display for ClassId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl ClassId {
     pub(crate) fn new(id: u64) -> Self {

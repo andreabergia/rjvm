@@ -209,7 +209,7 @@ impl<'a> CallFrame<'a> {
                     let method_return_type = class_and_method.return_type();
                     let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-                    Self::validate_type(method_return_type, &result)?;
+                    Self::validate_type(method_return_type, &result, vm)?;
                     if let Some(value) = result {
                         self.stack.push(value);
                     }
@@ -224,7 +224,7 @@ impl<'a> CallFrame<'a> {
                     let method_return_type = class_and_method.return_type();
                     let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-                    Self::validate_type(method_return_type, &result)?;
+                    Self::validate_type(method_return_type, &result, vm)?;
                     if let Some(value) = result {
                         self.stack.push(value);
                     }
@@ -240,7 +240,7 @@ impl<'a> CallFrame<'a> {
                     let method_return_type = class_and_method.return_type();
                     let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-                    Self::validate_type(method_return_type, &result)?;
+                    Self::validate_type(method_return_type, &result, vm)?;
                     if let Some(value) = result {
                         self.stack.push(value);
                     }
@@ -264,19 +264,19 @@ impl<'a> CallFrame<'a> {
 
                 OpCode::Iload => {
                     let index = instruction.argument(0)?.into_usize_safe();
-                    self.stack.push(self.get_local_int(index)?.clone());
+                    self.stack.push(self.get_local_int(index, vm)?.clone());
                 }
                 OpCode::Iload_0 => {
-                    self.stack.push(self.get_local_int(0)?.clone());
+                    self.stack.push(self.get_local_int(0, vm)?.clone());
                 }
                 OpCode::Iload_1 => {
-                    self.stack.push(self.get_local_int(1)?.clone());
+                    self.stack.push(self.get_local_int(1, vm)?.clone());
                 }
                 OpCode::Iload_2 => {
-                    self.stack.push(self.get_local_int(2)?.clone());
+                    self.stack.push(self.get_local_int(2, vm)?.clone());
                 }
                 OpCode::Iload_3 => {
-                    self.stack.push(self.get_local_int(3)?.clone());
+                    self.stack.push(self.get_local_int(3, vm)?.clone());
                 }
 
                 OpCode::Putfield => {
@@ -288,7 +288,11 @@ impl<'a> CallFrame<'a> {
                         Self::get_field(self.class_and_method.class, field_reference.field_name)?;
 
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    Self::validate_type(Some(field.type_descriptor.clone()), &Some(value.clone()))?;
+                    Self::validate_type(
+                        Some(field.type_descriptor.clone()),
+                        &Some(value.clone()),
+                        vm,
+                    )?;
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
                         object_ref.borrow_mut().fields[index] = value;
@@ -312,6 +316,7 @@ impl<'a> CallFrame<'a> {
                         Self::validate_type(
                             Some(field.type_descriptor.clone()),
                             &Some(field_value.clone()),
+                            vm,
                         )?;
                         self.stack.push(field_value);
                     } else {
@@ -320,8 +325,8 @@ impl<'a> CallFrame<'a> {
                 }
 
                 OpCode::Iadd => {
-                    let i1 = Self::pop_int(&mut self.stack)?;
-                    let i2 = Self::pop_int(&mut self.stack)?;
+                    let i1 = Self::pop_int(&mut self.stack, vm)?;
+                    let i2 = Self::pop_int(&mut self.stack, vm)?;
                     self.stack.push(Value::Int(i1 + i2));
                 }
 
@@ -347,9 +352,9 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn pop_int(stack: &mut Vec<Value>) -> Result<i32, VmError> {
+    fn pop_int(stack: &mut Vec<Value>, vm: &Vm) -> Result<i32, VmError> {
         let value = stack.pop().ok_or(VmError::ValidationException)?;
-        Self::validate_type(Some(Base(BaseType::Int)), &Some(value.clone()))?;
+        Self::validate_type(Some(Base(BaseType::Int)), &Some(value.clone()), vm)?;
         match value {
             Value::Int(int) => Ok(int),
             _ => Err(VmError::ValidationException),
@@ -509,6 +514,7 @@ impl<'a> CallFrame<'a> {
     fn validate_type(
         expected_type: Option<FieldType>,
         value: &Option<Value>,
+        vm: &Vm,
     ) -> Result<(), VmError> {
         match expected_type {
             None => match value {
@@ -518,7 +524,7 @@ impl<'a> CallFrame<'a> {
             Some(expected_type) => match value {
                 None => Err(VmError::ValidationException),
                 Some(value) => {
-                    if value.matches_type(expected_type) {
+                    if value.matches_type(expected_type, &vm.class_loader) {
                         Ok(())
                     } else {
                         Err(VmError::ValidationException)
@@ -528,10 +534,10 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn get_local_int(&self, index: usize) -> Result<&Value, VmError> {
+    fn get_local_int(&self, index: usize, vm: &Vm) -> Result<&Value, VmError> {
         // TODO: short, char, byte should (probably?) to be modelled as int
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        Self::validate_type(Some(Base(BaseType::Int)), &Some(variable.clone()))?;
+        Self::validate_type(Some(Base(BaseType::Int)), &Some(variable.clone()), vm)?;
         Ok(variable)
     }
 
@@ -586,7 +592,7 @@ impl<'a> Vm<'a> {
     }
 
     pub fn find_class<'b>(&'b self, class_name: &str) -> Option<ClassRef<'a>> {
-        self.class_loader.find_class(class_name)
+        self.class_loader.find_class_by_name(class_name)
     }
 
     pub fn get_class(&self, class_name: &str) -> Result<ClassRef<'a>, VmError> {
@@ -641,8 +647,7 @@ impl<'a> Vm<'a> {
         debug!("allocating new instance of {}", class_name);
 
         let instance = self.get_class(class_name).map(|class| ObjectValue {
-            // TODO
-            // class: class.clone(),
+            class_id: class.id,
             fields: class.fields.iter().map(|_| Value::Uninitialized).collect(),
         })?;
         let instance = Rc::new(RefCell::new(instance));
