@@ -505,7 +505,7 @@ impl<'a> CallFrame<'a> {
         match receiver {
             Object(object) => {
                 // TODO: here we should check "instanceof" the expected class of a subclass
-                Ok(object.clone())
+                Ok(object)
             }
             _ => Err(VmError::ValidationException),
         }

@@ -1,8 +1,7 @@
 use rjvm_reader::utils;
-use rjvm_vm::value::{ObjectRef, ObjectValue, Value};
 use rjvm_vm::vm::Vm;
 
-fn load_class<'a>(vm: &mut Vm<'a>, bytes: &[u8]) {
+fn load_class(vm: &mut Vm, bytes: &[u8]) {
     let class_file = utils::read_class_from_bytes(bytes);
     vm.load_class(class_file).unwrap();
 }
