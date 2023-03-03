@@ -5,8 +5,18 @@ use rjvm_reader::{
     class_file_method::ClassFileMethod, constant_pool::ConstantPool,
 };
 
+#[derive(Debug, Clone, Copy)]
+pub struct ClassId(u64);
+
+impl ClassId {
+    pub(crate) fn new(id: u64) -> Self {
+        Self(id)
+    }
+}
+
 #[derive(Debug)]
 pub struct Class<'a> {
+    pub id: ClassId,
     pub name: String,
     pub constants: ConstantPool,
     pub flags: ClassAccessFlags,

@@ -6,7 +6,7 @@ use typed_arena::Arena;
 
 use rjvm_reader::class_file::ClassFile;
 
-use crate::class::ClassRef;
+use crate::class::{ClassId, ClassRef};
 use crate::{class::Class, vm_error::VmError};
 
 pub trait ClassResolver<'a> {
@@ -15,12 +15,14 @@ pub trait ClassResolver<'a> {
 
 pub struct ClassAllocator<'a> {
     arena: Arena<Class<'a>>,
+    next_id: u64,
 }
 
 impl<'a> Default for ClassAllocator<'a> {
     fn default() -> Self {
         Self {
             arena: Arena::with_capacity(100),
+            next_id: 1,
         }
     }
 }
@@ -32,18 +34,22 @@ impl<'a> fmt::Debug for ClassAllocator<'a> {
 }
 
 impl<'a> ClassAllocator<'a> {
-    pub fn allocate<'b>(
-        &'b self,
+    pub fn allocate(
+        &mut self,
         class_file: ClassFile,
         resolver: &impl ClassResolver<'a>,
     ) -> Result<ClassRef<'a>, VmError> {
-        let class = Self::new_class(class_file, resolver)?;
+        let next_id = self.next_id;
+        self.next_id += 1;
+
+        let class = Self::new_class(class_file, ClassId::new(next_id), resolver)?;
         let class_ref = self.arena.alloc(class);
 
         // SAFETY: our reference class_ref is alive only for 'b.
         // However we actually know that the arena will keep the value alive for 'a,
         // and I cannot find a way to convince the compiler of this fact. Thus
-        // we use this pointer "trick" to make the compiler happy
+        // I'm using this pointer "trick" to make the compiler happy.
+        // I'm sure this can be done with safe Rust, I just do not know how at the moment...
         unsafe {
             let class_ptr: *const Class<'a> = class_ref;
             Ok(&*class_ptr)
@@ -52,6 +58,7 @@ impl<'a> ClassAllocator<'a> {
 
     fn new_class(
         class_file: ClassFile,
+        id: ClassId,
         resolver: &impl ClassResolver<'a>,
     ) -> Result<Class<'a>, VmError> {
         let superclass = class_file
@@ -74,6 +81,7 @@ impl<'a> ClassAllocator<'a> {
             .collect();
 
         Ok(Class {
+            id,
             name: class_file.name,
             constants: class_file.constants,
             flags: class_file.flags,
