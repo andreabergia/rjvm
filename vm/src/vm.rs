@@ -144,48 +144,21 @@ impl<'a> CallFrame<'a> {
                 OpCode::Aconst_null => self.stack.push(Value::Null),
                 OpCode::Aload => {
                     let index = instruction.argument_u8(0)?.into_usize_safe();
-                    let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
-                    self.stack.push(local.clone());
+                    self.execute_aload(index)?;
                 }
-                OpCode::Aload_0 => {
-                    let local = self.locals.get(0).ok_or(VmError::ValidationException)?;
-                    self.stack.push(local.clone());
-                }
-                OpCode::Aload_1 => {
-                    let local = self.locals.get(1).ok_or(VmError::ValidationException)?;
-                    self.stack.push(local.clone());
-                }
-                OpCode::Aload_2 => {
-                    let local = self.locals.get(2).ok_or(VmError::ValidationException)?;
-                    self.stack.push(local.clone());
-                }
-                OpCode::Aload_3 => {
-                    let local = self.locals.get(3).ok_or(VmError::ValidationException)?;
-                    self.stack.push(local.clone());
-                }
+                OpCode::Aload_0 => self.execute_aload(0)?,
+                OpCode::Aload_1 => self.execute_aload(1)?,
+                OpCode::Aload_2 => self.execute_aload(2)?,
+                OpCode::Aload_3 => self.execute_aload(3)?,
 
                 OpCode::Astore => {
                     let index = instruction.argument_u8(0)?.into_usize_safe();
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    // TODO: validate is object
-                    self.locals[index] = value;
+                    self.execute_astore(index)?;
                 }
-                OpCode::Astore_0 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[0] = value;
-                }
-                OpCode::Astore_1 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[1] = value;
-                }
-                OpCode::Astore_2 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[2] = value;
-                }
-                OpCode::Astore_3 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[3] = value;
-                }
+                OpCode::Astore_0 => self.execute_astore(0)?,
+                OpCode::Astore_1 => self.execute_astore(1)?,
+                OpCode::Astore_2 => self.execute_astore(2)?,
+                OpCode::Astore_3 => self.execute_astore(3)?,
 
                 OpCode::Istore => {
                     let index = instruction.argument_u8(0)?.into_usize_safe();
@@ -673,6 +646,28 @@ impl<'a> CallFrame<'a> {
             self.goto(instruction)
         } else {
             Ok(())
+        }
+    }
+
+    fn execute_aload(&mut self, index: usize) -> Result<(), VmError> {
+        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        match local {
+            Object(_) => {
+                self.stack.push(local.clone());
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_astore(&mut self, index: usize) -> Result<(), VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Object(_) => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
         }
     }
 
