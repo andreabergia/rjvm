@@ -31,6 +31,8 @@ pub struct Class<'a> {
     pub interfaces: Vec<ClassRef<'a>>,
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<ClassFileMethod>,
+    pub first_field_index: usize,
+    pub num_total_fields: usize,
 }
 
 pub type ClassRef<'a> = &'a Class<'a>;
@@ -47,11 +49,22 @@ impl<'a> Class<'a> {
             .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
     }
 
-    pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
-        // TODO: replace linear search with something faster
-        self.fields
-            .iter()
-            .enumerate()
-            .find(|entry| entry.1.name == field_name)
+    pub fn find_field(
+        &self,
+        class_name: &str,
+        field_name: &str,
+    ) -> Option<(usize, &ClassFileField)> {
+        // TODO: maybe replace linear search with something faster?
+        if class_name == self.name {
+            self.fields
+                .iter()
+                .enumerate()
+                .find(|entry| entry.1.name == field_name)
+                .map(|(index, field)| (index + self.first_field_index, field))
+        } else if let Some(superclass) = &self.superclass {
+            superclass.find_field(class_name, field_name)
+        } else {
+            None
+        }
     }
 }

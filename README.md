@@ -32,6 +32,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
   - [x] static methods invocation
   - [x] virtual methods invocation
   - [x] modelling of super classes
+  - [ ] abstract methods
   - [ ] object allocations and garbage collection
   - [ ] exceptions
   - [ ] threading

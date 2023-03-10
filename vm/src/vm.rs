@@ -84,7 +84,6 @@ struct MethodReference<'a> {
 
 #[derive(Debug)]
 struct FieldReference<'a> {
-    #[allow(dead_code)]
     class_name: &'a str,
     field_name: &'a str,
     #[allow(dead_code)]
@@ -241,7 +240,7 @@ impl<'a> CallFrame<'a> {
 
                     // TODO: validate class? How do super classes work?
                     let (index, field) =
-                        Self::get_field(self.class_and_method.class, field_reference.field_name)?;
+                        Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
                     Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
@@ -259,7 +258,7 @@ impl<'a> CallFrame<'a> {
 
                     // TODO: validate class? How do super classes work?
                     let (index, field) =
-                        Self::get_field(self.class_and_method.class, field_reference.field_name)?;
+                        Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
@@ -341,13 +340,13 @@ impl<'a> CallFrame<'a> {
 
     fn get_field(
         class: &'a Class,
-        field_name: &str,
+        field_reference: FieldReference,
     ) -> Result<(usize, &'a ClassFileField), VmError> {
         class
-            .find_field(field_name)
+            .find_field(field_reference.class_name, field_reference.field_name)
             .ok_or(VmError::FieldNotFoundException(
-                class.name.to_string(),
-                field_name.to_string(),
+                field_reference.class_name.to_string(),
+                field_reference.field_name.to_string(),
             ))
     }
 
@@ -447,11 +446,11 @@ impl<'a> CallFrame<'a> {
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
         let class = vm.get_class(method_reference.class_name)?;
-        let method = match kind {
-            InvokeKind::Special | InvokeKind::Static => Self::get_method(class, method_reference)?,
-            InvokeKind::Virtual => Self::get_virtual_method(class, method_reference)?,
-        };
-        Ok(ClassAndMethod { class, method })
+        match kind {
+            InvokeKind::Special | InvokeKind::Static => Self::get_method(class, method_reference)
+                .map(|method| ClassAndMethod { class, method }),
+            InvokeKind::Virtual => Self::get_virtual_method(class, method_reference),
+        }
     }
 
     fn get_method<'b>(
@@ -473,14 +472,17 @@ impl<'a> CallFrame<'a> {
     fn get_virtual_method<'b>(
         class: &'b Class<'a>,
         method_reference: MethodReference,
-    ) -> Result<&'b ClassFileMethod, VmError> {
+    ) -> Result<ClassAndMethod<'b>, VmError> {
         let mut curr_class = class;
         loop {
             if let Some(method) = curr_class.find_method(
                 method_reference.method_name,
                 method_reference.type_descriptor,
             ) {
-                return Ok(method);
+                return Ok(ClassAndMethod {
+                    class: curr_class,
+                    method,
+                });
             }
 
             if let Some(superclass) = class.superclass {

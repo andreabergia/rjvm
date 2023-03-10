@@ -33,7 +33,9 @@ pub struct ObjectValue<'a> {
 
 impl<'a> ObjectValue<'a> {
     pub fn new(class: &Class<'a>) -> Self {
-        let fields = class.fields.iter().map(|_| Value::Uninitialized).collect();
+        let fields = (0..class.num_total_fields)
+            .map(|_| Value::Uninitialized)
+            .collect();
         Self {
             class_id: class.id,
             fields: RefCell::new(fields),

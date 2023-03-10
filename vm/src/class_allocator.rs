@@ -81,6 +81,12 @@ impl<'a> ClassAllocator<'a> {
             })
             .collect();
 
+        let num_superclass_fields = match superclass {
+            Some(superclass) => superclass.num_total_fields,
+            None => 0,
+        };
+        let num_this_class_fields = class_file.fields.len();
+
         Ok(Class {
             id,
             name: class_file.name,
@@ -90,6 +96,8 @@ impl<'a> ClassAllocator<'a> {
             interfaces: interfaces?,
             fields: class_file.fields,
             methods: class_file.methods,
+            num_total_fields: num_superclass_fields + num_this_class_fields,
+            first_field_index: num_superclass_fields,
         })
     }
 }
