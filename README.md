@@ -30,11 +30,12 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
         - [ ] arrays
   - [x] new object instances creation
   - [x] static methods invocation
-  - [ ] virtual methods invocation
-  - [ ] modelling of super classes
+  - [x] virtual methods invocation
+  - [x] modelling of super classes
   - [ ] object allocations and garbage collection
   - [ ] exceptions
   - [ ] threading
+  - [ ] tons of other features :-)
 
 ## Structure
 

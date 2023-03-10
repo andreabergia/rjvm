@@ -96,6 +96,12 @@ pub struct CallFrame<'a> {
     stack: Vec<Value<'a>>,
 }
 
+enum InvokeKind {
+    Special,
+    Static,
+    Virtual,
+}
+
 impl<'a> CallFrame<'a> {
     fn new(class_and_method: ClassAndMethod<'a>, locals: Vec<Value<'a>>) -> Self {
         let max_stack_size = class_and_method
@@ -202,49 +208,13 @@ impl<'a> CallFrame<'a> {
                 OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
 
                 OpCode::Invokespecial => {
-                    let class_and_method = self.get_method_to_invoke(vm, instruction)?;
-                    let (receiver, params, new_stack_len) =
-                        self.get_method_receiver_and_params(&class_and_method)?;
-                    self.stack.truncate(new_stack_len);
-
-                    let method_return_type = class_and_method.return_type();
-                    let result = vm.invoke(stack, class_and_method, receiver, params)?;
-
-                    Self::validate_type(method_return_type, &result, vm)?;
-                    if let Some(value) = result {
-                        self.stack.push(value);
-                    }
+                    self.invoke_method(vm, stack, instruction, InvokeKind::Special)?
                 }
-
                 OpCode::Invokestatic => {
-                    let class_and_method = self.get_method_to_invoke(vm, instruction)?;
-                    let (receiver, params, new_stack_len) =
-                        self.get_method_receiver_and_params(&class_and_method)?;
-                    self.stack.truncate(new_stack_len);
-
-                    let method_return_type = class_and_method.return_type();
-                    let result = vm.invoke(stack, class_and_method, receiver, params)?;
-
-                    Self::validate_type(method_return_type, &result, vm)?;
-                    if let Some(value) = result {
-                        self.stack.push(value);
-                    }
+                    self.invoke_method(vm, stack, instruction, InvokeKind::Static)?
                 }
-
                 OpCode::Invokevirtual => {
-                    // TODO: should actually go through superclasses to find the correct method
-                    let class_and_method = self.get_method_to_invoke(vm, instruction)?;
-                    let (receiver, params, new_stack_len) =
-                        self.get_method_receiver_and_params(&class_and_method)?;
-                    self.stack.truncate(new_stack_len);
-
-                    let method_return_type = class_and_method.return_type();
-                    let result = vm.invoke(stack, class_and_method, receiver, params)?;
-
-                    Self::validate_type(method_return_type, &result, vm)?;
-                    if let Some(value) = result {
-                        self.stack.push(value);
-                    }
+                    self.invoke_method(vm, stack, instruction, InvokeKind::Virtual)?
                 }
 
                 OpCode::Return => {
@@ -338,6 +308,28 @@ impl<'a> CallFrame<'a> {
         }
 
         Err(VmError::NullPointerException)
+    }
+
+    fn invoke_method(
+        &mut self,
+        vm: &mut Vm<'a>,
+        stack: &mut Stack<'a>,
+        instruction: &Instruction,
+        kind: InvokeKind,
+    ) -> Result<(), VmError> {
+        let class_and_method = self.get_method_to_invoke(vm, instruction, kind)?;
+        let (receiver, params, new_stack_len) =
+            self.get_method_receiver_and_params(&class_and_method)?;
+        self.stack.truncate(new_stack_len);
+
+        let method_return_type = class_and_method.return_type();
+        let result = vm.invoke(stack, class_and_method, receiver, params)?;
+
+        Self::validate_type(method_return_type, &result, vm)?;
+        if let Some(value) = result {
+            self.stack.push(value);
+        }
+        Ok(())
     }
 
     fn get_field(
@@ -442,31 +434,58 @@ impl<'a> CallFrame<'a> {
         &self,
         vm: &Vm<'a>,
         instruction: &Instruction,
+        kind: InvokeKind,
     ) -> Result<ClassAndMethod<'a>, VmError> {
         let constant_index = instruction.arguments_u16(0)?;
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
         let class = vm.get_class(method_reference.class_name)?;
-        let method = Self::get_method(
-            class,
-            method_reference.method_name,
-            method_reference.type_descriptor,
-        )?;
+        let method = match kind {
+            InvokeKind::Special | InvokeKind::Static => Self::get_method(class, method_reference)?,
+            InvokeKind::Virtual => Self::get_virtual_method(class, method_reference)?,
+        };
         Ok(ClassAndMethod { class, method })
     }
 
     fn get_method<'b>(
         class: &'b Class<'a>,
-        method_name: &str,
-        type_descriptor: &str,
+        method_reference: MethodReference,
     ) -> Result<&'b ClassFileMethod, VmError> {
         class
-            .find_method(method_name, type_descriptor)
+            .find_method(
+                method_reference.method_name,
+                method_reference.type_descriptor,
+            )
             .ok_or(VmError::MethodNotFoundException(
                 class.name.to_string(),
-                method_name.to_string(),
-                type_descriptor.to_string(),
+                method_reference.method_name.to_string(),
+                method_reference.type_descriptor.to_string(),
             ))
+    }
+
+    fn get_virtual_method<'b>(
+        class: &'b Class<'a>,
+        method_reference: MethodReference,
+    ) -> Result<&'b ClassFileMethod, VmError> {
+        let mut curr_class = class;
+        loop {
+            if let Some(method) = curr_class.find_method(
+                method_reference.method_name,
+                method_reference.type_descriptor,
+            ) {
+                return Ok(method);
+            }
+
+            if let Some(superclass) = class.superclass {
+                curr_class = superclass;
+            } else {
+                return Err(VmError::MethodNotFoundException(
+                    class.name.to_string(),
+                    method_reference.method_name.to_string(),
+                    method_reference.type_descriptor.to_string(),
+                ));
+            }
+        }
     }
 
     fn get_method_receiver_and_params(
