@@ -179,13 +179,13 @@ impl<'a> CallFrame<'a> {
                 OpCode::Istore_2 => self.execute_istore(2)?,
                 OpCode::Istore_3 => self.execute_istore(3)?,
 
-                OpCode::Iconst_m1 => self.stack.push(Value::Int(-1)),
-                OpCode::Iconst_0 => self.stack.push(Value::Int(0)),
-                OpCode::Iconst_1 => self.stack.push(Value::Int(1)),
-                OpCode::Iconst_2 => self.stack.push(Value::Int(2)),
-                OpCode::Iconst_3 => self.stack.push(Value::Int(3)),
-                OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
-                OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
+                OpCode::Iconst_m1 => self.stack.push(Int(-1)),
+                OpCode::Iconst_0 => self.stack.push(Int(0)),
+                OpCode::Iconst_1 => self.stack.push(Int(1)),
+                OpCode::Iconst_2 => self.stack.push(Int(2)),
+                OpCode::Iconst_3 => self.stack.push(Int(3)),
+                OpCode::Iconst_4 => self.stack.push(Int(4)),
+                OpCode::Iconst_5 => self.stack.push(Int(5)),
 
                 OpCode::New => {
                     let constant_index = instruction.arguments_u16(0)?;
@@ -204,7 +204,7 @@ impl<'a> CallFrame<'a> {
                 }
                 OpCode::Bipush => {
                     let byte_value = instruction.argument_u8(0)?;
-                    self.stack.push(Value::Int(byte_value as i32));
+                    self.stack.push(Int(byte_value as i32));
                 }
 
                 OpCode::Invokespecial => {
@@ -288,7 +288,7 @@ impl<'a> CallFrame<'a> {
                     let index = instruction.argument_u8(0)?.into_usize_safe();
                     let local = self.get_local_int_as_int(vm, index)?;
                     let constant = instruction.argument_i8(1)?;
-                    self.locals[index] = Value::Int(local + constant as i32);
+                    self.locals[index] = Int(local + constant as i32);
                 }
 
                 OpCode::Goto => self.goto(instruction)?,
@@ -353,7 +353,7 @@ impl<'a> CallFrame<'a> {
         let value = stack.pop().ok_or(VmError::ValidationException)?;
         Self::validate_type(vm, Base(BaseType::Int), &value)?;
         match value {
-            Value::Int(int) => Ok(int),
+            Int(int) => Ok(int),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -570,7 +570,7 @@ impl<'a> CallFrame<'a> {
     fn get_local_int_as_int(&self, vm: &Vm, index: usize) -> Result<i32, VmError> {
         let value = self.get_local_int(vm, index)?;
         match value {
-            Value::Int(the_int) => Ok(the_int),
+            Int(the_int) => Ok(the_int),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -582,7 +582,7 @@ impl<'a> CallFrame<'a> {
         let val2 = Self::pop_int(&mut self.stack, vm)?;
         let val1 = Self::pop_int(&mut self.stack, vm)?;
         let result = evaluator(val1, val2)?;
-        self.stack.push(Value::Int(result));
+        self.stack.push(Int(result));
         Ok(())
     }
 
