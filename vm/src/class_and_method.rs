@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use rjvm_reader::class_file_method::ClassFileMethod;
 use rjvm_reader::field_type::FieldType;
 
@@ -8,7 +6,7 @@ use crate::class::ClassRef;
 #[derive(Debug, Clone)]
 pub struct ClassAndMethod<'a> {
     pub class: ClassRef<'a>,
-    pub method: Rc<ClassFileMethod>,
+    pub method: &'a ClassFileMethod,
 }
 
 impl<'a> ClassAndMethod<'a> {

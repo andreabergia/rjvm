@@ -455,11 +455,11 @@ impl<'a> CallFrame<'a> {
         Ok(ClassAndMethod { class, method })
     }
 
-    fn get_method(
-        class: &Class<'a>,
+    fn get_method<'b>(
+        class: &'b Class<'a>,
         method_name: &str,
         type_descriptor: &str,
-    ) -> Result<Rc<ClassFileMethod>, VmError> {
+    ) -> Result<&'b ClassFileMethod, VmError> {
         class
             .find_method(method_name, type_descriptor)
             .ok_or(VmError::MethodNotFoundException(

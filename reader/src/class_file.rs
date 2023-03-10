@@ -1,5 +1,4 @@
 use std::fmt;
-use std::rc::Rc;
 
 use crate::{
     class_access_flags::ClassAccessFlags, class_file_field::ClassFileField,
@@ -17,7 +16,7 @@ pub struct ClassFile {
     pub superclass: Option<String>,
     pub interfaces: Vec<String>,
     pub fields: Vec<ClassFileField>,
-    pub methods: Vec<Rc<ClassFileMethod>>,
+    pub methods: Vec<ClassFileMethod>,
 }
 
 impl fmt::Display for ClassFile {

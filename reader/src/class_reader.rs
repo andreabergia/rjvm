@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::{fs::File, io::Read, path::Path};
 
 use log::warn;
@@ -307,8 +306,7 @@ impl<'a> ClassFileReader<'a> {
         let methods_count = self.buffer.read_u16()?;
         self.class_file.methods = (0..methods_count)
             .map(|_| self.read_method())
-            .map(|method_result| method_result.map(Rc::new))
-            .collect::<Result<Vec<Rc<ClassFileMethod>>>>()?;
+            .collect::<Result<Vec<ClassFileMethod>>>()?;
         Ok(())
     }
 
