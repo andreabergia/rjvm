@@ -45,8 +45,7 @@ fn simple_main() {
     );
 
     let main_result = invoke(&mut vm, "rjvm/SimpleMain", "main", "([Ljava/lang/String;)V");
-    assert!(main_result.is_ok());
-    assert!(main_result.unwrap().is_none());
+    assert_eq!(Ok(None), main_result);
 
     assert_eq!(vec![Value::Int(3), Value::Int(6)], vm.printed);
 }
@@ -70,8 +69,7 @@ fn superclasses() {
         "main",
         "([Ljava/lang/String;)V",
     );
-    assert!(main_result.is_ok());
-    assert!(main_result.unwrap().is_none());
+    assert_eq!(Ok(None), main_result);
 
     assert_eq!(vec![Value::Int(1)], vm.printed);
 }
@@ -87,8 +85,7 @@ fn control_flow() {
         "main",
         "([Ljava/lang/String;)V",
     );
-    assert!(main_result.is_ok());
-    assert!(main_result.unwrap().is_none());
+    assert_eq!(Ok(None), main_result);
 
     assert_eq!(vec![Value::Int(241)], vm.printed);
 }

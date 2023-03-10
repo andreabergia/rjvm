@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use rjvm_reader::class_reader_error::ClassReaderError;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum VmError {
     #[error("null pointer exception")]
     NullPointerException,
@@ -18,7 +18,7 @@ pub enum VmError {
 
     #[error("validation exception - invalid class file")]
     ValidationException,
-    
+
     #[error("arithmetic exception")]
     ArithmeticException,
 
