@@ -7,7 +7,7 @@ use crate::class::{Class, ClassId};
 use crate::class_allocator::ClassResolver;
 
 // TODO: do we need short/char/byte? What about boolean?
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum Value<'a> {
     #[default]
     Uninitialized,
@@ -24,6 +24,7 @@ pub enum Value<'a> {
     // TODO: array?
 }
 
+#[derive(Clone, PartialEq, Eq)]
 pub struct ObjectValue<'a> {
     pub class_id: ClassId,
     fields: RefCell<Vec<Value<'a>>>,

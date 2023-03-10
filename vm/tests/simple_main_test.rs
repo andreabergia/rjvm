@@ -1,4 +1,5 @@
 use rjvm_reader::utils;
+use rjvm_vm::value::Value;
 use rjvm_vm::vm::Vm;
 
 fn load_class(vm: &mut Vm, bytes: &[u8]) {
@@ -30,4 +31,8 @@ fn can_execute_real_code() {
     print!("result: {main_result:?}");
     assert!(main_result.is_ok());
     assert!(main_result.unwrap().is_none());
+
+    assert_eq!(2, vm.printed.len());
+    assert_eq!(Value::Int(3), *vm.printed.get(0).unwrap());
+    assert_eq!(Value::Int(6), *vm.printed.get(1).unwrap());
 }

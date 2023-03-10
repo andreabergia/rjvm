@@ -576,6 +576,7 @@ pub struct Vm<'a> {
     class_allocator: ClassAllocator<'a>,
     class_loader: ClassLoader<'a>,
     object_allocator: ObjectAllocator<'a>,
+    pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 }
 
 impl<'a> Vm<'a> {
@@ -626,11 +627,12 @@ impl<'a> Vm<'a> {
         args: Vec<Value<'a>>,
     ) -> Result<Option<Value<'a>>, VmError> {
         if class_and_method.method.is_native() {
-            return if class_and_method.class.name == "rjvm/SimpleMain"
+            return if class_and_method.class.name.starts_with("rjvm/")
                 && class_and_method.method.name == "tempPrint"
             {
                 let arg = args.get(0).ok_or(VmError::ValidationException)?;
                 info!("TEMP implementation of native method: printing value {arg:?}");
+                self.printed.push(arg.clone());
                 Ok(None)
             } else {
                 Err(VmError::NotImplemented)
