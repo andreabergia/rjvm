@@ -1,19 +1,20 @@
 use std::fmt;
 use std::fmt::Formatter;
 
+use rjvm_utils::buffer::Buffer;
+
 use crate::class_reader_error::ClassReaderError;
 use crate::class_reader_error::ClassReaderError::UnsupportedInstruction;
 use crate::opcodes::InstructionLength::Fixed;
 use crate::opcodes::{InstructionLength, OpCode};
-use rjvm_utils::buffer::Buffer;
 
 #[derive(Debug, PartialEq)]
-pub struct Instruction {
+pub struct Instruction<'a> {
     pub op_code: OpCode,
-    pub arguments: Vec<u8>,
+    pub arguments: &'a [u8],
 }
 
-impl fmt::Display for Instruction {
+impl<'a> fmt::Display for Instruction<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if self.arguments.is_empty() {
             write!(f, "{}", self.op_code)
@@ -23,8 +24,34 @@ impl fmt::Display for Instruction {
     }
 }
 
-impl Instruction {
-    pub fn parse_instructions(raw_code: &[u8]) -> Result<Vec<Self>, ClassReaderError> {
+impl<'a> Instruction<'a> {
+    pub fn parse_instruction(raw_code: &'a [u8], index: usize) -> Result<Self, ClassReaderError> {
+        let op_byte = *raw_code
+            .get(index)
+            .ok_or(ClassReaderError::InvalidClassData(format!(
+                "cannot read instruction at offset {}",
+                index
+            )))?;
+        let op_code = OpCode::try_from(op_byte).map_err(|_| {
+            ClassReaderError::InvalidClassData(format!("invalid op code: {op_byte:#04x}"))
+        })?;
+
+        let arguments = match op_code.instruction_length() {
+            Fixed(arguments_len) => {
+                if index + 1 + arguments_len > raw_code.len() {
+                    return Err(ClassReaderError::InvalidClassData(format!(
+                        "cannot read arguments of instruction {op_code}"
+                    )));
+                }
+                &raw_code[index + 1..index + 1 + arguments_len]
+            }
+            InstructionLength::Variable => return Err(UnsupportedInstruction(op_code)),
+        };
+
+        Ok(Self { op_code, arguments })
+    }
+
+    pub fn parse_instructions(raw_code: &'a [u8]) -> Result<Vec<Self>, ClassReaderError> {
         let mut reader = Buffer::new(raw_code);
         let mut instructions: Vec<Instruction> = Vec::new();
 
@@ -43,10 +70,7 @@ impl Instruction {
                 InstructionLength::Variable => Err(UnsupportedInstruction(op_code)),
             }?;
 
-            instructions.push(Instruction {
-                op_code,
-                arguments: Vec::from(arguments),
-            });
+            instructions.push(Instruction { op_code, arguments });
         }
 
         Ok(instructions)
@@ -74,5 +98,9 @@ impl Instruction {
                 "invalid arguments of instruction".to_string(),
             ))
             .map(|byte_ref| unsafe { std::mem::transmute(*byte_ref) })
+    }
+
+    pub fn length(&self) -> usize {
+        1 + self.arguments.len()
     }
 }

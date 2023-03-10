@@ -18,7 +18,6 @@ use crate::{
     constant_pool::ConstantPoolEntry,
     field_flags::FieldFlags,
     field_type::FieldType,
-    instruction::Instruction,
     method_descriptor::MethodDescriptor,
     method_flags::MethodFlags,
 };
@@ -353,8 +352,7 @@ impl<'a> ClassFileReader<'a> {
                 let max_stack = buf.read_u16()?;
                 let max_locals = buf.read_u16()?;
                 let code_length = buf.read_u32()?.into_usize_safe();
-                let raw_code = buf.read_bytes(code_length)?;
-                let code = Instruction::parse_instructions(raw_code)?;
+                let code = Vec::from(buf.read_bytes(code_length)?);
                 let exception_table_length = buf.read_u16()?.into_usize_safe();
                 let exception_table = Vec::from(buf.read_bytes(exception_table_length)?);
                 let attributes =

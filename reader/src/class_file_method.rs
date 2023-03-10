@@ -1,9 +1,11 @@
 use std::fmt;
 use std::fmt::Formatter;
+use std::ptr::write;
 
+use crate::instruction::Instruction;
 use crate::{
-    attribute::Attribute, field_type::FieldType, instruction::Instruction,
-    method_descriptor::MethodDescriptor, method_flags::MethodFlags,
+    attribute::Attribute, field_type::FieldType, method_descriptor::MethodDescriptor,
+    method_flags::MethodFlags,
 };
 
 #[derive(Debug, Default, PartialEq)]
@@ -52,7 +54,7 @@ impl ClassFileMethod {
 pub struct ClassFileMethodCode {
     pub max_stack: u16,
     pub max_locals: u16,
-    pub code: Vec<Instruction>,
+    pub code: Vec<u8>,
     pub exception_table: Vec<u8>, // TODO: replace with some proper struct
     pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
 }
@@ -64,8 +66,14 @@ impl fmt::Display for ClassFileMethodCode {
             "max_stack = {}, max_locals = {}, exception_table = {:?}, attributes = {:?}, instructions:",
             self.max_stack, self.max_locals, self.exception_table, self.attributes
         )?;
-        for instruction in self.code.iter() {
-            writeln!(f, "    {instruction}")?;
+
+        let instructions = Instruction::parse_instructions(&self.code);
+        if let Ok(instructions) = instructions {
+            for instruction in instructions {
+                writeln!(f, "    {instruction}")?;
+            }
+        } else {
+            writeln!(f, "    unparseable code: {:?}", self.code)?;
         }
         Ok(())
     }

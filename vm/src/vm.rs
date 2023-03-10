@@ -94,6 +94,7 @@ pub struct CallFrame<'a> {
     pc: usize,
     locals: Vec<Value<'a>>,
     stack: Vec<Value<'a>>,
+    code: &'a Vec<u8>,
 }
 
 enum InvokeKind {
@@ -111,11 +112,18 @@ impl<'a> CallFrame<'a> {
             .expect("method is not native")
             .max_stack
             .into_usize_safe();
+        let code = &class_and_method
+            .method
+            .code
+            .as_ref()
+            .expect("method is not native")
+            .code;
         CallFrame {
             class_and_method,
             pc: 0,
             locals,
             stack: Vec::with_capacity(max_stack_size),
+            code,
         }
     }
 
@@ -126,17 +134,11 @@ impl<'a> CallFrame<'a> {
     ) -> Result<Option<Value<'a>>, VmError> {
         self.debug_start_execution();
 
-        let code = &self
-            .class_and_method
-            .method
-            .code
-            .as_ref()
-            .expect("method is not native")
-            .code;
         loop {
-            let instruction = &code[self.pc];
-            self.debug_print_status(instruction);
-            self.pc += 1;
+            let instruction = Instruction::parse_instruction(self.code, self.pc)
+                .map_err(|_| VmError::ValidationException)?;
+            self.pc += instruction.length();
+            self.debug_print_status(&instruction);
 
             match instruction.op_code {
                 OpCode::Aload => {
@@ -358,15 +360,13 @@ impl<'a> CallFrame<'a> {
                 }
             }
         }
-
-        Err(VmError::NullPointerException)
     }
 
     fn invoke_method(
         &mut self,
         vm: &mut Vm<'a>,
         stack: &mut Stack<'a>,
-        instruction: &Instruction,
+        instruction: Instruction,
         kind: InvokeKind,
     ) -> Result<(), VmError> {
         let class_and_method = self.get_method_to_invoke(vm, instruction, kind)?;
@@ -485,7 +485,7 @@ impl<'a> CallFrame<'a> {
     fn get_method_to_invoke(
         &self,
         vm: &Vm<'a>,
-        instruction: &Instruction,
+        instruction: Instruction,
         kind: InvokeKind,
     ) -> Result<ClassAndMethod<'a>, VmError> {
         let constant_index = instruction.arguments_u16(0)?;
@@ -636,7 +636,7 @@ impl<'a> CallFrame<'a> {
     fn execute_if<T>(
         &mut self,
         vm: &mut Vm,
-        instruction: &Instruction,
+        instruction: Instruction,
         comparator: T,
     ) -> Result<(), VmError>
     where
@@ -650,7 +650,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn goto(&mut self, instruction: &Instruction) -> Result<(), VmError> {
+    fn goto(&mut self, instruction: Instruction) -> Result<(), VmError> {
         let offset = instruction.arguments_u16(0)?;
         self.pc = (self.pc - 1) + offset.into_usize_safe();
         Ok(())
@@ -659,7 +659,7 @@ impl<'a> CallFrame<'a> {
     fn execute_if_icmp<T>(
         &mut self,
         vm: &mut Vm,
-        instruction: &Instruction,
+        instruction: Instruction,
         comparator: T,
     ) -> Result<(), VmError>
     where
@@ -682,10 +682,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn debug_print_status(&self, instruction: &Instruction) {
-        debug!(
-            "FRAME STATUS: pc: {}, next instruction: {}",
-            self.pc, instruction
-        );
+        debug!("FRAME STATUS: pc: {}", self.pc);
         debug!("  stack:");
         for stack_entry in self.stack.iter() {
             debug!("  - {:?}", stack_entry);
@@ -694,6 +691,7 @@ impl<'a> CallFrame<'a> {
         for local_variable in self.locals.iter() {
             debug!("  - {:?}", local_variable);
         }
+        debug!("  next instruction: {}", instruction)
     }
 
     fn debug_done_execution(&self, result: Option<&Value>) {
