@@ -80,6 +80,10 @@ impl<'a> Buffer<'a> {
         self.advance(len)
     }
 
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
     #[allow(dead_code)]
     pub fn has_more_data(&self) -> bool {
         self.position < self.buffer.len()

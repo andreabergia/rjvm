@@ -20,6 +20,7 @@ pub enum Value<'a> {
     Double(i64),
     Boolean(bool),
     Object(ObjectRef<'a>),
+    Null,
     // TODO: return address?
     // TODO: array?
 }
@@ -104,6 +105,7 @@ impl<'a> Value<'a> {
                 }
                 _ => false,
             },
+            Value::Null => false,
         }
     }
 }

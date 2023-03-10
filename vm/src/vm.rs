@@ -137,12 +137,13 @@ impl<'a> CallFrame<'a> {
         loop {
             let instruction = Instruction::parse_instruction(self.code, self.pc)
                 .map_err(|_| VmError::ValidationException)?;
-            self.pc += instruction.length();
             self.debug_print_status(&instruction);
+            self.pc += instruction.length();
 
             match instruction.op_code {
+                OpCode::Aconst_null => self.stack.push(Value::Null),
                 OpCode::Aload => {
-                    let index = instruction.argument(0)?.into_usize_safe();
+                    let index = instruction.argument_u8(0)?.into_usize_safe();
                     let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
                     self.stack.push(local.clone());
                 }
@@ -164,7 +165,7 @@ impl<'a> CallFrame<'a> {
                 }
 
                 OpCode::Astore => {
-                    let index = instruction.argument(0)?.into_usize_safe();
+                    let index = instruction.argument_u8(0)?.into_usize_safe();
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
                     // TODO: validate is object
                     self.locals[index] = value;
@@ -187,7 +188,7 @@ impl<'a> CallFrame<'a> {
                 }
 
                 OpCode::Istore => {
-                    let index = instruction.argument(0)?.into_usize_safe();
+                    let index = instruction.argument_u8(0)?.into_usize_safe();
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
                     // TODO: validate is int
                     self.locals[index] = value;
@@ -233,7 +234,7 @@ impl<'a> CallFrame<'a> {
                 OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
                 OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
                 OpCode::Bipush => {
-                    let byte_value = instruction.argument(0)?;
+                    let byte_value = instruction.argument_u8(0)?;
                     self.stack.push(Value::Int(byte_value as i32));
                 }
 
@@ -264,7 +265,7 @@ impl<'a> CallFrame<'a> {
                 }
 
                 OpCode::Iload => {
-                    let index = instruction.argument(0)?.into_usize_safe();
+                    let index = instruction.argument_u8(0)?.into_usize_safe();
                     self.stack.push(self.get_local_int(vm, index)?.clone());
                 }
                 OpCode::Iload_0 => {
@@ -332,9 +333,9 @@ impl<'a> CallFrame<'a> {
                 OpCode::Ixor => self.execute_int_math(vm, |a, b| Ok(a ^ b))?,
 
                 OpCode::Iinc => {
-                    let index = instruction.argument(0)?.into_usize_safe();
+                    let index = instruction.argument_u8(0)?.into_usize_safe();
                     let local = self.get_local_int_as_int(vm, index)?;
-                    let constant = instruction.argument_signed(1)?;
+                    let constant = instruction.argument_i8(1)?;
                     self.locals[index] = Value::Int(local + constant as i32);
                 }
 
@@ -633,6 +634,13 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
+    fn goto(&mut self, instruction: Instruction) -> Result<(), VmError> {
+        let offset = instruction.arguments_i16(0)?;
+        let new_pc = (self.pc - instruction.length()) as i32 + offset as i32;
+        self.pc = usize::try_from(new_pc).map_err(|_| VmError::ValidationException)?;
+        Ok(())
+    }
+
     fn execute_if<T>(
         &mut self,
         vm: &mut Vm,
@@ -650,12 +658,6 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn goto(&mut self, instruction: Instruction) -> Result<(), VmError> {
-        let offset = instruction.arguments_u16(0)?;
-        self.pc = (self.pc - 1) + offset.into_usize_safe();
-        Ok(())
-    }
-
     fn execute_if_icmp<T>(
         &mut self,
         vm: &mut Vm,
@@ -668,10 +670,10 @@ impl<'a> CallFrame<'a> {
         let val2 = Self::pop_int(&mut self.stack, vm)?;
         let val1 = Self::pop_int(&mut self.stack, vm)?;
         if comparator(val1, val2) {
-            let offset = instruction.arguments_u16(0)?;
-            self.pc = (self.pc - 1) + offset.into_usize_safe();
+            self.goto(instruction)
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     fn debug_start_execution(&self) {

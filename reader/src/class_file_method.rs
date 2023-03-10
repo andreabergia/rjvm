@@ -1,6 +1,5 @@
 use std::fmt;
 use std::fmt::Formatter;
-use std::ptr::write;
 
 use crate::instruction::Instruction;
 use crate::{
@@ -69,8 +68,8 @@ impl fmt::Display for ClassFileMethodCode {
 
         let instructions = Instruction::parse_instructions(&self.code);
         if let Ok(instructions) = instructions {
-            for instruction in instructions {
-                writeln!(f, "    {instruction}")?;
+            for (address, instruction) in instructions {
+                writeln!(f, "    {address:3} {instruction}")?;
             }
         } else {
             writeln!(f, "    unparseable code: {:?}", self.code)?;

@@ -51,11 +51,12 @@ impl<'a> Instruction<'a> {
         Ok(Self { op_code, arguments })
     }
 
-    pub fn parse_instructions(raw_code: &'a [u8]) -> Result<Vec<Self>, ClassReaderError> {
+    pub fn parse_instructions(raw_code: &'a [u8]) -> Result<Vec<(usize, Self)>, ClassReaderError> {
         let mut reader = Buffer::new(raw_code);
-        let mut instructions: Vec<Instruction> = Vec::new();
+        let mut instructions: Vec<(usize, Self)> = Vec::new();
 
         while reader.has_more_data() {
+            let address = reader.position();
             let op_byte = reader.read_u8()?;
             let op_code = OpCode::try_from(op_byte).map_err(|_| {
                 ClassReaderError::InvalidClassData(format!("invalid op code: {op_byte:#04x}"))
@@ -70,13 +71,13 @@ impl<'a> Instruction<'a> {
                 InstructionLength::Variable => Err(UnsupportedInstruction(op_code)),
             }?;
 
-            instructions.push(Instruction { op_code, arguments });
+            instructions.push((address, Instruction { op_code, arguments }));
         }
 
         Ok(instructions)
     }
 
-    pub fn argument(&self, index: usize) -> Result<u8, ClassReaderError> {
+    pub fn argument_u8(&self, index: usize) -> Result<u8, ClassReaderError> {
         self.arguments
             .get(index)
             .ok_or(ClassReaderError::ValidationError(
@@ -85,19 +86,20 @@ impl<'a> Instruction<'a> {
             .map(|byte_ref| *byte_ref)
     }
 
+    pub fn argument_i8(&self, index: usize) -> Result<i8, ClassReaderError> {
+        self.argument_u8(index)
+            .map(|byte_ref| unsafe { std::mem::transmute(byte_ref) })
+    }
+
     pub fn arguments_u16(&self, index: usize) -> Result<u16, ClassReaderError> {
-        let index_byte_1 = self.argument(index)? as u16;
-        let index_byte_2 = self.argument(index + 1)? as u16;
+        let index_byte_1 = self.argument_u8(index)? as u16;
+        let index_byte_2 = self.argument_u8(index + 1)? as u16;
         Ok((index_byte_1 << 8) | index_byte_2)
     }
 
-    pub fn argument_signed(&self, index: usize) -> Result<i8, ClassReaderError> {
-        self.arguments
-            .get(index)
-            .ok_or(ClassReaderError::ValidationError(
-                "invalid arguments of instruction".to_string(),
-            ))
-            .map(|byte_ref| unsafe { std::mem::transmute(*byte_ref) })
+    pub fn arguments_i16(&self, index: usize) -> Result<i16, ClassReaderError> {
+        self.arguments_u16(index)
+            .map(|byte_ref| unsafe { std::mem::transmute(byte_ref) })
     }
 
     pub fn length(&self) -> usize {
