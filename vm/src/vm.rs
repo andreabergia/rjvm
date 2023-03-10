@@ -84,8 +84,10 @@ struct MethodReference<'a> {
 
 #[derive(Debug)]
 struct FieldReference<'a> {
+    #[allow(dead_code)]
     class_name: &'a str,
     field_name: &'a str,
+    #[allow(dead_code)]
     type_descriptor: &'a str,
 }
 
