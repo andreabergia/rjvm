@@ -11,11 +11,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      CARGO_TERM_COLOR: always
+
     steps:
       - uses: actions/checkout@v3
-      - name: Build
-        run: cargo build --verbose
-      - name: Run tests
-        run: RUST_LOG=trace cargo test --verbose -- --nocapture
+      - run: |
+          rustup set auto-self-update disable
+          rustup toolchain install stable --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build and test
+        run: |
+          cargo check
+          RUST_LOG=trace cargo test --verbose -- --nocapture
+
       - name: Lint
         run: cargo clippy
