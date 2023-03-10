@@ -66,4 +66,13 @@ impl Instruction {
         let index_byte_2 = self.argument(index + 1)? as u16;
         Ok((index_byte_1 << 8) | index_byte_2)
     }
+
+    pub fn argument_signed(&self, index: usize) -> Result<i8, ClassReaderError> {
+        self.arguments
+            .get(index)
+            .ok_or(ClassReaderError::ValidationError(
+                "invalid arguments of instruction".to_string(),
+            ))
+            .map(|byte_ref| unsafe { std::mem::transmute(*byte_ref) })
+    }
 }

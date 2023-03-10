@@ -75,3 +75,20 @@ fn superclasses() {
 
     assert_eq!(vec![Value::Int(1)], vm.printed);
 }
+
+#[test_log::test]
+fn control_flow() {
+    let mut vm = create_base_vm();
+    load_class(&mut vm, include_bytes!("resources/rjvm/ControlFlow.class"));
+
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/ControlFlow",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert!(main_result.is_ok());
+    assert!(main_result.unwrap().is_none());
+
+    assert_eq!(vec![Value::Int(241)], vm.printed);
+}

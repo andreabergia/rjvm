@@ -133,7 +133,8 @@ impl<'a> CallFrame<'a> {
             .as_ref()
             .expect("method is not native")
             .code;
-        for instruction in code {
+        loop {
+            let instruction = &code[self.pc];
             self.debug_print_status(instruction);
             self.pc += 1;
 
@@ -183,6 +184,29 @@ impl<'a> CallFrame<'a> {
                     self.locals[3] = value;
                 }
 
+                OpCode::Istore => {
+                    let index = instruction.argument(0)?.into_usize_safe();
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    // TODO: validate is int
+                    self.locals[index] = value;
+                }
+                OpCode::Istore_0 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[0] = value;
+                }
+                OpCode::Istore_1 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[1] = value;
+                }
+                OpCode::Istore_2 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[2] = value;
+                }
+                OpCode::Istore_3 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    self.locals[3] = value;
+                }
+
                 OpCode::New => {
                     let constant_index = instruction.arguments_u16(0)?;
                     let new_object_class_name =
@@ -206,6 +230,10 @@ impl<'a> CallFrame<'a> {
                 OpCode::Iconst_3 => self.stack.push(Value::Int(3)),
                 OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
                 OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
+                OpCode::Bipush => {
+                    let byte_value = instruction.argument(0)?;
+                    self.stack.push(Value::Int(byte_value as i32));
+                }
 
                 OpCode::Invokespecial => {
                     self.invoke_method(vm, stack, instruction, InvokeKind::Special)?
@@ -235,19 +263,19 @@ impl<'a> CallFrame<'a> {
 
                 OpCode::Iload => {
                     let index = instruction.argument(0)?.into_usize_safe();
-                    self.stack.push(self.get_local_int(index, vm)?.clone());
+                    self.stack.push(self.get_local_int(vm, index)?.clone());
                 }
                 OpCode::Iload_0 => {
-                    self.stack.push(self.get_local_int(0, vm)?.clone());
+                    self.stack.push(self.get_local_int(vm, 0)?.clone());
                 }
                 OpCode::Iload_1 => {
-                    self.stack.push(self.get_local_int(1, vm)?.clone());
+                    self.stack.push(self.get_local_int(vm, 1)?.clone());
                 }
                 OpCode::Iload_2 => {
-                    self.stack.push(self.get_local_int(2, vm)?.clone());
+                    self.stack.push(self.get_local_int(vm, 2)?.clone());
                 }
                 OpCode::Iload_3 => {
-                    self.stack.push(self.get_local_int(3, vm)?.clone());
+                    self.stack.push(self.get_local_int(vm, 3)?.clone());
                 }
 
                 OpCode::Putfield => {
@@ -259,11 +287,7 @@ impl<'a> CallFrame<'a> {
                         Self::get_field(self.class_and_method.class, field_reference.field_name)?;
 
                     let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    Self::validate_type(
-                        Some(field.type_descriptor.clone()),
-                        &Some(value.clone()),
-                        vm,
-                    )?;
+                    Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
                         object_ref.set_field(index, value);
@@ -283,22 +307,50 @@ impl<'a> CallFrame<'a> {
                     let object = self.stack.pop().ok_or(VmError::ValidationException)?;
                     if let Object(object_ref) = object {
                         let field_value = object_ref.get_field(index);
-                        Self::validate_type(
-                            Some(field.type_descriptor.clone()),
-                            &Some(field_value.clone()),
-                            vm,
-                        )?;
+                        Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
                         self.stack.push(field_value);
                     } else {
                         return Err(VmError::ValidationException);
                     }
                 }
 
-                OpCode::Iadd => {
-                    let i1 = Self::pop_int(&mut self.stack, vm)?;
-                    let i2 = Self::pop_int(&mut self.stack, vm)?;
-                    self.stack.push(Value::Int(i1 + i2));
+                OpCode::Iadd => self.execute_int_math(vm, |a, b| Ok(a + b))?,
+                OpCode::Isub => self.execute_int_math(vm, |a, b| Ok(a - b))?,
+                OpCode::Imul => self.execute_int_math(vm, |a, b| Ok(a * b))?,
+                OpCode::Idiv => self.execute_int_math(vm, |a, b| match b {
+                    0 => Err(VmError::ArithmeticException),
+                    _ => Ok(a / b),
+                })?,
+                OpCode::Irem => self.execute_int_math(vm, |a, b| match b {
+                    0 => Err(VmError::ArithmeticException),
+                    _ => Ok(a % b),
+                })?,
+                OpCode::Iand => self.execute_int_math(vm, |a, b| Ok(a & b))?,
+                OpCode::Ior => self.execute_int_math(vm, |a, b| Ok(a | b))?,
+                OpCode::Ixor => self.execute_int_math(vm, |a, b| Ok(a ^ b))?,
+
+                OpCode::Iinc => {
+                    let index = instruction.argument(0)?.into_usize_safe();
+                    let local = self.get_local_int_as_int(vm, index)?;
+                    let constant = instruction.argument_signed(1)?;
+                    self.locals[index] = Value::Int(local + constant as i32);
                 }
+
+                OpCode::Goto => self.goto(instruction)?,
+
+                OpCode::Ifeq => self.execute_if(vm, instruction, |v| v == 0)?,
+                OpCode::Ifne => self.execute_if(vm, instruction, |v| v != 0)?,
+                OpCode::Iflt => self.execute_if(vm, instruction, |v| v < 0)?,
+                OpCode::Ifle => self.execute_if(vm, instruction, |v| v <= 0)?,
+                OpCode::Ifgt => self.execute_if(vm, instruction, |v| v > 0)?,
+                OpCode::Ifge => self.execute_if(vm, instruction, |v| v >= 0)?,
+
+                OpCode::If_icmpeq => self.execute_if_icmp(vm, instruction, |a, b| a == b)?,
+                OpCode::If_icmpne => self.execute_if_icmp(vm, instruction, |a, b| a != b)?,
+                OpCode::If_icmplt => self.execute_if_icmp(vm, instruction, |a, b| a < b)?,
+                OpCode::If_icmple => self.execute_if_icmp(vm, instruction, |a, b| a <= b)?,
+                OpCode::If_icmpgt => self.execute_if_icmp(vm, instruction, |a, b| a > b)?,
+                OpCode::If_icmpge => self.execute_if_icmp(vm, instruction, |a, b| a >= b)?,
 
                 _ => {
                     warn!("Unsupported op code: {}", instruction.op_code);
@@ -325,7 +377,7 @@ impl<'a> CallFrame<'a> {
         let method_return_type = class_and_method.return_type();
         let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
-        Self::validate_type(method_return_type, &result, vm)?;
+        Self::validate_type_opt(vm, method_return_type, &result)?;
         if let Some(value) = result {
             self.stack.push(value);
         }
@@ -346,7 +398,7 @@ impl<'a> CallFrame<'a> {
 
     fn pop_int(stack: &mut Vec<Value<'a>>, vm: &Vm) -> Result<i32, VmError> {
         let value = stack.pop().ok_or(VmError::ValidationException)?;
-        Self::validate_type(Some(Base(BaseType::Int)), &Some(value.clone()), vm)?;
+        Self::validate_type(vm, Base(BaseType::Int), &value)?;
         match value {
             Value::Int(int) => Ok(int),
             _ => Err(VmError::ValidationException),
@@ -530,10 +582,10 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn validate_type(
+    fn validate_type_opt(
+        vm: &Vm,
         expected_type: Option<FieldType>,
         value: &Option<Value<'a>>,
-        vm: &Vm,
     ) -> Result<(), VmError> {
         match expected_type {
             None => match value {
@@ -542,22 +594,84 @@ impl<'a> CallFrame<'a> {
             },
             Some(expected_type) => match value {
                 None => Err(VmError::ValidationException),
-                Some(value) => {
-                    if value.matches_type(expected_type, &vm.class_loader) {
-                        Ok(())
-                    } else {
-                        Err(VmError::ValidationException)
-                    }
-                }
+                Some(value) => Self::validate_type(vm, expected_type, value),
             },
         }
     }
 
-    fn get_local_int(&self, index: usize, vm: &Vm) -> Result<Value<'a>, VmError> {
+    fn validate_type(vm: &Vm, expected_type: FieldType, value: &Value) -> Result<(), VmError> {
+        if value.matches_type(expected_type, &vm.class_loader) {
+            Ok(())
+        } else {
+            Err(VmError::ValidationException)
+        }
+    }
+
+    fn get_local_int(&self, vm: &Vm, index: usize) -> Result<Value<'a>, VmError> {
         // TODO: short, char, byte should (probably?) to be modelled as int
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        Self::validate_type(Some(Base(BaseType::Int)), &Some(variable.clone()), vm)?;
+        Self::validate_type(vm, Base(BaseType::Int), &variable)?;
         Ok(variable.clone())
+    }
+
+    fn get_local_int_as_int(&self, vm: &Vm, index: usize) -> Result<i32, VmError> {
+        let value = self.get_local_int(vm, index)?;
+        match value {
+            Value::Int(the_int) => Ok(the_int),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_int_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    where
+        T: FnOnce(i32, i32) -> Result<i32, VmError>,
+    {
+        let val2 = Self::pop_int(&mut self.stack, vm)?;
+        let val1 = Self::pop_int(&mut self.stack, vm)?;
+        let result = evaluator(val1, val2)?;
+        self.stack.push(Value::Int(result));
+        Ok(())
+    }
+
+    fn execute_if<T>(
+        &mut self,
+        vm: &mut Vm,
+        instruction: &Instruction,
+        comparator: T,
+    ) -> Result<(), VmError>
+    where
+        T: FnOnce(i32) -> bool,
+    {
+        let value = Self::pop_int(&mut self.stack, vm)?;
+        if comparator(value) {
+            self.goto(instruction)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn goto(&mut self, instruction: &Instruction) -> Result<(), VmError> {
+        let offset = instruction.arguments_u16(0)?;
+        self.pc = (self.pc - 1) + offset.into_usize_safe();
+        Ok(())
+    }
+
+    fn execute_if_icmp<T>(
+        &mut self,
+        vm: &mut Vm,
+        instruction: &Instruction,
+        comparator: T,
+    ) -> Result<(), VmError>
+    where
+        T: FnOnce(i32, i32) -> bool,
+    {
+        let val2 = Self::pop_int(&mut self.stack, vm)?;
+        let val1 = Self::pop_int(&mut self.stack, vm)?;
+        if comparator(val1, val2) {
+            let offset = instruction.arguments_u16(0)?;
+            self.pc = (self.pc - 1) + offset.into_usize_safe();
+        }
+        Ok(())
     }
 
     fn debug_start_execution(&self) {

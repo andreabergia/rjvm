@@ -18,6 +18,9 @@ pub enum VmError {
 
     #[error("validation exception - invalid class file")]
     ValidationException,
+    
+    #[error("arithmetic exception")]
+    ArithmeticException,
 
     #[error("not yet implemented")]
     NotImplemented,
