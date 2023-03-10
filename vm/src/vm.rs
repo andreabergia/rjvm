@@ -15,6 +15,7 @@ use crate::class::ClassRef;
 use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::gc::ObjectAllocator;
 use crate::value::ObjectRef;
+use crate::value::Value::Int;
 use crate::{
     class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::Value,
     value::Value::Object, vm_error::VmError,
@@ -160,28 +161,31 @@ impl<'a> CallFrame<'a> {
                 OpCode::Astore_2 => self.execute_astore(2)?,
                 OpCode::Astore_3 => self.execute_astore(3)?,
 
+                OpCode::Iload => {
+                    let index = instruction.argument_u8(0)?.into_usize_safe();
+                    self.execute_iload(index)?;
+                }
+                OpCode::Iload_0 => self.execute_iload(0)?,
+                OpCode::Iload_1 => self.execute_iload(1)?,
+                OpCode::Iload_2 => self.execute_iload(2)?,
+                OpCode::Iload_3 => self.execute_iload(3)?,
+
                 OpCode::Istore => {
                     let index = instruction.argument_u8(0)?.into_usize_safe();
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    // TODO: validate is int
-                    self.locals[index] = value;
+                    self.execute_istore(index)?;
                 }
-                OpCode::Istore_0 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[0] = value;
-                }
-                OpCode::Istore_1 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[1] = value;
-                }
-                OpCode::Istore_2 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[2] = value;
-                }
-                OpCode::Istore_3 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.locals[3] = value;
-                }
+                OpCode::Istore_0 => self.execute_istore(0)?,
+                OpCode::Istore_1 => self.execute_istore(1)?,
+                OpCode::Istore_2 => self.execute_istore(2)?,
+                OpCode::Istore_3 => self.execute_istore(3)?,
+
+                OpCode::Iconst_m1 => self.stack.push(Value::Int(-1)),
+                OpCode::Iconst_0 => self.stack.push(Value::Int(0)),
+                OpCode::Iconst_1 => self.stack.push(Value::Int(1)),
+                OpCode::Iconst_2 => self.stack.push(Value::Int(2)),
+                OpCode::Iconst_3 => self.stack.push(Value::Int(3)),
+                OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
+                OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
 
                 OpCode::New => {
                     let constant_index = instruction.arguments_u16(0)?;
@@ -198,14 +202,6 @@ impl<'a> CallFrame<'a> {
                 OpCode::Pop => {
                     self.stack.pop().ok_or(VmError::ValidationException)?;
                 }
-
-                OpCode::Iconst_m1 => self.stack.push(Value::Int(-1)),
-                OpCode::Iconst_0 => self.stack.push(Value::Int(0)),
-                OpCode::Iconst_1 => self.stack.push(Value::Int(1)),
-                OpCode::Iconst_2 => self.stack.push(Value::Int(2)),
-                OpCode::Iconst_3 => self.stack.push(Value::Int(3)),
-                OpCode::Iconst_4 => self.stack.push(Value::Int(4)),
-                OpCode::Iconst_5 => self.stack.push(Value::Int(5)),
                 OpCode::Bipush => {
                     let byte_value = instruction.argument_u8(0)?;
                     self.stack.push(Value::Int(byte_value as i32));
@@ -235,23 +231,6 @@ impl<'a> CallFrame<'a> {
                     let result = self.stack.pop().ok_or(VmError::ValidationException)?;
                     self.debug_done_execution(Some(&result));
                     return Ok(Some(result));
-                }
-
-                OpCode::Iload => {
-                    let index = instruction.argument_u8(0)?.into_usize_safe();
-                    self.stack.push(self.get_local_int(vm, index)?.clone());
-                }
-                OpCode::Iload_0 => {
-                    self.stack.push(self.get_local_int(vm, 0)?.clone());
-                }
-                OpCode::Iload_1 => {
-                    self.stack.push(self.get_local_int(vm, 1)?.clone());
-                }
-                OpCode::Iload_2 => {
-                    self.stack.push(self.get_local_int(vm, 2)?.clone());
-                }
-                OpCode::Iload_3 => {
-                    self.stack.push(self.get_local_int(vm, 3)?.clone());
                 }
 
                 OpCode::Putfield => {
@@ -664,6 +643,28 @@ impl<'a> CallFrame<'a> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Object(_) => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_iload(&mut self, index: usize) -> Result<(), VmError> {
+        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        match local {
+            Int(_) => {
+                self.stack.push(local.clone());
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_istore(&mut self, index: usize) -> Result<(), VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Int(_) => {
                 self.locals[index] = value;
                 Ok(())
             }
