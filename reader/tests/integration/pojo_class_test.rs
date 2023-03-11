@@ -14,7 +14,7 @@ use rjvm_reader::{
 
 #[test_log::test]
 fn can_read_pojo_class_file() {
-    let class = utils::read_class_from_bytes(include_bytes!("resources/rjvm/Complex.class"));
+    let class = utils::read_class_from_bytes(include_bytes!("../resources/rjvm/Complex.class"));
     assert_eq!(ClassFileVersion::Jdk6, class.version);
     assert_eq!(
         ClassAccessFlags::PUBLIC | ClassAccessFlags::SUPER,

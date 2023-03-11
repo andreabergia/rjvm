@@ -12,7 +12,7 @@ fn create_base_vm() -> Vm<'static> {
     let mut vm = Vm::new();
     load_class(
         &mut vm,
-        include_bytes!("resources/jre-8-rt/java/lang/Object.class"),
+        include_bytes!("../resources/jre-8-rt/java/lang/Object.class"),
     );
     vm
 }
@@ -38,10 +38,13 @@ fn invoke<'a>(
 #[test_log::test]
 fn simple_main() {
     let mut vm = create_base_vm();
-    load_class(&mut vm, include_bytes!("resources/rjvm/SimpleMain.class"));
     load_class(
         &mut vm,
-        include_bytes!("resources/rjvm/SimpleMain$Generator.class"),
+        include_bytes!("../resources/rjvm/SimpleMain.class"),
+    );
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/SimpleMain$Generator.class"),
     );
 
     let main_result = invoke(&mut vm, "rjvm/SimpleMain", "main", "([Ljava/lang/String;)V");
@@ -53,14 +56,17 @@ fn simple_main() {
 #[test_log::test]
 fn superclasses() {
     let mut vm = create_base_vm();
-    load_class(&mut vm, include_bytes!("resources/rjvm/SuperClasses.class"));
     load_class(
         &mut vm,
-        include_bytes!("resources/rjvm/SuperClasses$BaseClass.class"),
+        include_bytes!("../resources/rjvm/SuperClasses.class"),
     );
     load_class(
         &mut vm,
-        include_bytes!("resources/rjvm/SuperClasses$DerivedClass.class"),
+        include_bytes!("../resources/rjvm/SuperClasses$BaseClass.class"),
+    );
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/SuperClasses$DerivedClass.class"),
     );
 
     let main_result = invoke(
@@ -77,7 +83,10 @@ fn superclasses() {
 #[test_log::test]
 fn control_flow() {
     let mut vm = create_base_vm();
-    load_class(&mut vm, include_bytes!("resources/rjvm/ControlFlow.class"));
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/ControlFlow.class"),
+    );
 
     let main_result = invoke(
         &mut vm,
