@@ -16,16 +16,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - run: |
           rustup set auto-self-update disable
           rustup toolchain install stable --profile minimal
+
+      - uses: taiki-e/install-action@nextest
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Build and test
         run: |
           cargo check
-          RUST_LOG=trace cargo test --verbose -- --nocapture
+          RUST_LOG=trace cargo nextest run --verbose -- --nocapture
 
       - name: Lint
         run: cargo clippy
