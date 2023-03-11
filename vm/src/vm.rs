@@ -11,7 +11,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::class::ClassRef;
+use crate::class::{ClassId, ClassRef};
 use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::gc::ObjectAllocator;
 use crate::value::ObjectRef;
@@ -99,6 +99,7 @@ pub struct CallFrame<'a> {
     code: &'a Vec<u8>,
 }
 
+#[derive(Clone, Copy)]
 enum InvokeKind {
     Special,
     Static,
@@ -326,10 +327,14 @@ impl<'a> CallFrame<'a> {
         let class_and_method = self.get_method_to_invoke(vm, instruction, kind)?;
         let (receiver, params, new_stack_len) =
             self.get_method_receiver_and_params(&class_and_method)?;
+        let actual_class_and_method = match kind {
+            InvokeKind::Virtual => Self::get_actual_virtual_method(vm, receiver, class_and_method)?,
+            _ => class_and_method,
+        };
         self.stack.truncate(new_stack_len);
 
-        let method_return_type = class_and_method.return_type();
-        let result = vm.invoke(stack, class_and_method, receiver, params)?;
+        let method_return_type = actual_class_and_method.return_type();
+        let result = vm.invoke(stack, actual_class_and_method, receiver, params)?;
 
         Self::validate_type_opt(vm, method_return_type, &result)?;
         if let Some(value) = result {
@@ -449,7 +454,7 @@ impl<'a> CallFrame<'a> {
         match kind {
             InvokeKind::Special | InvokeKind::Static => Self::get_method(class, method_reference)
                 .map(|method| ClassAndMethod { class, method }),
-            InvokeKind::Virtual => Self::get_virtual_method(class, method_reference),
+            InvokeKind::Virtual => Self::get_method_checking_superclasses(class, method_reference),
         }
     }
 
@@ -469,7 +474,7 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn get_virtual_method<'b>(
+    fn get_method_checking_superclasses<'b>(
         class: &'b Class<'a>,
         method_reference: MethodReference,
     ) -> Result<ClassAndMethod<'b>, VmError> {
@@ -493,6 +498,27 @@ impl<'a> CallFrame<'a> {
                     method_reference.method_name.to_string(),
                     method_reference.type_descriptor.to_string(),
                 ));
+            }
+        }
+    }
+
+    fn get_actual_virtual_method(
+        vm: &Vm<'a>,
+        receiver: Option<ObjectRef>,
+        class_and_method: ClassAndMethod,
+    ) -> Result<ClassAndMethod<'a>, VmError> {
+        match receiver {
+            None => Err(VmError::ValidationException),
+            Some(receiver) => {
+                let receiver_class = vm.get_class_by_id(receiver.class_id)?;
+                return Self::get_method_checking_superclasses(
+                    receiver_class,
+                    MethodReference {
+                        class_name: &class_and_method.class.name,
+                        method_name: &class_and_method.method.name,
+                        type_descriptor: &class_and_method.method.type_descriptor,
+                    },
+                );
             }
         }
     }
@@ -732,6 +758,12 @@ impl<'a> Vm<'a> {
     pub fn get_class(&self, class_name: &str) -> Result<ClassRef<'a>, VmError> {
         self.find_class(class_name)
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
+    }
+
+    pub fn get_class_by_id(&self, class_id: ClassId) -> Result<ClassRef<'a>, VmError> {
+        self.class_loader
+            .find_class_by_id(class_id)
+            .ok_or(VmError::ClassNotFoundException(class_id.to_string()))
     }
 
     pub fn find_class_method(
