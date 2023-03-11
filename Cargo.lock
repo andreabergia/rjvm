@@ -268,14 +268,12 @@ name = "rjvm_reader"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "cesu8",
  "env_logger",
  "int-enum",
  "itertools",
  "log",
  "result",
  "rjvm_utils",
- "strum",
  "strum_macros",
  "test-log",
  "thiserror",
@@ -285,16 +283,7 @@ dependencies = [
 name = "rjvm_utils"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "cesu8",
- "env_logger",
- "int-enum",
- "itertools",
- "log",
- "result",
- "strum",
- "strum_macros",
- "test-log",
  "thiserror",
 ]
 
@@ -303,13 +292,10 @@ name = "rjvm_vm"
 version = "0.1.0"
 dependencies = [
  "env_logger",
- "int-enum",
  "log",
  "result",
  "rjvm_reader",
  "rjvm_utils",
- "strum",
- "strum_macros",
  "test-log",
  "thiserror",
  "typed-arena",
@@ -334,12 +320,6 @@ name = "rustversion"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5583e89e108996506031660fe09baa5011b9dd0341b89029313006d1fb508d70"
-
-[[package]]
-name = "strum"
-version = "0.24.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
 
 [[package]]
 name = "strum_macros"
