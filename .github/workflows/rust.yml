@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - uses: extractions/setup-just@v1
+
       - run: |
           rustup set auto-self-update disable
           rustup toolchain install stable --profile minimal
@@ -26,9 +28,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build and test
-        run: |
-          cargo check
-          RUST_LOG=trace cargo nextest run --verbose -- --nocapture
+        run: just build test
 
       - name: Lint
-        run: cargo clippy
+        run: just lint
