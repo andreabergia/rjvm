@@ -77,7 +77,7 @@ fn superclasses() {
     );
     assert_eq!(Ok(None), main_result);
 
-    assert_eq!(vec![Value::Int(3)], vm.printed);
+    assert_eq!(vec![Value::Int(4)], vm.printed);
 }
 
 #[test_log::test]

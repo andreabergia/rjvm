@@ -324,17 +324,20 @@ impl<'a> CallFrame<'a> {
         instruction: Instruction,
         kind: InvokeKind,
     ) -> Result<(), VmError> {
-        let class_and_method = self.get_method_to_invoke(vm, instruction, kind)?;
+        let static_method_reference =
+            self.get_method_to_invoke_statically(vm, instruction, kind)?;
         let (receiver, params, new_stack_len) =
-            self.get_method_receiver_and_params(&class_and_method)?;
-        let actual_class_and_method = match kind {
-            InvokeKind::Virtual => Self::get_actual_virtual_method(vm, receiver, class_and_method)?,
-            _ => class_and_method,
+            self.get_method_receiver_and_params(&static_method_reference)?;
+        let class_and_method = match kind {
+            InvokeKind::Virtual => {
+                Self::resolve_virtual_method(vm, receiver, static_method_reference)?
+            }
+            _ => static_method_reference,
         };
         self.stack.truncate(new_stack_len);
 
-        let method_return_type = actual_class_and_method.return_type();
-        let result = vm.invoke(stack, actual_class_and_method, receiver, params)?;
+        let method_return_type = class_and_method.return_type();
+        let result = vm.invoke(stack, class_and_method, receiver, params)?;
 
         Self::validate_type_opt(vm, method_return_type, &result)?;
         if let Some(value) = result {
@@ -441,7 +444,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn get_method_to_invoke(
+    fn get_method_to_invoke_statically(
         &self,
         vm: &Vm<'a>,
         instruction: Instruction,
@@ -452,13 +455,15 @@ impl<'a> CallFrame<'a> {
 
         let class = vm.get_class(method_reference.class_name)?;
         match kind {
-            InvokeKind::Special | InvokeKind::Static => Self::get_method(class, method_reference)
-                .map(|method| ClassAndMethod { class, method }),
+            InvokeKind::Special | InvokeKind::Static => {
+                Self::get_method_of_class(class, method_reference)
+                    .map(|method| ClassAndMethod { class, method })
+            }
             InvokeKind::Virtual => Self::get_method_checking_superclasses(class, method_reference),
         }
     }
 
-    fn get_method<'b>(
+    fn get_method_of_class<'b>(
         class: &'b Class<'a>,
         method_reference: MethodReference,
     ) -> Result<&'b ClassFileMethod, VmError> {
@@ -502,7 +507,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn get_actual_virtual_method(
+    fn resolve_virtual_method(
         vm: &Vm<'a>,
         receiver: Option<ObjectRef>,
         class_and_method: ClassAndMethod,
@@ -511,14 +516,23 @@ impl<'a> CallFrame<'a> {
             None => Err(VmError::ValidationException),
             Some(receiver) => {
                 let receiver_class = vm.get_class_by_id(receiver.class_id)?;
-                return Self::get_method_checking_superclasses(
+                let resolved_method = Self::get_method_checking_superclasses(
                     receiver_class,
                     MethodReference {
                         class_name: &class_and_method.class.name,
                         method_name: &class_and_method.method.name,
                         type_descriptor: &class_and_method.method.type_descriptor,
                     },
+                )?;
+                debug!(
+                    "resolved virtual method {}.{}:{} on object of class {}: using version of class {}",
+                    class_and_method.class.name,
+                    class_and_method.method.name,
+                    class_and_method.method.type_descriptor,
+                    receiver_class.name,
+                    resolved_method.class.name,
                 );
+                Ok(resolved_method)
             }
         }
     }
