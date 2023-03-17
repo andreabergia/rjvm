@@ -19,20 +19,23 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
   - [ ] data types
       - [ ] primitives
         - [x] int
-        - [ ] short
-        - [ ] char
-        - [ ] byte
+        - [x] short
+        - [x] char
+        - [x] byte
         - [ ] long
-        - [ ] float
+        - [x] float
         - [ ] double
-        - [ ] boolean
+        - [x] boolean
         - [x] object
-        - [ ] arrays
+        - [ ] primitive arrays
+        - [ ] object arrays
+        - [ ] multidimensional arrays
   - [x] new object instances creation
   - [x] static methods invocation
   - [x] virtual methods invocation
   - [x] modelling of super classes
   - [x] abstract methods
+  - [x] control flow
   - [ ] object allocations and garbage collection
   - [ ] exceptions
   - [ ] threading
