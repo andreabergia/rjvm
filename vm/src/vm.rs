@@ -14,7 +14,7 @@ use crate::class::{ClassId, ClassRef};
 use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::gc::ObjectAllocator;
 use crate::value::ObjectRef;
-use crate::value::Value::Int;
+use crate::value::Value::{Float, Int};
 use crate::{
     class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::Value,
     value::Value::Object, vm_error::VmError,
@@ -176,6 +176,26 @@ impl<'a> CallFrame<'a> {
                 Instruction::Iconst_4 => self.stack.push(Int(4)),
                 Instruction::Iconst_5 => self.stack.push(Int(5)),
 
+                Instruction::Ldc(index) => self.execute_ldc(index as u16)?,
+                Instruction::Ldc_w(index) => self.execute_ldc(index)?,
+
+                Instruction::Fload(index) => self.execute_fload(index.into_usize_safe())?,
+                Instruction::Fload_0 => self.execute_fload(0)?,
+                Instruction::Fload_1 => self.execute_fload(1)?,
+                Instruction::Fload_2 => self.execute_fload(2)?,
+                Instruction::Fload_3 => self.execute_fload(3)?,
+
+                Instruction::Fstore(index) => self.execute_fstore(index.into_usize_safe())?,
+                Instruction::Fstore_0 => self.execute_fstore(0)?,
+                Instruction::Fstore_1 => self.execute_fstore(1)?,
+                Instruction::Fstore_2 => self.execute_fstore(2)?,
+                Instruction::Fstore_3 => self.execute_fstore(3)?,
+
+                Instruction::I2b => self.coerce_int(vm, |value| Int((value as i8) as i32))?,
+                Instruction::I2c => self.coerce_int(vm, |value| Int((value as u16) as i32))?,
+                Instruction::I2s => self.coerce_int(vm, |value| Int((value as i16) as i32))?,
+                Instruction::I2f => self.coerce_int(vm, |value| Float(value as f32))?,
+
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
@@ -273,6 +293,24 @@ impl<'a> CallFrame<'a> {
                     self.locals[index] = Int(local + constant as i32);
                 }
 
+                Instruction::Fadd => self.execute_float_math(vm, |a, b| Ok(a + b))?,
+                Instruction::Fsub => self.execute_float_math(vm, |a, b| Ok(a - b))?,
+                Instruction::Fmul => self.execute_float_math(vm, |a, b| Ok(a * b))?,
+                Instruction::Fdiv => self.execute_float_math(vm, |a, b| {
+                    Ok(if Self::is_float_division_returning_nan(a, b) {
+                        f32::NAN
+                    } else {
+                        a / b
+                    })
+                })?,
+                Instruction::Frem => self.execute_float_math(vm, |a, b| {
+                    Ok(if Self::is_float_division_returning_nan(a, b) {
+                        f32::NAN
+                    } else {
+                        a % b
+                    })
+                })?,
+
                 Instruction::Goto(jump_address) => self.goto(jump_address),
 
                 Instruction::Ifeq(jump_address) => self.execute_if(vm, jump_address, |v| v == 0)?,
@@ -355,6 +393,15 @@ impl<'a> CallFrame<'a> {
         Self::validate_type(vm, Base(BaseType::Int), &value)?;
         match value {
             Int(int) => Ok(int),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn pop_float(&mut self, vm: &Vm) -> Result<f32, VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        Self::validate_type(vm, Base(BaseType::Float), &value)?;
+        match value {
+            Float(float) => Ok(float),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -621,6 +668,34 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
+    fn is_float_division_returning_nan(a: f32, b: f32) -> bool {
+        a.is_nan()
+            || b.is_nan()
+            || (a.is_infinite() && b.is_infinite())
+            || ((a == 0f32 || a == -0f32) && (b == 0f32 || b == -0f32))
+    }
+
+    fn execute_float_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    where
+        T: FnOnce(f32, f32) -> Result<f32, VmError>,
+    {
+        let val2 = self.pop_float(vm)?;
+        let val1 = self.pop_float(vm)?;
+        let result = evaluator(val1, val2)?;
+        self.stack.push(Float(result));
+        Ok(())
+    }
+
+    fn coerce_int<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    where
+        T: FnOnce(i32) -> Value<'a>,
+    {
+        let value = Self::pop_int(&mut self.stack, vm)?;
+        let coerced = evaluator(value);
+        self.stack.push(coerced);
+        Ok(())
+    }
+
     fn goto(&mut self, jump_address: u16) {
         self.pc = jump_address.into_usize_safe();
     }
@@ -700,6 +775,41 @@ impl<'a> CallFrame<'a> {
             }
             _ => Err(VmError::ValidationException),
         }
+    }
+
+    fn execute_fload(&mut self, index: usize) -> Result<(), VmError> {
+        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        match local {
+            Float(_) => {
+                self.stack.push(local.clone());
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_fstore(&mut self, index: usize) -> Result<(), VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Float(_) => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_ldc(&mut self, index: u16) -> Result<(), VmError> {
+        let constant_value = self.get_constant(index)?;
+        match constant_value {
+            ConstantPoolEntry::Integer(value) => self.stack.push(Int(*value)),
+            ConstantPoolEntry::Float(value) => self.stack.push(Float(*value)),
+            // TODO: StringReference
+            // TODO: ClassReference
+            // TODO: method type or method handle
+            _ => return Err(VmError::ValidationException),
+        }
+        Ok(())
     }
 
     fn debug_start_execution(&self) {

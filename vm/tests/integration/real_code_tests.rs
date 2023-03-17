@@ -98,3 +98,22 @@ fn control_flow() {
 
     assert_eq!(vec![Value::Int(241)], vm.printed);
 }
+
+#[test_log::test]
+fn numeric_types() {
+    let mut vm = create_base_vm();
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/NumericTypes.class"),
+    );
+
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/NumericTypes",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(vec![Value::Int(3), Value::Float(3.45)], vm.printed);
+}
