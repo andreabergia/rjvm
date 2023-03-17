@@ -388,8 +388,8 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn pop_int(stack: &mut Vec<Value<'a>>, vm: &Vm) -> Result<i32, VmError> {
-        let value = stack.pop().ok_or(VmError::ValidationException)?;
+    fn pop_int(&mut self, vm: &Vm) -> Result<i32, VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         Self::validate_type(vm, Base(BaseType::Int), &value)?;
         match value {
             Int(int) => Ok(int),
@@ -661,8 +661,8 @@ impl<'a> CallFrame<'a> {
     where
         T: FnOnce(i32, i32) -> Result<i32, VmError>,
     {
-        let val2 = Self::pop_int(&mut self.stack, vm)?;
-        let val1 = Self::pop_int(&mut self.stack, vm)?;
+        let val2 = self.pop_int(vm)?;
+        let val1 = self.pop_int(vm)?;
         let result = evaluator(val1, val2)?;
         self.stack.push(Int(result));
         Ok(())
@@ -690,7 +690,7 @@ impl<'a> CallFrame<'a> {
     where
         T: FnOnce(i32) -> Value<'a>,
     {
-        let value = Self::pop_int(&mut self.stack, vm)?;
+        let value = self.pop_int(vm)?;
         let coerced = evaluator(value);
         self.stack.push(coerced);
         Ok(())
@@ -709,7 +709,7 @@ impl<'a> CallFrame<'a> {
     where
         T: FnOnce(i32) -> bool,
     {
-        let value = Self::pop_int(&mut self.stack, vm)?;
+        let value = self.pop_int(vm)?;
         if comparator(value) {
             self.goto(jump_address);
         }
@@ -725,8 +725,8 @@ impl<'a> CallFrame<'a> {
     where
         T: FnOnce(i32, i32) -> bool,
     {
-        let val2 = Self::pop_int(&mut self.stack, vm)?;
-        let val1 = Self::pop_int(&mut self.stack, vm)?;
+        let val2 = self.pop_int(vm)?;
+        let val1 = self.pop_int(vm)?;
         if comparator(val1, val2) {
             self.goto(jump_address);
         }
