@@ -69,7 +69,7 @@ impl fmt::Display for ClassFileMethodCode {
         let instructions = Instruction::parse_instructions(&self.code);
         if let Ok(instructions) = instructions {
             for (address, instruction) in instructions {
-                writeln!(f, "    {address:3} {instruction}")?;
+                writeln!(f, "    {address:3} {instruction:?}")?;
             }
         } else {
             writeln!(f, "    unparseable code: {:?}", self.code)?;

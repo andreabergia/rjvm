@@ -15,5 +15,4 @@ pub mod field_type;
 pub mod instruction;
 pub mod method_descriptor;
 pub mod method_flags;
-pub mod opcodes;
 pub mod utils;

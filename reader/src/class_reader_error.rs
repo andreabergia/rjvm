@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use crate::constant_pool::InvalidConstantPoolIndexError;
-use crate::opcodes::OpCode;
+use crate::instruction::Instruction;
 use rjvm_utils::buffer::BufferError;
 
 #[derive(Error, Debug, PartialEq)]
@@ -15,8 +15,8 @@ pub enum ClassReaderError {
     #[error("unsupported class file version {0}.{1}")]
     UnsupportedVersion(u16, u16),
 
-    #[error("unsupported instruction: {0}")]
-    UnsupportedInstruction(OpCode),
+    #[error("unsupported instruction: {0:?}")]
+    UnsupportedInstruction(Instruction),
 
     #[error("validation error: {0}")]
     ValidationError(String),

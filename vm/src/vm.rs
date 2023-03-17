@@ -7,7 +7,6 @@ use rjvm_reader::{
     class_file::ClassFile, class_file_field::ClassFileField, class_file_method::ClassFileMethod,
     constant_pool::ConstantPoolEntry, field_type::BaseType, field_type::FieldType,
     field_type::FieldType::Base, instruction::Instruction, method_flags::MethodFlags,
-    opcodes::OpCode,
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
@@ -138,95 +137,79 @@ impl<'a> CallFrame<'a> {
         self.debug_start_execution();
 
         loop {
-            let instruction = Instruction::parse_instruction(self.code, self.pc)
-                .map_err(|_| VmError::ValidationException)?;
+            let (instruction, new_address) =
+                Instruction::parse(self.code, self.pc).map_err(|_| VmError::ValidationException)?;
             self.debug_print_status(&instruction);
-            self.pc += instruction.length();
+            self.pc = new_address;
 
-            match instruction.op_code {
-                OpCode::Aconst_null => self.stack.push(Value::Null),
-                OpCode::Aload => {
-                    let index = instruction.argument_u8(0)?.into_usize_safe();
-                    self.execute_aload(index)?;
-                }
-                OpCode::Aload_0 => self.execute_aload(0)?,
-                OpCode::Aload_1 => self.execute_aload(1)?,
-                OpCode::Aload_2 => self.execute_aload(2)?,
-                OpCode::Aload_3 => self.execute_aload(3)?,
+            match instruction {
+                Instruction::Aconst_null => self.stack.push(Value::Null),
+                Instruction::Aload(index) => self.execute_aload(index.into_usize_safe())?,
+                Instruction::Aload_0 => self.execute_aload(0)?,
+                Instruction::Aload_1 => self.execute_aload(1)?,
+                Instruction::Aload_2 => self.execute_aload(2)?,
+                Instruction::Aload_3 => self.execute_aload(3)?,
 
-                OpCode::Astore => {
-                    let index = instruction.argument_u8(0)?.into_usize_safe();
-                    self.execute_astore(index)?;
-                }
-                OpCode::Astore_0 => self.execute_astore(0)?,
-                OpCode::Astore_1 => self.execute_astore(1)?,
-                OpCode::Astore_2 => self.execute_astore(2)?,
-                OpCode::Astore_3 => self.execute_astore(3)?,
+                Instruction::Astore(index) => self.execute_astore(index.into_usize_safe())?,
+                Instruction::Astore_0 => self.execute_astore(0)?,
+                Instruction::Astore_1 => self.execute_astore(1)?,
+                Instruction::Astore_2 => self.execute_astore(2)?,
+                Instruction::Astore_3 => self.execute_astore(3)?,
 
-                OpCode::Iload => {
-                    let index = instruction.argument_u8(0)?.into_usize_safe();
-                    self.execute_iload(index)?;
-                }
-                OpCode::Iload_0 => self.execute_iload(0)?,
-                OpCode::Iload_1 => self.execute_iload(1)?,
-                OpCode::Iload_2 => self.execute_iload(2)?,
-                OpCode::Iload_3 => self.execute_iload(3)?,
+                Instruction::Iload(index) => self.execute_iload(index.into_usize_safe())?,
+                Instruction::Iload_0 => self.execute_iload(0)?,
+                Instruction::Iload_1 => self.execute_iload(1)?,
+                Instruction::Iload_2 => self.execute_iload(2)?,
+                Instruction::Iload_3 => self.execute_iload(3)?,
 
-                OpCode::Istore => {
-                    let index = instruction.argument_u8(0)?.into_usize_safe();
-                    self.execute_istore(index)?;
-                }
-                OpCode::Istore_0 => self.execute_istore(0)?,
-                OpCode::Istore_1 => self.execute_istore(1)?,
-                OpCode::Istore_2 => self.execute_istore(2)?,
-                OpCode::Istore_3 => self.execute_istore(3)?,
+                Instruction::Istore(index) => self.execute_istore(index.into_usize_safe())?,
+                Instruction::Istore_0 => self.execute_istore(0)?,
+                Instruction::Istore_1 => self.execute_istore(1)?,
+                Instruction::Istore_2 => self.execute_istore(2)?,
+                Instruction::Istore_3 => self.execute_istore(3)?,
 
-                OpCode::Iconst_m1 => self.stack.push(Int(-1)),
-                OpCode::Iconst_0 => self.stack.push(Int(0)),
-                OpCode::Iconst_1 => self.stack.push(Int(1)),
-                OpCode::Iconst_2 => self.stack.push(Int(2)),
-                OpCode::Iconst_3 => self.stack.push(Int(3)),
-                OpCode::Iconst_4 => self.stack.push(Int(4)),
-                OpCode::Iconst_5 => self.stack.push(Int(5)),
+                Instruction::Iconst_m1 => self.stack.push(Int(-1)),
+                Instruction::Iconst_0 => self.stack.push(Int(0)),
+                Instruction::Iconst_1 => self.stack.push(Int(1)),
+                Instruction::Iconst_2 => self.stack.push(Int(2)),
+                Instruction::Iconst_3 => self.stack.push(Int(3)),
+                Instruction::Iconst_4 => self.stack.push(Int(4)),
+                Instruction::Iconst_5 => self.stack.push(Int(5)),
 
-                OpCode::New => {
-                    let constant_index = instruction.arguments_u16(0)?;
+                Instruction::New(constant_index) => {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
                     let new_object = vm.new_object(new_object_class_name)?;
                     self.stack.push(Object(new_object));
                 }
 
-                OpCode::Dup => {
+                Instruction::Dup => {
                     let stack_head = self.stack.last().ok_or(VmError::ValidationException)?;
                     self.stack.push(stack_head.clone());
                 }
-                OpCode::Pop => {
+                Instruction::Pop => {
                     self.stack.pop().ok_or(VmError::ValidationException)?;
                 }
-                OpCode::Bipush => {
-                    let byte_value = instruction.argument_u8(0)?;
-                    self.stack.push(Int(byte_value as i32));
+                Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32)),
+
+                Instruction::Invokespecial(constant_index) => {
+                    self.invoke_method(vm, stack, constant_index, InvokeKind::Special)?
+                }
+                Instruction::Invokestatic(constant_index) => {
+                    self.invoke_method(vm, stack, constant_index, InvokeKind::Static)?
+                }
+                Instruction::Invokevirtual(constant_index) => {
+                    self.invoke_method(vm, stack, constant_index, InvokeKind::Virtual)?
                 }
 
-                OpCode::Invokespecial => {
-                    self.invoke_method(vm, stack, instruction, InvokeKind::Special)?
-                }
-                OpCode::Invokestatic => {
-                    self.invoke_method(vm, stack, instruction, InvokeKind::Static)?
-                }
-                OpCode::Invokevirtual => {
-                    self.invoke_method(vm, stack, instruction, InvokeKind::Virtual)?
-                }
-
-                OpCode::Return => {
+                Instruction::Return => {
                     if !self.class_and_method.is_void() {
                         return Err(VmError::ValidationException);
                     }
                     self.debug_done_execution(None);
                     return Ok(None);
                 }
-                OpCode::Ireturn => {
+                Instruction::Ireturn => {
                     if !self.class_and_method.returns(Base(BaseType::Int)) {
                         return Err(VmError::ValidationException);
                     }
@@ -235,8 +218,7 @@ impl<'a> CallFrame<'a> {
                     return Ok(Some(result));
                 }
 
-                OpCode::Putfield => {
-                    let field_index = instruction.arguments_u16(0)?;
+                Instruction::Putfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
                     // TODO: validate class? How do super classes work?
@@ -253,8 +235,7 @@ impl<'a> CallFrame<'a> {
                     }
                 }
 
-                OpCode::Getfield => {
-                    let field_index = instruction.arguments_u16(0)?;
+                Instruction::Getfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
                     // TODO: validate class? How do super classes work?
@@ -271,46 +252,57 @@ impl<'a> CallFrame<'a> {
                     }
                 }
 
-                OpCode::Iadd => self.execute_int_math(vm, |a, b| Ok(a + b))?,
-                OpCode::Isub => self.execute_int_math(vm, |a, b| Ok(a - b))?,
-                OpCode::Imul => self.execute_int_math(vm, |a, b| Ok(a * b))?,
-                OpCode::Idiv => self.execute_int_math(vm, |a, b| match b {
+                Instruction::Iadd => self.execute_int_math(vm, |a, b| Ok(a + b))?,
+                Instruction::Isub => self.execute_int_math(vm, |a, b| Ok(a - b))?,
+                Instruction::Imul => self.execute_int_math(vm, |a, b| Ok(a * b))?,
+                Instruction::Idiv => self.execute_int_math(vm, |a, b| match b {
                     0 => Err(VmError::ArithmeticException),
                     _ => Ok(a / b),
                 })?,
-                OpCode::Irem => self.execute_int_math(vm, |a, b| match b {
+                Instruction::Irem => self.execute_int_math(vm, |a, b| match b {
                     0 => Err(VmError::ArithmeticException),
                     _ => Ok(a % b),
                 })?,
-                OpCode::Iand => self.execute_int_math(vm, |a, b| Ok(a & b))?,
-                OpCode::Ior => self.execute_int_math(vm, |a, b| Ok(a | b))?,
-                OpCode::Ixor => self.execute_int_math(vm, |a, b| Ok(a ^ b))?,
+                Instruction::Iand => self.execute_int_math(vm, |a, b| Ok(a & b))?,
+                Instruction::Ior => self.execute_int_math(vm, |a, b| Ok(a | b))?,
+                Instruction::Ixor => self.execute_int_math(vm, |a, b| Ok(a ^ b))?,
 
-                OpCode::Iinc => {
-                    let index = instruction.argument_u8(0)?.into_usize_safe();
+                Instruction::Iinc(index, constant) => {
+                    let index = index.into_usize_safe();
                     let local = self.get_local_int_as_int(vm, index)?;
-                    let constant = instruction.argument_i8(1)?;
                     self.locals[index] = Int(local + constant as i32);
                 }
 
-                OpCode::Goto => self.goto(instruction)?,
+                Instruction::Goto(jump_address) => self.goto(jump_address),
 
-                OpCode::Ifeq => self.execute_if(vm, instruction, |v| v == 0)?,
-                OpCode::Ifne => self.execute_if(vm, instruction, |v| v != 0)?,
-                OpCode::Iflt => self.execute_if(vm, instruction, |v| v < 0)?,
-                OpCode::Ifle => self.execute_if(vm, instruction, |v| v <= 0)?,
-                OpCode::Ifgt => self.execute_if(vm, instruction, |v| v > 0)?,
-                OpCode::Ifge => self.execute_if(vm, instruction, |v| v >= 0)?,
+                Instruction::Ifeq(jump_address) => self.execute_if(vm, jump_address, |v| v == 0)?,
+                Instruction::Ifne(jump_address) => self.execute_if(vm, jump_address, |v| v != 0)?,
+                Instruction::Iflt(jump_address) => self.execute_if(vm, jump_address, |v| v < 0)?,
+                Instruction::Ifle(jump_address) => self.execute_if(vm, jump_address, |v| v <= 0)?,
+                Instruction::Ifgt(jump_address) => self.execute_if(vm, jump_address, |v| v > 0)?,
+                Instruction::Ifge(jump_address) => self.execute_if(vm, jump_address, |v| v >= 0)?,
 
-                OpCode::If_icmpeq => self.execute_if_icmp(vm, instruction, |a, b| a == b)?,
-                OpCode::If_icmpne => self.execute_if_icmp(vm, instruction, |a, b| a != b)?,
-                OpCode::If_icmplt => self.execute_if_icmp(vm, instruction, |a, b| a < b)?,
-                OpCode::If_icmple => self.execute_if_icmp(vm, instruction, |a, b| a <= b)?,
-                OpCode::If_icmpgt => self.execute_if_icmp(vm, instruction, |a, b| a > b)?,
-                OpCode::If_icmpge => self.execute_if_icmp(vm, instruction, |a, b| a >= b)?,
+                Instruction::If_icmpeq(jump_address) => {
+                    self.execute_if_icmp(vm, jump_address, |a, b| a == b)?
+                }
+                Instruction::If_icmpne(jump_address) => {
+                    self.execute_if_icmp(vm, jump_address, |a, b| a != b)?
+                }
+                Instruction::If_icmplt(jump_address) => {
+                    self.execute_if_icmp(vm, jump_address, |a, b| a < b)?
+                }
+                Instruction::If_icmple(jump_address) => {
+                    self.execute_if_icmp(vm, jump_address, |a, b| a <= b)?
+                }
+                Instruction::If_icmpgt(jump_address) => {
+                    self.execute_if_icmp(vm, jump_address, |a, b| a > b)?
+                }
+                Instruction::If_icmpge(jump_address) => {
+                    self.execute_if_icmp(vm, jump_address, |a, b| a >= b)?
+                }
 
                 _ => {
-                    warn!("Unsupported op code: {}", instruction.op_code);
+                    warn!("Unsupported instruction: {:?}", instruction);
                     return Err(VmError::NotImplemented);
                 }
             }
@@ -321,11 +313,11 @@ impl<'a> CallFrame<'a> {
         &mut self,
         vm: &mut Vm<'a>,
         stack: &mut Stack<'a>,
-        instruction: Instruction,
+        constant_index: u16,
         kind: InvokeKind,
     ) -> Result<(), VmError> {
         let static_method_reference =
-            self.get_method_to_invoke_statically(vm, instruction, kind)?;
+            self.get_method_to_invoke_statically(vm, constant_index, kind)?;
         let (receiver, params, new_stack_len) =
             self.get_method_receiver_and_params(&static_method_reference)?;
         let class_and_method = match kind {
@@ -447,10 +439,9 @@ impl<'a> CallFrame<'a> {
     fn get_method_to_invoke_statically(
         &self,
         vm: &Vm<'a>,
-        instruction: Instruction,
+        constant_index: u16,
         kind: InvokeKind,
     ) -> Result<ClassAndMethod<'a>, VmError> {
-        let constant_index = instruction.arguments_u16(0)?;
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
         let class = vm.get_class(method_reference.class_name)?;
@@ -630,17 +621,14 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    fn goto(&mut self, instruction: Instruction) -> Result<(), VmError> {
-        let offset = instruction.arguments_i16(0)?;
-        let new_pc = (self.pc - instruction.length()) as i32 + offset as i32;
-        self.pc = usize::try_from(new_pc).map_err(|_| VmError::ValidationException)?;
-        Ok(())
+    fn goto(&mut self, jump_address: u16) {
+        self.pc = jump_address.into_usize_safe();
     }
 
     fn execute_if<T>(
         &mut self,
         vm: &mut Vm,
-        instruction: Instruction,
+        jump_address: u16,
         comparator: T,
     ) -> Result<(), VmError>
     where
@@ -648,16 +636,15 @@ impl<'a> CallFrame<'a> {
     {
         let value = Self::pop_int(&mut self.stack, vm)?;
         if comparator(value) {
-            self.goto(instruction)
-        } else {
-            Ok(())
+            self.goto(jump_address);
         }
+        Ok(())
     }
 
     fn execute_if_icmp<T>(
         &mut self,
         vm: &mut Vm,
-        instruction: Instruction,
+        jump_address: u16,
         comparator: T,
     ) -> Result<(), VmError>
     where
@@ -666,10 +653,9 @@ impl<'a> CallFrame<'a> {
         let val2 = Self::pop_int(&mut self.stack, vm)?;
         let val1 = Self::pop_int(&mut self.stack, vm)?;
         if comparator(val1, val2) {
-            self.goto(instruction)
-        } else {
-            Ok(())
+            self.goto(jump_address);
         }
+        Ok(())
     }
 
     fn execute_aload(&mut self, index: usize) -> Result<(), VmError> {
@@ -733,7 +719,7 @@ impl<'a> CallFrame<'a> {
         for local_variable in self.locals.iter() {
             debug!("  - {:?}", local_variable);
         }
-        debug!("  next instruction: {}", instruction)
+        debug!("  next instruction: {:?}", instruction)
     }
 
     fn debug_done_execution(&self, result: Option<&Value>) {
