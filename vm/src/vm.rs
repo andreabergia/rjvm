@@ -241,7 +241,6 @@ impl<'a> CallFrame<'a> {
                 Instruction::Putfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    // TODO: validate class? How do super classes work?
                     let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
@@ -258,7 +257,6 @@ impl<'a> CallFrame<'a> {
                 Instruction::Getfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    // TODO: validate class? How do super classes work?
                     let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
@@ -643,7 +641,6 @@ impl<'a> CallFrame<'a> {
     }
 
     fn get_local_int(&self, vm: &Vm, index: usize) -> Result<Value<'a>, VmError> {
-        // TODO: short, char, byte should (probably?) to be modelled as int
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
         Self::validate_type(vm, Base(BaseType::Int), variable)?;
         Ok(variable.clone())
