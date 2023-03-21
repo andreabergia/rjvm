@@ -384,7 +384,27 @@ impl<'a> ClassFileReader<'a> {
     fn read_class_attributes(&mut self) -> Result<()> {
         let raw_attributes = self.read_raw_attributes()?;
         self.class_file.deprecated = self.search_deprecated_attribute(&raw_attributes);
+        self.class_file.source_file = self.search_source_file_attribute(&raw_attributes)?;
         Ok(())
+    }
+
+    fn search_source_file_attribute(&self, raw_attributes: &[Attribute]) -> Result<Option<String>> {
+        raw_attributes
+            .iter()
+            .find(|attr| attr.name == "SourceFile")
+            .map(|attr| {
+                let attribute_bytes: &[u8] = &attr.bytes;
+                let constant_index = u16::from_be_bytes(attribute_bytes.try_into().unwrap());
+                self.class_file
+                    .constants
+                    .get(constant_index)
+                    .map_err(|err| err.into())
+                    .and_then(|entry| match entry {
+                        ConstantPoolEntry::Utf8(file_name) => Ok(file_name.clone()),
+                        _ => Err(InvalidClassData("invalid SourceFile attribute".to_string())),
+                    })
+            })
+            .invert()
     }
 
     fn read_raw_attributes(&mut self) -> Result<Vec<Attribute>> {

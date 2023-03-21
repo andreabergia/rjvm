@@ -18,6 +18,7 @@ pub struct ClassFile {
     pub fields: Vec<ClassFileField>,
     pub methods: Vec<ClassFileMethod>,
     pub deprecated: bool,
+    pub source_file: Option<String>,
 }
 
 impl fmt::Display for ClassFile {

@@ -29,6 +29,7 @@ fn can_read_pojo_class_file() {
         vec!("java/lang/Cloneable", "java/io/Serializable"),
         class.interfaces
     );
+    assert_eq!(Some("Complex.java".to_string()), class.source_file);
 
     check_fields(&class);
     check_methods(&class);

@@ -18,7 +18,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
     - [ ] [EnclosingMethod](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.7)
     - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
     - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
-    - [ ] [SourceFile](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.10)
+    - [x] [SourceFile](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.10)
     - [ ] [SourceDebugExtension](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.11)
     - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
     - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
