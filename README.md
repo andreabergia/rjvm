@@ -2,7 +2,9 @@
 
 This project is an attempt to write a minimal JVM using Rust.
 
-It is a hobby project, built for fun and for learning purposes.
+It is a hobby project, built for fun and for learning purposes. The code quality is definitely not production ready -
+there are not enough tests, there isn't enough documentation, and some parts might not be idiomatic Rust since I'm
+just learning it. 😊
 
 The code is licensed under the [Apache v2 license](./LICENSE).
 
