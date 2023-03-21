@@ -16,8 +16,9 @@ impl fmt::Display for ClassFileField {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?} {}: {} constant {:?}",
+            "{:?} {}: {} constant {:?}{}",
             self.flags, self.name, self.type_descriptor, self.constant_value,
+            if self.deprecated { " (deprecated)" } else { "" }
         )
     }
 }

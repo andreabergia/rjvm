@@ -29,7 +29,11 @@ impl fmt::Display for ClassFile {
         }
         writeln!(f, "version: {}", self.version)?;
         write!(f, "{}", self.constants)?;
-        writeln!(f, "flags: {:?}", self.flags)?;
+        writeln!(
+            f,
+            "flags: {:?}, deprecated: {}",
+            self.flags, self.deprecated
+        )?;
         writeln!(f, "interfaces: {:?}", self.interfaces)?;
         writeln!(f, "fields:")?;
         for field in self.fields.iter() {

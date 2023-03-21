@@ -22,8 +22,11 @@ impl fmt::Display for ClassFileMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "{:?} {}: {}",
-            self.flags, self.name, self.parsed_type_descriptor,
+            "{:?} {}: {}{}",
+            self.flags,
+            self.name,
+            self.parsed_type_descriptor,
+            if self.deprecated { " (deprecated)" } else { "" }
         )?;
         if let Some(code) = &self.code {
             writeln!(f, "  code: {code}")?;
@@ -65,7 +68,7 @@ impl fmt::Display for ClassFileMethodCode {
         writeln!(
             f,
             "max_stack = {}, max_locals = {}, exception_table = {:?}, attributes = {:?}, instructions:",
-            self.max_stack, self.max_locals, self.exception_table, self.attributes
+            self.max_stack, self.max_locals, self.exception_table, self.attributes,
         )?;
 
         let instructions = Instruction::parse_instructions(&self.code);
