@@ -48,7 +48,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
       - [x] constant value
       - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
       - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
-      - [ ] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
+      - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
       - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
       - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
 - [ ] execution
@@ -75,6 +75,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
   - [ ] exceptions
   - [ ] object allocations and garbage collection
   - [ ] threading
+  - [ ] generics
   - [ ] tons of other features :-)
 
 ## Structure
