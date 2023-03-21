@@ -5,6 +5,7 @@ use rjvm_reader::{
     class_file::ClassFile,
     class_file_field::ClassFileField,
     class_file_method::ClassFileMethod,
+    class_file_method::{LineNumberTable, LineNumberTableEntry},
     class_file_version::ClassFileVersion,
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
@@ -59,11 +60,26 @@ fn check_fields(class: &ClassFile) {
 
 fn check_methods(class: &ClassFile) {
     assert_eq!(5, class.methods.len());
+
     check_method(&class.methods[0], MethodFlags::PUBLIC, "<init>", "(D)V");
+    assert_eq!(
+        Some(LineNumberTable::new(vec![
+            LineNumberTableEntry::new(0, 9),
+            LineNumberTableEntry::new(4, 10),
+            LineNumberTableEntry::new(9, 11),
+            LineNumberTableEntry::new(14, 12),
+        ])),
+        class.methods[0].code.as_ref().unwrap().line_number_table
+    );
+
     check_method(&class.methods[1], MethodFlags::PUBLIC, "<init>", "(DD)V");
     check_method(&class.methods[2], MethodFlags::PUBLIC, "getReal", "()D");
     check_method(&class.methods[3], MethodFlags::PUBLIC, "getImag", "()D");
     check_method(&class.methods[4], MethodFlags::PUBLIC, "abs", "()D");
+    assert_eq!(
+        Some(LineNumberTable::new(vec![LineNumberTableEntry::new(0, 28)])),
+        class.methods[4].code.as_ref().unwrap().line_number_table
+    );
 }
 
 fn check_method(method: &ClassFileMethod, flags: MethodFlags, name: &str, type_descriptor: &str) {

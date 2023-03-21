@@ -28,7 +28,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
     - [ ] code
         - [ ] exception tables
         - [ ] attributes
-          - [ ] [LineNumberTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.12)
+          - [x] [LineNumberTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.12)
           - [ ] [LocalVariableTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.13)
           - [ ] [LocalVariableTypeTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.14)
           - [ ] [StackMapTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.4)

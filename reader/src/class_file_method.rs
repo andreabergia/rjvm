@@ -7,7 +7,7 @@ use crate::{
     method_flags::MethodFlags,
 };
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct ClassFileMethod {
     pub flags: MethodFlags,
     pub name: String,
@@ -57,6 +57,7 @@ pub struct ClassFileMethodCode {
     pub code: Vec<u8>,
     pub exception_table: Vec<u8>, // TODO: replace with some proper struct
     pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
+    pub line_number_table: Option<LineNumberTable>,
 }
 
 impl fmt::Display for ClassFileMethodCode {
@@ -76,5 +77,31 @@ impl fmt::Display for ClassFileMethodCode {
             writeln!(f, "    unparseable code: {:?}", self.code)?;
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct LineNumberTable {
+    entries: Vec<LineNumberTableEntry>,
+}
+
+impl LineNumberTable {
+    pub fn new(entries: Vec<LineNumberTableEntry>) -> Self {
+        Self { entries }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct LineNumberTableEntry {
+    pub program_counter: u16,
+    pub line_number: u16,
+}
+
+impl LineNumberTableEntry {
+    pub fn new(program_counter: u16, line_number: u16) -> Self {
+        Self {
+            program_counter,
+            line_number,
+        }
     }
 }

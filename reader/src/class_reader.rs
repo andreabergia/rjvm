@@ -11,6 +11,7 @@ use crate::{
     class_file::ClassFile,
     class_file_field::{ClassFileField, FieldConstantValue},
     class_file_method::{ClassFileMethod, ClassFileMethodCode},
+    class_file_method::{LineNumberTable, LineNumberTableEntry},
     class_file_version::ClassFileVersion,
     class_reader_error::ClassReaderError::InvalidClassData,
     class_reader_error::Result,
@@ -366,17 +367,44 @@ impl<'a> ClassFileReader<'a> {
                 let exception_table = Vec::from(buf.read_bytes(exception_table_length)?);
                 let attributes =
                     Self::read_raw_attributes_from(&self.class_file.constants, &mut buf)?;
+                let line_number_table = self.extract_line_number_table(&attributes)?;
+
                 Result::<ClassFileMethodCode>::Ok(ClassFileMethodCode {
                     max_stack,
                     max_locals,
                     code,
                     exception_table,
                     attributes,
+                    line_number_table,
                 })
             })
             .next()
             .invert()?
             .ok_or_else(|| InvalidClassData("method is missing code attribute".to_string()))
+    }
+
+    fn extract_line_number_table(
+        &self,
+        raw_attributes: &[Attribute],
+    ) -> Result<Option<LineNumberTable>> {
+        raw_attributes
+            .iter()
+            .find(|attr| attr.name == "LineNumberTable")
+            .map(|attr| {
+                let mut buf = Buffer::new(&attr.bytes);
+                let num_entries = buf.read_u16()?.into_usize_safe();
+                let mut entries = Vec::with_capacity(num_entries);
+                for _ in 0..num_entries {
+                    let program_counter = buf.read_u16()?;
+                    let line_number = buf.read_u16()?;
+                    entries.push(LineNumberTableEntry {
+                        program_counter,
+                        line_number,
+                    });
+                }
+                Ok(LineNumberTable::new(entries))
+            })
+            .invert()
     }
 
     fn read_class_attributes(&mut self) -> Result<()> {
