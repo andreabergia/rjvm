@@ -9,6 +9,7 @@ pub struct ClassFileField {
     pub name: String,
     pub type_descriptor: FieldType,
     pub constant_value: Option<FieldConstantValue>,
+    pub deprecated: bool,
 }
 
 impl fmt::Display for ClassFileField {

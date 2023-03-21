@@ -42,12 +42,14 @@ fn check_fields(class: &ClassFile) {
                 name: "real".to_string(),
                 type_descriptor: FieldType::Base(BaseType::Double),
                 constant_value: None,
+                deprecated: false,
             },
             ClassFileField {
                 flags: FieldFlags::PRIVATE | FieldFlags::FINAL,
                 name: "imag".to_string(),
                 type_descriptor: FieldType::Base(BaseType::Double),
                 constant_value: None,
+                deprecated: false,
             }
         ),
         class.fields

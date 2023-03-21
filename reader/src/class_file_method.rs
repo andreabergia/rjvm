@@ -15,6 +15,7 @@ pub struct ClassFileMethod {
     pub parsed_type_descriptor: MethodDescriptor,
     pub attributes: Vec<Attribute>,
     pub code: Option<ClassFileMethodCode>,
+    pub deprecated: bool,
 }
 
 impl fmt::Display for ClassFileMethod {

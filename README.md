@@ -20,7 +20,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
     - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
     - [ ] [SourceFile](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.10)
     - [ ] [SourceDebugExtension](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.11)
-    - [ ] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
+    - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
     - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
     - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
     - [ ] [BootstrapMethods](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.21)
@@ -36,7 +36,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
     - [ ] attributes
       - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
       - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
-      - [ ] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
+      - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
       - [ ] [exceptions](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.5)
       - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
       - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
@@ -72,8 +72,8 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
   - [x] modelling of super classes
   - [x] abstract methods
   - [x] control flow
-  - [ ] object allocations and garbage collection
   - [ ] exceptions
+  - [ ] object allocations and garbage collection
   - [ ] threading
   - [ ] tons of other features :-)
 

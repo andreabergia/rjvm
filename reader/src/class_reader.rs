@@ -45,6 +45,7 @@ impl<'a> ClassFileReader<'a> {
         self.read_interfaces()?;
         self.read_fields()?;
         self.read_methods()?;
+        self.read_class_attributes()?;
 
         Ok(self.class_file)
     }
@@ -243,13 +244,15 @@ impl<'a> ClassFileReader<'a> {
         let type_descriptor = FieldType::parse(&type_descriptor_raw)?;
 
         let raw_attributes = self.read_raw_attributes()?;
-        let constant_value = self.extract_constant_value(raw_attributes)?;
+        let constant_value = self.extract_constant_value(&raw_attributes)?;
+        let deprecated = self.search_deprecated_attribute(&raw_attributes);
 
         Ok(ClassFileField {
             flags,
             name,
             type_descriptor,
             constant_value,
+            deprecated,
         })
     }
 
@@ -265,7 +268,7 @@ impl<'a> ClassFileReader<'a> {
 
     fn extract_constant_value(
         &self,
-        raw_attributes: Vec<Attribute>,
+        raw_attributes: &Vec<Attribute>,
     ) -> Result<Option<FieldConstantValue>> {
         raw_attributes
             .iter()
@@ -301,6 +304,12 @@ impl<'a> ClassFileReader<'a> {
             .invert()
     }
 
+    fn search_deprecated_attribute(&self, raw_attributes: &Vec<Attribute>) -> bool {
+        raw_attributes
+            .into_iter()
+            .any(|attr| attr.name == "Deprecated")
+    }
+
     fn read_methods(&mut self) -> Result<()> {
         let methods_count = self.buffer.read_u16()?;
         self.class_file.methods = (0..methods_count)
@@ -322,6 +331,7 @@ impl<'a> ClassFileReader<'a> {
         } else {
             Some(self.extract_code(&raw_attributes)?)
         };
+        let deprecated = self.search_deprecated_attribute(&raw_attributes);
 
         Ok(ClassFileMethod {
             flags,
@@ -330,6 +340,7 @@ impl<'a> ClassFileReader<'a> {
             parsed_type_descriptor,
             attributes: raw_attributes,
             code,
+            deprecated,
         })
     }
 
@@ -368,6 +379,12 @@ impl<'a> ClassFileReader<'a> {
             .next()
             .invert()?
             .ok_or_else(|| InvalidClassData("method is missing code attribute".to_string()))
+    }
+
+    fn read_class_attributes(&mut self) -> Result<()> {
+        let raw_attributes = self.read_raw_attributes()?;
+        self.class_file.deprecated = self.search_deprecated_attribute(&raw_attributes);
+        Ok(())
     }
 
     fn read_raw_attributes(&mut self) -> Result<Vec<Attribute>> {
