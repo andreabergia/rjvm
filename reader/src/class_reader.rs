@@ -268,7 +268,7 @@ impl<'a> ClassFileReader<'a> {
 
     fn extract_constant_value(
         &self,
-        raw_attributes: &Vec<Attribute>,
+        raw_attributes: &[Attribute],
     ) -> Result<Option<FieldConstantValue>> {
         raw_attributes
             .iter()
@@ -304,10 +304,8 @@ impl<'a> ClassFileReader<'a> {
             .invert()
     }
 
-    fn search_deprecated_attribute(&self, raw_attributes: &Vec<Attribute>) -> bool {
-        raw_attributes
-            .into_iter()
-            .any(|attr| attr.name == "Deprecated")
+    fn search_deprecated_attribute(&self, raw_attributes: &[Attribute]) -> bool {
+        raw_attributes.iter().any(|attr| attr.name == "Deprecated")
     }
 
     fn read_methods(&mut self) -> Result<()> {
