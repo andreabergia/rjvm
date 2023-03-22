@@ -94,14 +94,20 @@ impl LineNumberTable {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct ProgramCounter(pub u16);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct LineNumber(pub u16);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LineNumberTableEntry {
-    pub program_counter: u16,
-    pub line_number: u16,
+    pub program_counter: ProgramCounter,
+    pub line_number: LineNumber,
 }
 
 impl LineNumberTableEntry {
-    pub fn new(program_counter: u16, line_number: u16) -> Self {
+    pub fn new(program_counter: ProgramCounter, line_number: LineNumber) -> Self {
         Self {
             program_counter,
             line_number,

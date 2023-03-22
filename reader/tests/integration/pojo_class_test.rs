@@ -1,5 +1,6 @@
 extern crate rjvm_reader;
 
+use rjvm_reader::class_file_method::{LineNumber, ProgramCounter};
 use rjvm_reader::{
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
@@ -64,10 +65,10 @@ fn check_methods(class: &ClassFile) {
     check_method(&class.methods[0], MethodFlags::PUBLIC, "<init>", "(D)V");
     assert_eq!(
         Some(LineNumberTable::new(vec![
-            LineNumberTableEntry::new(0, 9),
-            LineNumberTableEntry::new(4, 10),
-            LineNumberTableEntry::new(9, 11),
-            LineNumberTableEntry::new(14, 12),
+            LineNumberTableEntry::new(ProgramCounter(0), LineNumber(9)),
+            LineNumberTableEntry::new(ProgramCounter(4), LineNumber(10)),
+            LineNumberTableEntry::new(ProgramCounter(9), LineNumber(11)),
+            LineNumberTableEntry::new(ProgramCounter(14), LineNumber(12)),
         ])),
         class.methods[0].code.as_ref().unwrap().line_number_table
     );
@@ -77,7 +78,10 @@ fn check_methods(class: &ClassFile) {
     check_method(&class.methods[3], MethodFlags::PUBLIC, "getImag", "()D");
     check_method(&class.methods[4], MethodFlags::PUBLIC, "abs", "()D");
     assert_eq!(
-        Some(LineNumberTable::new(vec![LineNumberTableEntry::new(0, 28)])),
+        Some(LineNumberTable::new(vec![LineNumberTableEntry::new(
+            ProgramCounter(0),
+            LineNumber(28)
+        )])),
         class.methods[4].code.as_ref().unwrap().line_number_table
     );
 }

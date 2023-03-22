@@ -5,6 +5,7 @@ use result::prelude::*;
 
 use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
+use crate::class_file_method::{LineNumber, ProgramCounter};
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
@@ -397,10 +398,10 @@ impl<'a> ClassFileReader<'a> {
                 for _ in 0..num_entries {
                     let program_counter = buf.read_u16()?;
                     let line_number = buf.read_u16()?;
-                    entries.push(LineNumberTableEntry {
-                        program_counter,
-                        line_number,
-                    });
+                    entries.push(LineNumberTableEntry::new(
+                        ProgramCounter(program_counter),
+                        LineNumber(line_number),
+                    ));
                 }
                 Ok(LineNumberTable::new(entries))
             })
