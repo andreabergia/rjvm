@@ -216,12 +216,12 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dstore_2 => self.execute_dstore(2)?,
                 Instruction::Dstore_3 => self.execute_dstore(3)?,
 
-                Instruction::I2b => self.coerce_int(vm, |value| Int((value as i8) as i32))?,
-                Instruction::I2c => self.coerce_int(vm, |value| Int((value as u16) as i32))?,
-                Instruction::I2s => self.coerce_int(vm, |value| Int((value as i16) as i32))?,
-                Instruction::I2f => self.coerce_int(vm, |value| Float(value as f32))?,
-                Instruction::I2l => self.coerce_int(vm, |value| Long(value as i64))?,
-                Instruction::I2d => self.coerce_int(vm, |value| Double(value as f64))?,
+                Instruction::I2b => self.coerce_int(|value| Int((value as i8) as i32))?,
+                Instruction::I2c => self.coerce_int(|value| Int((value as u16) as i32))?,
+                Instruction::I2s => self.coerce_int(|value| Int((value as i16) as i32))?,
+                Instruction::I2f => self.coerce_int(|value| Float(value as f32))?,
+                Instruction::I2l => self.coerce_int(|value| Long(value as i64))?,
+                Instruction::I2d => self.coerce_int(|value| Double(value as f64))?,
 
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
@@ -297,20 +297,20 @@ impl<'a> CallFrame<'a> {
                     }
                 }
 
-                Instruction::Iadd => self.execute_int_math(vm, |a, b| Ok(a + b))?,
-                Instruction::Isub => self.execute_int_math(vm, |a, b| Ok(a - b))?,
-                Instruction::Imul => self.execute_int_math(vm, |a, b| Ok(a * b))?,
-                Instruction::Idiv => self.execute_int_math(vm, |a, b| match b {
+                Instruction::Iadd => self.execute_int_math(|a, b| Ok(a + b))?,
+                Instruction::Isub => self.execute_int_math(|a, b| Ok(a - b))?,
+                Instruction::Imul => self.execute_int_math(|a, b| Ok(a * b))?,
+                Instruction::Idiv => self.execute_int_math(|a, b| match b {
                     0 => Err(VmError::ArithmeticException),
                     _ => Ok(a / b),
                 })?,
-                Instruction::Irem => self.execute_int_math(vm, |a, b| match b {
+                Instruction::Irem => self.execute_int_math(|a, b| match b {
                     0 => Err(VmError::ArithmeticException),
                     _ => Ok(a % b),
                 })?,
-                Instruction::Iand => self.execute_int_math(vm, |a, b| Ok(a & b))?,
-                Instruction::Ior => self.execute_int_math(vm, |a, b| Ok(a | b))?,
-                Instruction::Ixor => self.execute_int_math(vm, |a, b| Ok(a ^ b))?,
+                Instruction::Iand => self.execute_int_math(|a, b| Ok(a & b))?,
+                Instruction::Ior => self.execute_int_math(|a, b| Ok(a | b))?,
+                Instruction::Ixor => self.execute_int_math(|a, b| Ok(a ^ b))?,
 
                 Instruction::Iinc(index, constant) => {
                     let index = index.into_usize_safe();
@@ -318,25 +318,25 @@ impl<'a> CallFrame<'a> {
                     self.locals[index] = Int(local + constant as i32);
                 }
 
-                Instruction::Ladd => self.execute_long_math(vm, |a, b| Ok(a + b))?,
-                Instruction::Lsub => self.execute_long_math(vm, |a, b| Ok(a - b))?,
-                Instruction::Lmul => self.execute_long_math(vm, |a, b| Ok(a * b))?,
-                Instruction::Ldiv => self.execute_long_math(vm, |a, b| match b {
+                Instruction::Ladd => self.execute_long_math(|a, b| Ok(a + b))?,
+                Instruction::Lsub => self.execute_long_math(|a, b| Ok(a - b))?,
+                Instruction::Lmul => self.execute_long_math(|a, b| Ok(a * b))?,
+                Instruction::Ldiv => self.execute_long_math(|a, b| match b {
                     0 => Err(VmError::ArithmeticException),
                     _ => Ok(a / b),
                 })?,
-                Instruction::Lrem => self.execute_long_math(vm, |a, b| match b {
+                Instruction::Lrem => self.execute_long_math(|a, b| match b {
                     0 => Err(VmError::ArithmeticException),
                     _ => Ok(a % b),
                 })?,
-                Instruction::Land => self.execute_long_math(vm, |a, b| Ok(a & b))?,
-                Instruction::Lor => self.execute_long_math(vm, |a, b| Ok(a | b))?,
-                Instruction::Lxor => self.execute_long_math(vm, |a, b| Ok(a ^ b))?,
+                Instruction::Land => self.execute_long_math(|a, b| Ok(a & b))?,
+                Instruction::Lor => self.execute_long_math(|a, b| Ok(a | b))?,
+                Instruction::Lxor => self.execute_long_math(|a, b| Ok(a ^ b))?,
 
-                Instruction::Fadd => self.execute_float_math(vm, |a, b| Ok(a + b))?,
-                Instruction::Fsub => self.execute_float_math(vm, |a, b| Ok(a - b))?,
-                Instruction::Fmul => self.execute_float_math(vm, |a, b| Ok(a * b))?,
-                Instruction::Fdiv => self.execute_float_math(vm, |a, b| {
+                Instruction::Fadd => self.execute_float_math(|a, b| Ok(a + b))?,
+                Instruction::Fsub => self.execute_float_math(|a, b| Ok(a - b))?,
+                Instruction::Fmul => self.execute_float_math(|a, b| Ok(a * b))?,
+                Instruction::Fdiv => self.execute_float_math(|a, b| {
                     Ok(
                         if Self::is_double_division_returning_nan(a as f64, b as f64) {
                             f32::NAN
@@ -345,7 +345,7 @@ impl<'a> CallFrame<'a> {
                         },
                     )
                 })?,
-                Instruction::Frem => self.execute_float_math(vm, |a, b| {
+                Instruction::Frem => self.execute_float_math(|a, b| {
                     Ok(
                         if Self::is_double_division_returning_nan(a as f64, b as f64) {
                             f32::NAN
@@ -355,17 +355,17 @@ impl<'a> CallFrame<'a> {
                     )
                 })?,
 
-                Instruction::Dadd => self.execute_double_math(vm, |a, b| Ok(a + b))?,
-                Instruction::Dsub => self.execute_double_math(vm, |a, b| Ok(a - b))?,
-                Instruction::Dmul => self.execute_double_math(vm, |a, b| Ok(a * b))?,
-                Instruction::Ddiv => self.execute_double_math(vm, |a, b| {
+                Instruction::Dadd => self.execute_double_math(|a, b| Ok(a + b))?,
+                Instruction::Dsub => self.execute_double_math(|a, b| Ok(a - b))?,
+                Instruction::Dmul => self.execute_double_math(|a, b| Ok(a * b))?,
+                Instruction::Ddiv => self.execute_double_math(|a, b| {
                     Ok(if Self::is_double_division_returning_nan(a, b) {
                         f64::NAN
                     } else {
                         a / b
                     })
                 })?,
-                Instruction::Drem => self.execute_double_math(vm, |a, b| {
+                Instruction::Drem => self.execute_double_math(|a, b| {
                     Ok(if Self::is_double_division_returning_nan(a, b) {
                         f64::NAN
                     } else {
@@ -375,30 +375,30 @@ impl<'a> CallFrame<'a> {
 
                 Instruction::Goto(jump_address) => self.goto(jump_address),
 
-                Instruction::Ifeq(jump_address) => self.execute_if(vm, jump_address, |v| v == 0)?,
-                Instruction::Ifne(jump_address) => self.execute_if(vm, jump_address, |v| v != 0)?,
-                Instruction::Iflt(jump_address) => self.execute_if(vm, jump_address, |v| v < 0)?,
-                Instruction::Ifle(jump_address) => self.execute_if(vm, jump_address, |v| v <= 0)?,
-                Instruction::Ifgt(jump_address) => self.execute_if(vm, jump_address, |v| v > 0)?,
-                Instruction::Ifge(jump_address) => self.execute_if(vm, jump_address, |v| v >= 0)?,
+                Instruction::Ifeq(jump_address) => self.execute_if(jump_address, |v| v == 0)?,
+                Instruction::Ifne(jump_address) => self.execute_if(jump_address, |v| v != 0)?,
+                Instruction::Iflt(jump_address) => self.execute_if(jump_address, |v| v < 0)?,
+                Instruction::Ifle(jump_address) => self.execute_if(jump_address, |v| v <= 0)?,
+                Instruction::Ifgt(jump_address) => self.execute_if(jump_address, |v| v > 0)?,
+                Instruction::Ifge(jump_address) => self.execute_if(jump_address, |v| v >= 0)?,
 
                 Instruction::If_icmpeq(jump_address) => {
-                    self.execute_if_icmp(vm, jump_address, |a, b| a == b)?
+                    self.execute_if_icmp(jump_address, |a, b| a == b)?
                 }
                 Instruction::If_icmpne(jump_address) => {
-                    self.execute_if_icmp(vm, jump_address, |a, b| a != b)?
+                    self.execute_if_icmp(jump_address, |a, b| a != b)?
                 }
                 Instruction::If_icmplt(jump_address) => {
-                    self.execute_if_icmp(vm, jump_address, |a, b| a < b)?
+                    self.execute_if_icmp(jump_address, |a, b| a < b)?
                 }
                 Instruction::If_icmple(jump_address) => {
-                    self.execute_if_icmp(vm, jump_address, |a, b| a <= b)?
+                    self.execute_if_icmp(jump_address, |a, b| a <= b)?
                 }
                 Instruction::If_icmpgt(jump_address) => {
-                    self.execute_if_icmp(vm, jump_address, |a, b| a > b)?
+                    self.execute_if_icmp(jump_address, |a, b| a > b)?
                 }
                 Instruction::If_icmpge(jump_address) => {
-                    self.execute_if_icmp(vm, jump_address, |a, b| a >= b)?
+                    self.execute_if_icmp(jump_address, |a, b| a >= b)?
                 }
 
                 _ => {
@@ -450,7 +450,7 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn pop_int(&mut self, _vm: &Vm) -> Result<i32, VmError> {
+    fn pop_int(&mut self) -> Result<i32, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Int(int) => Ok(int),
@@ -458,7 +458,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn pop_long(&mut self, _vm: &Vm) -> Result<i64, VmError> {
+    fn pop_long(&mut self) -> Result<i64, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Long(long) => Ok(long),
@@ -466,7 +466,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn pop_float(&mut self, _vm: &Vm) -> Result<f32, VmError> {
+    fn pop_float(&mut self) -> Result<f32, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Float(float) => Ok(float),
@@ -474,7 +474,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn pop_double(&mut self, _vm: &Vm) -> Result<f64, VmError> {
+    fn pop_double(&mut self) -> Result<f64, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Double(double) => Ok(double),
@@ -732,23 +732,23 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn execute_int_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    fn execute_int_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
     where
         T: FnOnce(i32, i32) -> Result<i32, VmError>,
     {
-        let val2 = self.pop_int(vm)?;
-        let val1 = self.pop_int(vm)?;
+        let val2 = self.pop_int()?;
+        let val1 = self.pop_int()?;
         let result = evaluator(val1, val2)?;
         self.stack.push(Int(result));
         Ok(())
     }
 
-    fn execute_long_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    fn execute_long_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
     where
         T: FnOnce(i64, i64) -> Result<i64, VmError>,
     {
-        let val2 = self.pop_long(vm)?;
-        let val1 = self.pop_long(vm)?;
+        let val2 = self.pop_long()?;
+        let val1 = self.pop_long()?;
         let result = evaluator(val1, val2)?;
         self.stack.push(Long(result));
         Ok(())
@@ -761,33 +761,33 @@ impl<'a> CallFrame<'a> {
             || ((a == 0f64 || a == -0f64) && (b == 0f64 || b == -0f64))
     }
 
-    fn execute_float_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    fn execute_float_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
     where
         T: FnOnce(f32, f32) -> Result<f32, VmError>,
     {
-        let val2 = self.pop_float(vm)?;
-        let val1 = self.pop_float(vm)?;
+        let val2 = self.pop_float()?;
+        let val1 = self.pop_float()?;
         let result = evaluator(val1, val2)?;
         self.stack.push(Float(result));
         Ok(())
     }
 
-    fn execute_double_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    fn execute_double_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
     where
         T: FnOnce(f64, f64) -> Result<f64, VmError>,
     {
-        let val2 = self.pop_double(vm)?;
-        let val1 = self.pop_double(vm)?;
+        let val2 = self.pop_double()?;
+        let val1 = self.pop_double()?;
         let result = evaluator(val1, val2)?;
         self.stack.push(Double(result));
         Ok(())
     }
 
-    fn coerce_int<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    fn coerce_int<T>(&mut self, evaluator: T) -> Result<(), VmError>
     where
         T: FnOnce(i32) -> Value<'a>,
     {
-        let value = self.pop_int(vm)?;
+        let value = self.pop_int()?;
         let coerced = evaluator(value);
         self.stack.push(coerced);
         Ok(())
@@ -797,33 +797,23 @@ impl<'a> CallFrame<'a> {
         self.pc = jump_address.into_usize_safe();
     }
 
-    fn execute_if<T>(
-        &mut self,
-        vm: &mut Vm,
-        jump_address: u16,
-        comparator: T,
-    ) -> Result<(), VmError>
+    fn execute_if<T>(&mut self, jump_address: u16, comparator: T) -> Result<(), VmError>
     where
         T: FnOnce(i32) -> bool,
     {
-        let value = self.pop_int(vm)?;
+        let value = self.pop_int()?;
         if comparator(value) {
             self.goto(jump_address);
         }
         Ok(())
     }
 
-    fn execute_if_icmp<T>(
-        &mut self,
-        vm: &mut Vm,
-        jump_address: u16,
-        comparator: T,
-    ) -> Result<(), VmError>
+    fn execute_if_icmp<T>(&mut self, jump_address: u16, comparator: T) -> Result<(), VmError>
     where
         T: FnOnce(i32, i32) -> bool,
     {
-        let val2 = self.pop_int(vm)?;
-        let val1 = self.pop_int(vm)?;
+        let val2 = self.pop_int()?;
+        let val1 = self.pop_int()?;
         if comparator(val1, val2) {
             self.goto(jump_address);
         }
