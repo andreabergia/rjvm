@@ -204,11 +204,24 @@ impl<'a> CallFrame<'a> {
                 Instruction::Fstore_2 => self.execute_fstore(2)?,
                 Instruction::Fstore_3 => self.execute_fstore(3)?,
 
+                Instruction::Dload(index) => self.execute_dload(index.into_usize_safe())?,
+                Instruction::Dload_0 => self.execute_dload(0)?,
+                Instruction::Dload_1 => self.execute_dload(1)?,
+                Instruction::Dload_2 => self.execute_dload(2)?,
+                Instruction::Dload_3 => self.execute_dload(3)?,
+
+                Instruction::Dstore(index) => self.execute_dstore(index.into_usize_safe())?,
+                Instruction::Dstore_0 => self.execute_dstore(0)?,
+                Instruction::Dstore_1 => self.execute_dstore(1)?,
+                Instruction::Dstore_2 => self.execute_dstore(2)?,
+                Instruction::Dstore_3 => self.execute_dstore(3)?,
+
                 Instruction::I2b => self.coerce_int(vm, |value| Int((value as i8) as i32))?,
                 Instruction::I2c => self.coerce_int(vm, |value| Int((value as u16) as i32))?,
                 Instruction::I2s => self.coerce_int(vm, |value| Int((value as i16) as i32))?,
                 Instruction::I2f => self.coerce_int(vm, |value| Float(value as f32))?,
                 Instruction::I2l => self.coerce_int(vm, |value| Long(value as i64))?,
+                Instruction::I2d => self.coerce_int(vm, |value| Double(value as f64))?,
 
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
@@ -324,15 +337,37 @@ impl<'a> CallFrame<'a> {
                 Instruction::Fsub => self.execute_float_math(vm, |a, b| Ok(a - b))?,
                 Instruction::Fmul => self.execute_float_math(vm, |a, b| Ok(a * b))?,
                 Instruction::Fdiv => self.execute_float_math(vm, |a, b| {
-                    Ok(if Self::is_float_division_returning_nan(a, b) {
-                        f32::NAN
+                    Ok(
+                        if Self::is_double_division_returning_nan(a as f64, b as f64) {
+                            f32::NAN
+                        } else {
+                            a / b
+                        },
+                    )
+                })?,
+                Instruction::Frem => self.execute_float_math(vm, |a, b| {
+                    Ok(
+                        if Self::is_double_division_returning_nan(a as f64, b as f64) {
+                            f32::NAN
+                        } else {
+                            a % b
+                        },
+                    )
+                })?,
+
+                Instruction::Dadd => self.execute_double_math(vm, |a, b| Ok(a + b))?,
+                Instruction::Dsub => self.execute_double_math(vm, |a, b| Ok(a - b))?,
+                Instruction::Dmul => self.execute_double_math(vm, |a, b| Ok(a * b))?,
+                Instruction::Ddiv => self.execute_double_math(vm, |a, b| {
+                    Ok(if Self::is_double_division_returning_nan(a, b) {
+                        f64::NAN
                     } else {
                         a / b
                     })
                 })?,
-                Instruction::Frem => self.execute_float_math(vm, |a, b| {
-                    Ok(if Self::is_float_division_returning_nan(a, b) {
-                        f32::NAN
+                Instruction::Drem => self.execute_double_math(vm, |a, b| {
+                    Ok(if Self::is_double_division_returning_nan(a, b) {
+                        f64::NAN
                     } else {
                         a % b
                     })
@@ -415,29 +450,34 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn pop_int(&mut self, vm: &Vm) -> Result<i32, VmError> {
+    fn pop_int(&mut self, _vm: &Vm) -> Result<i32, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        Self::validate_type(vm, Base(BaseType::Int), &value)?;
         match value {
             Int(int) => Ok(int),
             _ => Err(VmError::ValidationException),
         }
     }
 
-    fn pop_long(&mut self, vm: &Vm) -> Result<i64, VmError> {
+    fn pop_long(&mut self, _vm: &Vm) -> Result<i64, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        Self::validate_type(vm, Base(BaseType::Long), &value)?;
         match value {
             Long(long) => Ok(long),
             _ => Err(VmError::ValidationException),
         }
     }
 
-    fn pop_float(&mut self, vm: &Vm) -> Result<f32, VmError> {
+    fn pop_float(&mut self, _vm: &Vm) -> Result<f32, VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        Self::validate_type(vm, Base(BaseType::Float), &value)?;
         match value {
             Float(float) => Ok(float),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn pop_double(&mut self, _vm: &Vm) -> Result<f64, VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Double(double) => Ok(double),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -714,11 +754,11 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    fn is_float_division_returning_nan(a: f32, b: f32) -> bool {
+    fn is_double_division_returning_nan(a: f64, b: f64) -> bool {
         a.is_nan()
             || b.is_nan()
             || (a.is_infinite() && b.is_infinite())
-            || ((a == 0f32 || a == -0f32) && (b == 0f32 || b == -0f32))
+            || ((a == 0f64 || a == -0f64) && (b == 0f64 || b == -0f64))
     }
 
     fn execute_float_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
@@ -729,6 +769,17 @@ impl<'a> CallFrame<'a> {
         let val1 = self.pop_float(vm)?;
         let result = evaluator(val1, val2)?;
         self.stack.push(Float(result));
+        Ok(())
+    }
+
+    fn execute_double_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    where
+        T: FnOnce(f64, f64) -> Result<f64, VmError>,
+    {
+        let val2 = self.pop_double(vm)?;
+        let val1 = self.pop_double(vm)?;
+        let result = evaluator(val1, val2)?;
+        self.stack.push(Double(result));
         Ok(())
     }
 
@@ -860,6 +911,28 @@ impl<'a> CallFrame<'a> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Float(_) => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_dload(&mut self, index: usize) -> Result<(), VmError> {
+        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        match local {
+            Double(_) => {
+                self.stack.push(local.clone());
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_dstore(&mut self, index: usize) -> Result<(), VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Double(_) => {
                 self.locals[index] = value;
                 Ok(())
             }
