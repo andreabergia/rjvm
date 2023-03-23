@@ -115,5 +115,8 @@ fn numeric_types() {
     );
     assert_eq!(Ok(None), main_result);
 
-    assert_eq!(vec![Value::Int(3), Value::Float(3.45)], vm.printed);
+    assert_eq!(
+        vec![Value::Int(3), Value::Float(3.45), Value::Long(2)],
+        vm.printed
+    );
 }

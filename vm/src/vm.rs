@@ -14,7 +14,7 @@ use crate::class::{ClassId, ClassRef};
 use crate::class_allocator::{ClassAllocator, ClassResolver};
 use crate::gc::ObjectAllocator;
 use crate::value::ObjectRef;
-use crate::value::Value::{Float, Int};
+use crate::value::Value::{Double, Float, Int, Long};
 use crate::{
     class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::Value,
     value::Value::Object, vm_error::VmError,
@@ -176,8 +176,21 @@ impl<'a> CallFrame<'a> {
                 Instruction::Iconst_4 => self.stack.push(Int(4)),
                 Instruction::Iconst_5 => self.stack.push(Int(5)),
 
+                Instruction::Lload(index) => self.execute_lload(index.into_usize_safe())?,
+                Instruction::Lload_0 => self.execute_lload(0)?,
+                Instruction::Lload_1 => self.execute_lload(1)?,
+                Instruction::Lload_2 => self.execute_lload(2)?,
+                Instruction::Lload_3 => self.execute_lload(3)?,
+
+                Instruction::Lstore(index) => self.execute_lstore(index.into_usize_safe())?,
+                Instruction::Lstore_0 => self.execute_lstore(0)?,
+                Instruction::Lstore_1 => self.execute_lstore(1)?,
+                Instruction::Lstore_2 => self.execute_lstore(2)?,
+                Instruction::Lstore_3 => self.execute_lstore(3)?,
+
                 Instruction::Ldc(index) => self.execute_ldc(index as u16)?,
                 Instruction::Ldc_w(index) => self.execute_ldc(index)?,
+                Instruction::Ldc2_w(index) => self.execute_ldc_long_double(index)?,
 
                 Instruction::Fload(index) => self.execute_fload(index.into_usize_safe())?,
                 Instruction::Fload_0 => self.execute_fload(0)?,
@@ -195,6 +208,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::I2c => self.coerce_int(vm, |value| Int((value as u16) as i32))?,
                 Instruction::I2s => self.coerce_int(vm, |value| Int((value as i16) as i32))?,
                 Instruction::I2f => self.coerce_int(vm, |value| Float(value as f32))?,
+                Instruction::I2l => self.coerce_int(vm, |value| Long(value as i64))?,
 
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
@@ -290,6 +304,21 @@ impl<'a> CallFrame<'a> {
                     let local = self.get_local_int_as_int(vm, index)?;
                     self.locals[index] = Int(local + constant as i32);
                 }
+
+                Instruction::Ladd => self.execute_long_math(vm, |a, b| Ok(a + b))?,
+                Instruction::Lsub => self.execute_long_math(vm, |a, b| Ok(a - b))?,
+                Instruction::Lmul => self.execute_long_math(vm, |a, b| Ok(a * b))?,
+                Instruction::Ldiv => self.execute_long_math(vm, |a, b| match b {
+                    0 => Err(VmError::ArithmeticException),
+                    _ => Ok(a / b),
+                })?,
+                Instruction::Lrem => self.execute_long_math(vm, |a, b| match b {
+                    0 => Err(VmError::ArithmeticException),
+                    _ => Ok(a % b),
+                })?,
+                Instruction::Land => self.execute_long_math(vm, |a, b| Ok(a & b))?,
+                Instruction::Lor => self.execute_long_math(vm, |a, b| Ok(a | b))?,
+                Instruction::Lxor => self.execute_long_math(vm, |a, b| Ok(a ^ b))?,
 
                 Instruction::Fadd => self.execute_float_math(vm, |a, b| Ok(a + b))?,
                 Instruction::Fsub => self.execute_float_math(vm, |a, b| Ok(a - b))?,
@@ -391,6 +420,15 @@ impl<'a> CallFrame<'a> {
         Self::validate_type(vm, Base(BaseType::Int), &value)?;
         match value {
             Int(int) => Ok(int),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn pop_long(&mut self, vm: &Vm) -> Result<i64, VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        Self::validate_type(vm, Base(BaseType::Long), &value)?;
+        match value {
+            Long(long) => Ok(long),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -665,6 +703,17 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
+    fn execute_long_math<T>(&mut self, vm: &mut Vm, evaluator: T) -> Result<(), VmError>
+    where
+        T: FnOnce(i64, i64) -> Result<i64, VmError>,
+    {
+        let val2 = self.pop_long(vm)?;
+        let val1 = self.pop_long(vm)?;
+        let result = evaluator(val1, val2)?;
+        self.stack.push(Long(result));
+        Ok(())
+    }
+
     fn is_float_division_returning_nan(a: f32, b: f32) -> bool {
         a.is_nan()
             || b.is_nan()
@@ -774,6 +823,28 @@ impl<'a> CallFrame<'a> {
         }
     }
 
+    fn execute_lload(&mut self, index: usize) -> Result<(), VmError> {
+        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        match local {
+            Long(_) => {
+                self.stack.push(local.clone());
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_lstore(&mut self, index: usize) -> Result<(), VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Long(_) => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
     fn execute_fload(&mut self, index: usize) -> Result<(), VmError> {
         let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
         match local {
@@ -804,6 +875,16 @@ impl<'a> CallFrame<'a> {
             // TODO: StringReference
             // TODO: ClassReference
             // TODO: method type or method handle
+            _ => return Err(VmError::ValidationException),
+        }
+        Ok(())
+    }
+
+    fn execute_ldc_long_double(&mut self, index: u16) -> Result<(), VmError> {
+        let constant_value = self.get_constant(index)?;
+        match constant_value {
+            ConstantPoolEntry::Long(value) => self.stack.push(Long(*value)),
+            ConstantPoolEntry::Double(value) => self.stack.push(Double(*value)),
             _ => return Err(VmError::ValidationException),
         }
         Ok(())
