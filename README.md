@@ -58,9 +58,9 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
         - [x] short
         - [x] char
         - [x] byte
-        - [ ] long
+        - [x] long
         - [x] float
-        - [ ] double
+        - [x] double
         - [x] boolean
         - [x] object
         - [ ] primitive arrays
