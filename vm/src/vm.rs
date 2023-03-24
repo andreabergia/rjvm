@@ -47,6 +47,21 @@ macro_rules! generate_execute_math {
     };
 }
 
+macro_rules! generate_execute_load {
+    ($name:ident, $variant:ident) => {
+        fn $name(&mut self, index: usize) -> Result<(), VmError> {
+            let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+            match local {
+                $variant(_) => {
+                    self.stack.push(local.clone());
+                    Ok(())
+                }
+                _ => Err(VmError::ValidationException),
+            }
+        }
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct Stack<'a> {
     frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
@@ -781,33 +796,17 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    fn execute_aload(&mut self, index: usize) -> Result<(), VmError> {
-        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        match local {
-            Object(_) => {
-                self.stack.push(local.clone());
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
+    generate_execute_load!(execute_aload, Object);
+    generate_execute_load!(execute_iload, Int);
+    generate_execute_load!(execute_lload, Long);
+    generate_execute_load!(execute_fload, Float);
+    generate_execute_load!(execute_dload, Double);
 
     fn execute_astore(&mut self, index: usize) -> Result<(), VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Object(_) => {
                 self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn execute_iload(&mut self, index: usize) -> Result<(), VmError> {
-        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        match local {
-            Int(_) => {
-                self.stack.push(local.clone());
                 Ok(())
             }
             _ => Err(VmError::ValidationException),
@@ -825,17 +824,6 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn execute_lload(&mut self, index: usize) -> Result<(), VmError> {
-        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        match local {
-            Long(_) => {
-                self.stack.push(local.clone());
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
     fn execute_lstore(&mut self, index: usize) -> Result<(), VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
@@ -847,33 +835,11 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn execute_fload(&mut self, index: usize) -> Result<(), VmError> {
-        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        match local {
-            Float(_) => {
-                self.stack.push(local.clone());
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
     fn execute_fstore(&mut self, index: usize) -> Result<(), VmError> {
         let value = self.stack.pop().ok_or(VmError::ValidationException)?;
         match value {
             Float(_) => {
                 self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn execute_dload(&mut self, index: usize) -> Result<(), VmError> {
-        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
-        match local {
-            Double(_) => {
-                self.stack.push(local.clone());
                 Ok(())
             }
             _ => Err(VmError::ValidationException),
