@@ -481,6 +481,17 @@ impl<'a> CallFrame<'a> {
                 Instruction::Iand => self.execute_int_math(|a, b| Ok(a & b))?,
                 Instruction::Ior => self.execute_int_math(|a, b| Ok(a | b))?,
                 Instruction::Ixor => self.execute_int_math(|a, b| Ok(a ^ b))?,
+                Instruction::Ishr => self.execute_int_math(|a, b| Ok({ a >> (b & 0x1f) }))?,
+                Instruction::Ishl => self.execute_int_math(|a, b| Ok({ a << (b & 0x1f) }))?,
+                Instruction::Iushr => self.execute_int_math(|a, b| {
+                    Ok({
+                        if a > 0 {
+                            a >> (b & 0x1f)
+                        } else {
+                            ((a as u32) >> (b & 0x1f)) as i32
+                        }
+                    })
+                })?,
 
                 Instruction::Iinc(index, constant) => {
                     let index = index.into_usize_safe();
