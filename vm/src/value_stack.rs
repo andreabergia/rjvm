@@ -31,8 +31,8 @@ impl<'a> ValueStack<'a> {
         }
     }
 
-    pub fn pop(&mut self) -> Option<Value<'a>> {
-        self.stack.pop()
+    pub fn pop(&mut self) -> Result<Value<'a>, VmError> {
+        self.stack.pop().ok_or(ValidationException)
     }
 
     pub fn truncate(&mut self, len: usize) -> Result<(), VmError> {
@@ -68,8 +68,8 @@ impl<'a> ValueStack<'a> {
 
     pub fn dup_x1(&mut self) -> Result<(), VmError> {
         if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop().ok_or(ValidationException)?;
-            let value2 = self.pop().ok_or(ValidationException)?;
+            let value1 = self.pop()?;
+            let value2 = self.pop()?;
             self.push(value1.clone())?;
             self.push(value2)?;
             self.push(value1)
@@ -80,9 +80,9 @@ impl<'a> ValueStack<'a> {
 
     pub fn dup_x2(&mut self) -> Result<(), VmError> {
         if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop().ok_or(ValidationException)?;
-            let value2 = self.pop().ok_or(ValidationException)?;
-            let value3 = self.pop().ok_or(ValidationException)?;
+            let value1 = self.pop()?;
+            let value2 = self.pop()?;
+            let value3 = self.pop()?;
             self.push(value1.clone())?;
             self.push(value3)?;
             self.push(value2)?;
@@ -94,8 +94,8 @@ impl<'a> ValueStack<'a> {
 
     pub fn dup2(&mut self) -> Result<(), VmError> {
         if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop().ok_or(ValidationException)?;
-            let value2 = self.pop().ok_or(ValidationException)?;
+            let value1 = self.pop()?;
+            let value2 = self.pop()?;
             self.push(value2.clone())?;
             self.push(value1.clone())?;
             self.push(value2)?;
@@ -107,9 +107,9 @@ impl<'a> ValueStack<'a> {
 
     pub fn dup2_x1(&mut self) -> Result<(), VmError> {
         if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop().ok_or(ValidationException)?;
-            let value2 = self.pop().ok_or(ValidationException)?;
-            let value3 = self.pop().ok_or(ValidationException)?;
+            let value1 = self.pop()?;
+            let value2 = self.pop()?;
+            let value3 = self.pop()?;
             self.push(value2.clone())?;
             self.push(value1.clone())?;
             self.push(value3)?;
@@ -122,10 +122,10 @@ impl<'a> ValueStack<'a> {
 
     pub fn dup2_x2(&mut self) -> Result<(), VmError> {
         if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop().ok_or(ValidationException)?;
-            let value2 = self.pop().ok_or(ValidationException)?;
-            let value3 = self.pop().ok_or(ValidationException)?;
-            let value4 = self.pop().ok_or(ValidationException)?;
+            let value1 = self.pop()?;
+            let value2 = self.pop()?;
+            let value3 = self.pop()?;
+            let value4 = self.pop()?;
             self.push(value2.clone())?;
             self.push(value1.clone())?;
             self.push(value4)?;
@@ -161,14 +161,14 @@ mod tests {
         stack.push(Value::Int(2)).expect("should be able to push");
         stack.push(Value::Int(3)).expect("should be able to push");
 
-        assert_eq!(Some(Value::Int(3)), stack.pop());
+        assert_eq!(Ok(Value::Int(3)), stack.pop());
         assert_eq!(Some(&Value::Int(1)), stack.get(0));
         assert_eq!(Value::Int(2), stack[1]);
         assert_eq!(2, stack.len());
 
         stack.truncate(1).expect("should be able to truncate");
         assert_eq!(1, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
     }
 
     #[test]
@@ -184,8 +184,8 @@ mod tests {
         stack.push(Value::Int(1)).expect("should be able to push");
         stack.dup().expect("should be able to dup");
         assert_eq!(2, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
     }
 
     #[test]
@@ -195,9 +195,9 @@ mod tests {
         stack.push(Value::Int(1)).expect("should be able to push");
         stack.dup_x1().expect("should be able to dup_x1");
         assert_eq!(3, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
     }
 
     #[test]
@@ -208,10 +208,10 @@ mod tests {
         stack.push(Value::Int(1)).expect("should be able to push");
         stack.dup_x2().expect("should be able to dup_x2");
         assert_eq!(4, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
-        assert_eq!(Some(Value::Int(3)), stack.pop());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(3)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
     }
 
     #[test]
@@ -221,10 +221,10 @@ mod tests {
         stack.push(Value::Int(1)).expect("should be able to push");
         stack.dup2().expect("should be able to dup2");
         assert_eq!(4, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
     }
 
     #[test]
@@ -235,11 +235,11 @@ mod tests {
         stack.push(Value::Int(1)).expect("should be able to push");
         stack.dup2_x1().expect("should be able to dup2_x1");
         assert_eq!(5, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
-        assert_eq!(Some(Value::Int(3)), stack.pop());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(3)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
     }
 
     #[test]
@@ -251,11 +251,11 @@ mod tests {
         stack.push(Value::Int(1)).expect("should be able to push");
         stack.dup2_x2().expect("should be able to dup2_x2");
         assert_eq!(6, stack.len());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
-        assert_eq!(Some(Value::Int(3)), stack.pop());
-        assert_eq!(Some(Value::Int(4)), stack.pop());
-        assert_eq!(Some(Value::Int(1)), stack.pop());
-        assert_eq!(Some(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
+        assert_eq!(Ok(Value::Int(3)), stack.pop());
+        assert_eq!(Ok(Value::Int(4)), stack.pop());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
     }
 }

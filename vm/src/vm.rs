@@ -29,7 +29,7 @@ use crate::{
 macro_rules! generate_pop {
     ($name:ident, $variant:ident, $type:ty) => {
         fn $name(&mut self) -> Result<$type, VmError> {
-            let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+            let value = self.stack.pop()?;
             match value {
                 $variant(value) => Ok(value),
                 _ => Err(VmError::ValidationException),
@@ -44,7 +44,7 @@ macro_rules! generate_execute_return {
             if !self.class_and_method.returns(Base(BaseType::$variant)) {
                 return Err(VmError::ValidationException);
             }
-            let result = self.stack.pop().ok_or(VmError::ValidationException)?;
+            let result = self.stack.pop()?;
             self.debug_done_execution(Some(&result));
             return Ok(Some(result));
         }
@@ -120,7 +120,7 @@ macro_rules! generate_execute_load {
 macro_rules! generate_execute_store {
     ($name:ident, $($variant:ident),+) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
-            let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+            let value = self.stack.pop()?;
             match value {
                 $($variant(..) => {
                     self.locals[index] = value;
@@ -408,15 +408,14 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dup2 => self.stack.dup2()?,
                 Instruction::Dup2_x1 => self.stack.dup2_x1()?,
                 Instruction::Dup2_x2 => self.stack.dup2_x2()?,
-                Instruction::Pop => {
-                    self.stack.pop().ok_or(VmError::ValidationException)?;
-                }
+                Instruction::Pop => self.stack.pop().map(|_| ())?,
+
                 Instruction::Pop2 => {
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    let value = self.stack.pop()?;
                     match value {
                         Double(_) | Long(_) => {}
                         _ => {
-                            self.stack.pop().ok_or(VmError::ValidationException)?;
+                            self.stack.pop()?;
                         }
                     }
                 }
@@ -450,9 +449,9 @@ impl<'a> CallFrame<'a> {
                     let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
-                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    let value = self.stack.pop()?;
                     Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
-                    let object = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    let object = self.stack.pop()?;
                     if let Object(object_ref) = object {
                         object_ref.set_field(index, value);
                     } else {
@@ -466,7 +465,7 @@ impl<'a> CallFrame<'a> {
                     let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
-                    let object = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    let object = self.stack.pop()?;
                     if let Object(object_ref) = object {
                         let field_value = object_ref.get_field(index);
                         Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
@@ -741,7 +740,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_object, Object, ObjectRef<'a>);
 
     fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), VmError> {
-        let receiver = self.stack.pop().ok_or(VmError::ValidationException)?;
+        let receiver = self.stack.pop()?;
         match receiver {
             Array(field_type, vector) => Ok((field_type, vector)),
             _ => Err(VmError::ValidationException),
@@ -1075,7 +1074,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_if_null(&mut self, jump_address: u16, jump_on_null: bool) -> Result<(), VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        let value = self.stack.pop()?;
         match value {
             Object(_) => {
                 if !jump_on_null {
