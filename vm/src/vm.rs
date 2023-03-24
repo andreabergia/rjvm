@@ -374,6 +374,15 @@ impl<'a> CallFrame<'a> {
                 Instruction::Pop => {
                     self.stack.pop().ok_or(VmError::ValidationException)?;
                 }
+                Instruction::Pop2 => {
+                    let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+                    match value {
+                        Double(_) | Long(_) => {}
+                        _ => {
+                            self.stack.pop().ok_or(VmError::ValidationException)?;
+                        }
+                    }
+                }
                 Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32)),
 
                 Instruction::Invokespecial(constant_index) => {
@@ -518,6 +527,10 @@ impl<'a> CallFrame<'a> {
                 Instruction::Ifle(jump_address) => self.execute_if(jump_address, |v| v <= 0)?,
                 Instruction::Ifgt(jump_address) => self.execute_if(jump_address, |v| v > 0)?,
                 Instruction::Ifge(jump_address) => self.execute_if(jump_address, |v| v >= 0)?,
+                Instruction::Ifnull(jump_address) => self.execute_if_null(jump_address, true)?,
+                Instruction::Ifnonnull(jump_address) => {
+                    self.execute_if_null(jump_address, false)?
+                }
 
                 Instruction::If_icmpeq(jump_address) => {
                     self.execute_if_icmp(jump_address, |a, b| a == b)?
@@ -564,6 +577,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Fastore => self.execute_fastore()?,
                 Instruction::Dastore => self.execute_dastore()?,
                 Instruction::Aastore => self.execute_aastore(vm)?,
+
+                Instruction::Nop => {}
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
@@ -979,6 +994,24 @@ impl<'a> CallFrame<'a> {
         let val1 = self.pop_int()?;
         if comparator(val1, val2) {
             self.goto(jump_address);
+        }
+        Ok(())
+    }
+
+    fn execute_if_null(&mut self, jump_address: u16, jump_on_null: bool) -> Result<(), VmError> {
+        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match value {
+            Object(_) => {
+                if !jump_on_null {
+                    self.goto(jump_address);
+                }
+            }
+            Value::Null => {
+                if jump_on_null {
+                    self.goto(jump_address);
+                }
+            }
+            _ => return Err(VmError::ValidationException),
         }
         Ok(())
     }

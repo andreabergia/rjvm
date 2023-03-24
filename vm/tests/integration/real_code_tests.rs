@@ -96,7 +96,7 @@ fn control_flow() {
     );
     assert_eq!(Ok(None), main_result);
 
-    assert_eq!(vec![Value::Int(241)], vm.printed);
+    assert_eq!(vec![Value::Int(241), Value::Int(42)], vm.printed);
 }
 
 #[test_log::test]
