@@ -52,6 +52,16 @@ macro_rules! generate_execute_math {
     };
 }
 
+macro_rules! generate_execute_neg {
+    ($name:ident, $pop_fn:ident, $variant:ident) => {
+        fn $name(&mut self) -> Result<(), VmError> {
+            let value = self.$pop_fn()?;
+            self.stack.push($variant(-value));
+            Ok(())
+        }
+    };
+}
+
 macro_rules! generate_execute_coerce {
     ($name:ident, $pop_fn:ident, $type:ty) => {
         fn $name<T>(&mut self, evaluator: T) -> Result<(), VmError>
@@ -536,6 +546,11 @@ impl<'a> CallFrame<'a> {
                     })
                 })?,
 
+                Instruction::Ineg => self.execute_ineg()?,
+                Instruction::Lneg => self.execute_lneg()?,
+                Instruction::Fneg => self.execute_fneg()?,
+                Instruction::Dneg => self.execute_dneg()?,
+
                 Instruction::Goto(jump_address) => self.goto(jump_address),
 
                 Instruction::Ifeq(jump_address) => self.execute_if(jump_address, |v| v == 0)?,
@@ -1010,6 +1025,11 @@ impl<'a> CallFrame<'a> {
             || (a.is_infinite() && b.is_infinite())
             || ((a == 0f64 || a == -0f64) && (b == 0f64 || b == -0f64))
     }
+
+    generate_execute_neg!(execute_ineg, pop_int, Int);
+    generate_execute_neg!(execute_lneg, pop_long, Long);
+    generate_execute_neg!(execute_fneg, pop_float, Float);
+    generate_execute_neg!(execute_dneg, pop_double, Double);
 
     generate_execute_coerce!(coerce_int, pop_int, i32);
     generate_execute_coerce!(coerce_long, pop_long, i64);

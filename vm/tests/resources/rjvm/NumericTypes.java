@@ -6,6 +6,7 @@ public class NumericTypes {
         floatAndIntMath(1, 2.45f);
         longMath(1, 3);
         doubleMath(1, 3.45);
+        negate(1, 1, 1, 1);
     }
 
     private static void shortAndCharMath(short s, char c) {
@@ -31,6 +32,13 @@ public class NumericTypes {
         tempPrint((int)(i + d));
         tempPrint((float)(i + d));
         tempPrint((long)(i + d));
+    }
+
+    private static void negate(int i, long l, float f, double d) {
+        tempPrint(-i);
+        tempPrint(-l);
+        tempPrint(-f);
+        tempPrint(-d);
     }
 
     private static native void tempPrint(int value);

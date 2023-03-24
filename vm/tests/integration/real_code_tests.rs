@@ -139,6 +139,10 @@ fn numeric_types() {
             Value::Int(4),
             Value::Float(4.45),
             Value::Long(4),
+            Value::Int(-1),
+            Value::Long(-1),
+            Value::Float(-1f32),
+            Value::Double(-1f64),
         ],
         vm.printed
     );
