@@ -12,6 +12,7 @@ use rjvm_reader::{
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::value::ArrayRef;
+use crate::value_stack::ValueStack;
 use crate::{
     class::Class,
     class::{ClassId, ClassRef},
@@ -59,8 +60,7 @@ macro_rules! generate_execute_math {
             let val2 = self.$pop_fn()?;
             let val1 = self.$pop_fn()?;
             let result = evaluator(val1, val2)?;
-            self.stack.push($variant(result));
-            Ok(())
+            self.stack.push($variant(result))
         }
     };
 }
@@ -69,8 +69,7 @@ macro_rules! generate_execute_neg {
     ($name:ident, $pop_fn:ident, $variant:ident) => {
         fn $name(&mut self) -> Result<(), VmError> {
             let value = self.$pop_fn()?;
-            self.stack.push($variant(-value));
-            Ok(())
+            self.stack.push($variant(-value))
         }
     };
 }
@@ -83,8 +82,7 @@ macro_rules! generate_execute_coerce {
         {
             let value = self.$pop_fn()?;
             let coerced = evaluator(value);
-            self.stack.push(coerced);
-            Ok(())
+            self.stack.push(coerced)
         }
     };
 }
@@ -101,7 +99,6 @@ macro_rules! generate_compare {
             } else {
                 self.stack.push(Int(0))
             }
-            Ok(())
         }
     };
 }
@@ -112,8 +109,7 @@ macro_rules! generate_execute_load {
             let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
             match local {
                 $($variant(..) => {
-                    self.stack.push(local.clone());
-                    Ok(())
+                    self.stack.push(local.clone())
                 }),+
                 _ => Err(VmError::ValidationException),
             }
@@ -149,8 +145,7 @@ macro_rules! generate_execute_array_load {
                     .map(|value| value.clone()),)+
                 _ => return Err(VmError::ValidationException),
             }?;
-            self.stack.push(value);
-            Ok(())
+            self.stack.push(value)
         }
     };
 }
@@ -249,7 +244,7 @@ pub struct CallFrame<'a> {
     class_and_method: ClassAndMethod<'a>,
     pc: usize,
     locals: Vec<Value<'a>>,
-    stack: Vec<Value<'a>>,
+    stack: ValueStack<'a>,
     code: &'a Vec<u8>,
 }
 
@@ -279,7 +274,7 @@ impl<'a> CallFrame<'a> {
             class_and_method,
             pc: 0,
             locals,
-            stack: Vec::with_capacity(max_stack_size),
+            stack: ValueStack::with_max_size(max_stack_size),
             code,
         }
     }
@@ -298,7 +293,7 @@ impl<'a> CallFrame<'a> {
             self.pc = new_address;
 
             match instruction {
-                Instruction::Aconst_null => self.stack.push(Value::Null),
+                Instruction::Aconst_null => self.stack.push(Value::Null)?,
                 Instruction::Aload(index) => self.execute_aload(index.into_usize_safe())?,
                 Instruction::Aload_0 => self.execute_aload(0)?,
                 Instruction::Aload_1 => self.execute_aload(1)?,
@@ -323,23 +318,23 @@ impl<'a> CallFrame<'a> {
                 Instruction::Istore_2 => self.execute_istore(2)?,
                 Instruction::Istore_3 => self.execute_istore(3)?,
 
-                Instruction::Iconst_m1 => self.stack.push(Int(-1)),
-                Instruction::Iconst_0 => self.stack.push(Int(0)),
-                Instruction::Iconst_1 => self.stack.push(Int(1)),
-                Instruction::Iconst_2 => self.stack.push(Int(2)),
-                Instruction::Iconst_3 => self.stack.push(Int(3)),
-                Instruction::Iconst_4 => self.stack.push(Int(4)),
-                Instruction::Iconst_5 => self.stack.push(Int(5)),
+                Instruction::Iconst_m1 => self.stack.push(Int(-1))?,
+                Instruction::Iconst_0 => self.stack.push(Int(0))?,
+                Instruction::Iconst_1 => self.stack.push(Int(1))?,
+                Instruction::Iconst_2 => self.stack.push(Int(2))?,
+                Instruction::Iconst_3 => self.stack.push(Int(3))?,
+                Instruction::Iconst_4 => self.stack.push(Int(4))?,
+                Instruction::Iconst_5 => self.stack.push(Int(5))?,
 
-                Instruction::Lconst_0 => self.stack.push(Long(0)),
-                Instruction::Lconst_1 => self.stack.push(Long(1)),
+                Instruction::Lconst_0 => self.stack.push(Long(0))?,
+                Instruction::Lconst_1 => self.stack.push(Long(1))?,
 
-                Instruction::Fconst_0 => self.stack.push(Float(0f32)),
-                Instruction::Fconst_1 => self.stack.push(Float(1f32)),
-                Instruction::Fconst_2 => self.stack.push(Float(2f32)),
+                Instruction::Fconst_0 => self.stack.push(Float(0f32))?,
+                Instruction::Fconst_1 => self.stack.push(Float(1f32))?,
+                Instruction::Fconst_2 => self.stack.push(Float(2f32))?,
 
-                Instruction::Dconst_0 => self.stack.push(Double(0f64)),
-                Instruction::Dconst_1 => self.stack.push(Double(1f64)),
+                Instruction::Dconst_0 => self.stack.push(Double(0f64))?,
+                Instruction::Dconst_1 => self.stack.push(Double(1f64))?,
 
                 Instruction::Lload(index) => self.execute_lload(index.into_usize_safe())?,
                 Instruction::Lload_0 => self.execute_lload(0)?,
@@ -404,13 +399,10 @@ impl<'a> CallFrame<'a> {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
                     let new_object = vm.new_object(new_object_class_name)?;
-                    self.stack.push(Object(new_object));
+                    self.stack.push(Object(new_object))?;
                 }
 
-                Instruction::Dup => {
-                    let stack_head = self.stack.last().ok_or(VmError::ValidationException)?;
-                    self.stack.push(stack_head.clone());
-                }
+                Instruction::Dup => self.stack.dup()?,
                 Instruction::Pop => {
                     self.stack.pop().ok_or(VmError::ValidationException)?;
                 }
@@ -423,7 +415,7 @@ impl<'a> CallFrame<'a> {
                         }
                     }
                 }
-                Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32)),
+                Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32))?,
 
                 Instruction::Invokespecial(constant_index) => {
                     self.invoke_method(vm, call_stack, constant_index, InvokeKind::Special)?
@@ -473,7 +465,7 @@ impl<'a> CallFrame<'a> {
                     if let Object(object_ref) = object {
                         let field_value = object_ref.get_field(index);
                         Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-                        self.stack.push(field_value);
+                        self.stack.push(field_value)?;
                     } else {
                         return Err(VmError::ValidationException);
                     }
@@ -713,14 +705,14 @@ impl<'a> CallFrame<'a> {
             }
             _ => static_method_reference,
         };
-        self.stack.truncate(new_stack_len);
+        self.stack.truncate(new_stack_len)?;
 
         let method_return_type = class_and_method.return_type();
         let result = vm.invoke(call_stack, class_and_method, receiver, params)?;
 
         Self::validate_type_opt(vm, method_return_type, &result)?;
         if let Some(value) = result {
-            self.stack.push(value);
+            self.stack.push(value)?;
         }
         Ok(())
     }
@@ -1119,9 +1111,8 @@ impl<'a> CallFrame<'a> {
             // TODO: StringReference
             // TODO: ClassReference
             // TODO: method type or method handle
-            _ => return Err(VmError::ValidationException),
+            _ => Err(VmError::ValidationException),
         }
-        Ok(())
     }
 
     fn execute_ldc_long_double(&mut self, index: u16) -> Result<(), VmError> {
@@ -1129,9 +1120,8 @@ impl<'a> CallFrame<'a> {
         match constant_value {
             ConstantPoolEntry::Long(value) => self.stack.push(Long(*value)),
             ConstantPoolEntry::Double(value) => self.stack.push(Double(*value)),
-            _ => return Err(VmError::ValidationException),
+            _ => Err(VmError::ValidationException),
         }
-        Ok(())
     }
 
     fn execute_newarray(&mut self, array_type: NewArrayType) -> Result<(), VmError> {
@@ -1151,8 +1141,7 @@ impl<'a> CallFrame<'a> {
         let vec = vec![default_value; length];
         let vec = Rc::new(RefCell::new(vec));
         let array_value = Array(elements_type, vec);
-        self.stack.push(array_value);
-        Ok(())
+        self.stack.push(array_value)
     }
 
     fn execute_anewarray(&mut self, constant_index: u16) -> Result<(), VmError> {
@@ -1162,13 +1151,12 @@ impl<'a> CallFrame<'a> {
         let vec = vec![Value::Null; length];
         let vec = Rc::new(RefCell::new(vec));
         let array_value = Array(FieldType::Object(class_name.to_string()), vec);
-        self.stack.push(array_value);
-        Ok(())
+        self.stack.push(array_value)
     }
 
     fn execute_array_length(&mut self) -> Result<(), VmError> {
         let (_, array) = self.pop_array()?;
-        self.stack.push(Int(array.borrow().len() as i32));
+        self.stack.push(Int(array.borrow().len() as i32))?;
         Ok(())
     }
 
