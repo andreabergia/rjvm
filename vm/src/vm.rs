@@ -413,6 +413,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Swap => self.stack.swap()?,
 
                 Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32))?,
+                Instruction::Sipush(short_value) => self.stack.push(Int(short_value as i32))?,
 
                 Instruction::Invokespecial(constant_index) => {
                     self.invoke_method(vm, call_stack, constant_index, InvokeKind::Special)?
