@@ -11,6 +11,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::value::ArrayRef;
 use crate::{
     class::Class,
     class::{ClassId, ClassRef},
@@ -71,7 +72,7 @@ macro_rules! generate_execute_store {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
             let value = self.stack.pop().ok_or(VmError::ValidationException)?;
             match value {
-                $($variant(_, ..) => {
+                $($variant(..) => {
                     self.locals[index] = value;
                     Ok(())
                 })+
@@ -624,7 +625,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_double, Double, f64);
     generate_pop!(pop_object, Object, ObjectRef<'a>);
 
-    fn pop_array(&mut self) -> Result<(FieldType, Rc<RefCell<Vec<Value<'a>>>>), VmError> {
+    fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), VmError> {
         let receiver = self.stack.pop().ok_or(VmError::ValidationException)?;
         match receiver {
             Array(field_type, vector) => Ok((field_type, vector)),

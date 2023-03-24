@@ -19,7 +19,7 @@ pub enum Value<'a> {
     Null, // TODO: should this be merged with Object and use an Option?
 
     // TODO: avoid RC and use garbage collector to allocate
-    Array(FieldType, Rc<RefCell<Vec<Value<'a>>>>),
+    Array(FieldType, ArrayRef<'a>),
     // TODO: return address
 }
 
@@ -50,6 +50,7 @@ impl<'a> ObjectValue<'a> {
 }
 
 pub type ObjectRef<'a> = &'a ObjectValue<'a>;
+pub type ArrayRef<'a> = Rc<RefCell<Vec<Value<'a>>>>;
 
 impl<'a> Value<'a> {
     pub fn matches_type<'b>(
