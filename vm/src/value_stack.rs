@@ -144,6 +144,13 @@ impl<'a> ValueStack<'a> {
             Err(ValidationException)
         }
     }
+
+    pub fn swap(&mut self) -> Result<(), VmError> {
+        let value1 = self.pop()?;
+        let value2 = self.pop()?;
+        self.push(value1)?;
+        self.push(value2)
+    }
 }
 
 impl<'a, I> Index<I> for ValueStack<'a>
@@ -281,5 +288,16 @@ mod tests {
         assert_eq!(Ok(Value::Int(2)), stack.pop2());
         assert_eq!(1, stack.len());
         assert_eq!(Ok(Value::Double(0f64)), stack.pop2());
+    }
+
+    #[test]
+    fn can_invoke_swap() {
+        let mut stack = ValueStack::with_max_size(2);
+        stack.push(Value::Int(1)).expect("should be able to push");
+        stack.push(Value::Int(2)).expect("should be able to push");
+        stack.swap().expect("should be able to swap");
+        assert_eq!(2, stack.len());
+        assert_eq!(Ok(Value::Int(1)), stack.pop());
+        assert_eq!(Ok(Value::Int(2)), stack.pop());
     }
 }

@@ -410,6 +410,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dup2_x2 => self.stack.dup2_x2()?,
                 Instruction::Pop => self.stack.pop().map(|_| ())?,
                 Instruction::Pop2 => self.stack.pop2().map(|_| ())?,
+                Instruction::Swap => self.stack.swap()?,
 
                 Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32))?,
 
