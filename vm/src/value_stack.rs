@@ -1,5 +1,6 @@
 use std::ops::Index;
 use std::slice::{Iter, SliceIndex};
+use VmError::ValidationException;
 
 use crate::value::Value;
 use crate::vm_error::VmError;
@@ -25,7 +26,7 @@ impl<'a> ValueStack<'a> {
             self.stack.push(value);
             Ok(())
         } else {
-            Err(VmError::ValidationException)
+            Err(ValidationException)
         }
     }
 
@@ -35,7 +36,7 @@ impl<'a> ValueStack<'a> {
 
     pub fn truncate(&mut self, len: usize) -> Result<(), VmError> {
         if len > self.stack.capacity() {
-            Err(VmError::ValidationException)
+            Err(ValidationException)
         } else {
             self.stack.truncate(len);
             Ok(())
@@ -53,14 +54,26 @@ impl<'a> ValueStack<'a> {
     pub fn dup(&mut self) -> Result<(), VmError> {
         if self.stack.len() < self.stack.capacity() {
             match self.stack.last() {
-                None => Err(VmError::ValidationException),
+                None => Err(ValidationException),
                 Some(head) => {
                     self.stack.push(head.clone());
                     Ok(())
                 }
             }
         } else {
-            Err(VmError::ValidationException)
+            Err(ValidationException)
+        }
+    }
+
+    pub fn dup_x1(&mut self) -> Result<(), VmError> {
+        if self.stack.len() < self.stack.capacity() {
+            let value1 = self.pop().ok_or(ValidationException)?;
+            let value2 = self.pop().ok_or(ValidationException)?;
+            self.push(value1.clone())?;
+            self.push(value2)?;
+            self.push(value1)
+        } else {
+            Err(ValidationException)
         }
     }
 }
@@ -112,6 +125,18 @@ mod tests {
         stack.dup().expect("should be able to dup");
         assert_eq!(2, stack.len());
         assert_eq!(Some(Value::Int(1)), stack.pop());
+        assert_eq!(Some(Value::Int(1)), stack.pop());
+    }
+
+    #[test]
+    fn can_invoke_dup_x1() {
+        let mut stack = ValueStack::with_max_size(3);
+        stack.push(Value::Int(2)).expect("should be able to push");
+        stack.push(Value::Int(1)).expect("should be able to push");
+        stack.dup_x1().expect("should be able to dup");
+        assert_eq!(3, stack.len());
+        assert_eq!(Some(Value::Int(1)), stack.pop());
+        assert_eq!(Some(Value::Int(2)), stack.pop());
         assert_eq!(Some(Value::Int(1)), stack.pop());
     }
 }

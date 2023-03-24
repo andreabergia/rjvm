@@ -403,6 +403,7 @@ impl<'a> CallFrame<'a> {
                 }
 
                 Instruction::Dup => self.stack.dup()?,
+                Instruction::Dup_x1 => self.stack.dup_x1()?,
                 Instruction::Pop => {
                     self.stack.pop().ok_or(VmError::ValidationException)?;
                 }
