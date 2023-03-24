@@ -7,7 +7,7 @@ public class NumericTypes {
         longMath(1, 3);
         doubleMath(1, 3.45);
         negate(returnOneInt(), returnOneLong(), returnOneFloat(), returnOneDouble());
-        logicalShifts(4);
+        logicalShifts(4, 4);
     }
 
     private static void shortAndCharMath(short s, char c) {
@@ -42,10 +42,14 @@ public class NumericTypes {
         tempPrint(-d);
     }
 
-    private static void logicalShifts(int i) {
+    private static void logicalShifts(int i, long l) {
         tempPrint(i >> 2);
         tempPrint((-i) >>> 2);
         tempPrint(i << 1);
+
+        tempPrint(l >> 2);
+        tempPrint((-l) >>> 2);
+        tempPrint(l << 1);
     }
 
     private static int returnOneInt() {

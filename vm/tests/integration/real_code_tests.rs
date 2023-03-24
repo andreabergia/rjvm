@@ -144,8 +144,11 @@ fn numeric_types() {
             Value::Float(-1f32),
             Value::Double(-1f64),
             Value::Int(1),
-            Value::Int(1073741823),
+            Value::Int(((-1i32) as u32 >> 2) as i32),
             Value::Int(8),
+            Value::Long(1),
+            Value::Long(((-1i64) as u64 >> 2) as i64),
+            Value::Long(8),
         ],
         vm.printed
     );

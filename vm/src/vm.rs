@@ -481,8 +481,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Iand => self.execute_int_math(|a, b| Ok(a & b))?,
                 Instruction::Ior => self.execute_int_math(|a, b| Ok(a | b))?,
                 Instruction::Ixor => self.execute_int_math(|a, b| Ok(a ^ b))?,
-                Instruction::Ishr => self.execute_int_math(|a, b| Ok({ a >> (b & 0x1f) }))?,
-                Instruction::Ishl => self.execute_int_math(|a, b| Ok({ a << (b & 0x1f) }))?,
+                Instruction::Ishr => self.execute_int_math(|a, b| Ok(a >> (b & 0x1f)))?,
+                Instruction::Ishl => self.execute_int_math(|a, b| Ok(a << (b & 0x1f)))?,
                 Instruction::Iushr => self.execute_int_math(|a, b| {
                     Ok({
                         if a > 0 {
@@ -513,6 +513,17 @@ impl<'a> CallFrame<'a> {
                 Instruction::Land => self.execute_long_math(|a, b| Ok(a & b))?,
                 Instruction::Lor => self.execute_long_math(|a, b| Ok(a | b))?,
                 Instruction::Lxor => self.execute_long_math(|a, b| Ok(a ^ b))?,
+                Instruction::Lshr => self.execute_long_shift(|a, b| Ok(a >> (b & 0x1f)))?,
+                Instruction::Lshl => self.execute_long_shift(|a, b| Ok(a << (b & 0x1f)))?,
+                Instruction::Lushr => self.execute_long_shift(|a, b| {
+                    Ok({
+                        if a > 0 {
+                            a >> (b & 0x1f)
+                        } else {
+                            ((a as u64) >> (b & 0x1f)) as i64
+                        }
+                    })
+                })?,
 
                 Instruction::Fadd => self.execute_float_math(|a, b| Ok(a + b))?,
                 Instruction::Fsub => self.execute_float_math(|a, b| Ok(a - b))?,
@@ -1031,6 +1042,16 @@ impl<'a> CallFrame<'a> {
     generate_execute_math!(execute_long_math, pop_long, Long, i64);
     generate_execute_math!(execute_float_math, pop_float, Float, f32);
     generate_execute_math!(execute_double_math, pop_double, Double, f64);
+
+    fn execute_long_shift<T>(&mut self, evaluator: T) -> Result<(), VmError>
+    where
+        T: FnOnce(i64, i32) -> Result<i64, VmError>,
+    {
+        let val2 = self.pop_int()?;
+        let val1 = self.pop_long()?;
+        let result = evaluator(val1, val2)?;
+        self.stack.push(Long(result))
+    }
 
     fn is_double_division_returning_nan(a: f64, b: f64) -> bool {
         a.is_nan()
