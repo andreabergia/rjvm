@@ -37,6 +37,19 @@ macro_rules! generate_pop {
     };
 }
 
+macro_rules! generate_execute_return {
+    ($name:ident, $variant:ident) => {
+        fn $name(&mut self) -> Result<Option<Value<'a>>, VmError> {
+            if !self.class_and_method.returns(Base(BaseType::$variant)) {
+                return Err(VmError::ValidationException);
+            }
+            let result = self.stack.pop().ok_or(VmError::ValidationException)?;
+            self.debug_done_execution(Some(&result));
+            return Ok(Some(result));
+        }
+    };
+}
+
 macro_rules! generate_execute_math {
     ($name:ident, $pop_fn:ident, $variant:ident, $type:ty) => {
         fn $name<T>(&mut self, evaluator: T) -> Result<(), VmError>
@@ -429,14 +442,10 @@ impl<'a> CallFrame<'a> {
                     self.debug_done_execution(None);
                     return Ok(None);
                 }
-                Instruction::Ireturn => {
-                    if !self.class_and_method.returns(Base(BaseType::Int)) {
-                        return Err(VmError::ValidationException);
-                    }
-                    let result = self.stack.pop().ok_or(VmError::ValidationException)?;
-                    self.debug_done_execution(Some(&result));
-                    return Ok(Some(result));
-                }
+                Instruction::Ireturn => return self.execute_ireturn(),
+                Instruction::Lreturn => return self.execute_lreturn(),
+                Instruction::Freturn => return self.execute_freturn(),
+                Instruction::Dreturn => return self.execute_dreturn(),
 
                 Instruction::Putfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
@@ -999,6 +1008,11 @@ impl<'a> CallFrame<'a> {
             Err(VmError::ValidationException)
         }
     }
+
+    generate_execute_return!(execute_ireturn, Int);
+    generate_execute_return!(execute_lreturn, Long);
+    generate_execute_return!(execute_freturn, Float);
+    generate_execute_return!(execute_dreturn, Double);
 
     fn get_local_int(&self, vm: &Vm, index: usize) -> Result<Value<'a>, VmError> {
         let variable = self.locals.get(index).ok_or(VmError::ValidationException)?;
