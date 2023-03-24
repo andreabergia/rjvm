@@ -81,6 +81,45 @@ macro_rules! generate_execute_store {
     };
 }
 
+macro_rules! generate_execute_array_load {
+    ($name:ident, $($variant:pat),+) => {
+        fn $name(&mut self) -> Result<(), VmError> {
+            let index = self.pop_int()?.into_usize_safe();
+            let (field_type, array) = self.pop_array()?;
+            let value = match field_type {
+                $($variant => array
+                    .borrow()
+                    .get(index)
+                    .ok_or(VmError::ValidationException)
+                    .map(|value| value.clone()),)+
+                _ => return Err(VmError::ValidationException),
+            }?;
+            self.stack.push(value);
+            Ok(())
+        }
+    };
+}
+
+macro_rules! generate_execute_array_store {
+    ($name:ident, $pop_fn:ident, $map_fn:ident, $($variant:pat),+) => {
+        fn $name(&mut self) -> Result<(), VmError> {
+            let value = Self::$map_fn(self.$pop_fn()?);
+            let index = self.pop_int()?.into_usize_safe();
+            let (field_type, array) = self.pop_array()?;
+            match field_type {
+                $($variant => {
+                    match array.borrow_mut().get_mut(index) {
+                        None => return Err(VmError::ValidationException),
+                        Some(reference) => *reference = value,
+                    }
+                })+
+                _ => return Err(VmError::ValidationException),
+            }
+            Ok(())
+        }
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct Stack<'a> {
     frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
@@ -909,65 +948,21 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    fn execute_baload(&mut self) -> Result<(), VmError> {
-        let index = self.pop_int()?.into_usize_safe();
-        let (field_type, array) = self.pop_array()?;
-        let value = match field_type {
-            Base(BaseType::Byte) | Base(BaseType::Boolean) => array
-                .borrow()
-                .get(index)
-                .ok_or(VmError::ValidationException)
-                .map(|value| value.clone()),
-            _ => return Err(VmError::ValidationException),
-        }?;
-        self.stack.push(value);
-        Ok(())
-    }
+    generate_execute_array_load!(
+        execute_baload,
+        Base(BaseType::Byte),
+        Base(BaseType::Boolean)
+    );
+    generate_execute_array_load!(execute_caload, Base(BaseType::Char));
 
-    fn execute_bastore(&mut self) -> Result<(), VmError> {
-        let value = self.pop_int()?;
-        let index = self.pop_int()?.into_usize_safe();
-        let (field_type, array) = self.pop_array()?;
-        match field_type {
-            Base(BaseType::Byte) | Base(BaseType::Boolean) => {
-                match array.borrow_mut().get_mut(index) {
-                    None => return Err(VmError::ValidationException),
-                    Some(reference) => *reference = Self::i2b(value),
-                }
-            }
-            _ => return Err(VmError::ValidationException),
-        }
-        Ok(())
-    }
-
-    fn execute_caload(&mut self) -> Result<(), VmError> {
-        let index = self.pop_int()?.into_usize_safe();
-        let (field_type, array) = self.pop_array()?;
-        let value = match field_type {
-            Base(BaseType::Char) => array
-                .borrow()
-                .get(index)
-                .ok_or(VmError::ValidationException)
-                .map(|value| value.clone()),
-            _ => return Err(VmError::ValidationException),
-        }?;
-        self.stack.push(value);
-        Ok(())
-    }
-
-    fn execute_castore(&mut self) -> Result<(), VmError> {
-        let value = self.pop_int()?;
-        let index = self.pop_int()?.into_usize_safe();
-        let (field_type, array) = self.pop_array()?;
-        match field_type {
-            Base(BaseType::Char) => match array.borrow_mut().get_mut(index) {
-                None => return Err(VmError::ValidationException),
-                Some(reference) => *reference = Self::i2c(value),
-            },
-            _ => return Err(VmError::ValidationException),
-        }
-        Ok(())
-    }
+    generate_execute_array_store!(
+        execute_bastore,
+        pop_int,
+        i2b,
+        Base(BaseType::Byte),
+        Base(BaseType::Boolean)
+    );
+    generate_execute_array_store!(execute_castore, pop_int, i2c, Base(BaseType::Char));
 
     fn debug_start_execution(&self) {
         debug!(
