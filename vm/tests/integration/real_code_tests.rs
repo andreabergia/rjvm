@@ -142,5 +142,13 @@ fn numeric_arrays() {
     );
     assert_eq!(Ok(None), main_result);
 
-    assert_eq!(vec![Value::Int(1), Value::Int(0x03)], vm.printed);
+    assert_eq!(
+        vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(0x03),
+            Value::Int('b' as i32),
+        ],
+        vm.printed
+    );
 }

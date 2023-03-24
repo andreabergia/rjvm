@@ -482,8 +482,11 @@ impl<'a> CallFrame<'a> {
                     self.stack.push(array_value);
                 }
 
+                Instruction::Arraylength => self.execute_array_length()?,
                 Instruction::Baload => self.execute_baload()?,
                 Instruction::Bastore => self.execute_bastore()?,
+                Instruction::Caload => self.execute_caload()?,
+                Instruction::Castore => self.execute_castore()?,
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
@@ -900,6 +903,12 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
+    fn execute_array_length(&mut self) -> Result<(), VmError> {
+        let (_, array) = self.pop_array()?;
+        self.stack.push(Int(array.borrow().len() as i32));
+        Ok(())
+    }
+
     fn execute_baload(&mut self) -> Result<(), VmError> {
         let index = self.pop_int()?.into_usize_safe();
         let (field_type, array) = self.pop_array()?;
@@ -926,6 +935,35 @@ impl<'a> CallFrame<'a> {
                     Some(reference) => *reference = Self::i2b(value),
                 }
             }
+            _ => return Err(VmError::ValidationException),
+        }
+        Ok(())
+    }
+
+    fn execute_caload(&mut self) -> Result<(), VmError> {
+        let index = self.pop_int()?.into_usize_safe();
+        let (field_type, array) = self.pop_array()?;
+        let value = match field_type {
+            Base(BaseType::Char) => array
+                .borrow()
+                .get(index)
+                .ok_or(VmError::ValidationException)
+                .map(|value| value.clone()),
+            _ => return Err(VmError::ValidationException),
+        }?;
+        self.stack.push(value);
+        Ok(())
+    }
+
+    fn execute_castore(&mut self) -> Result<(), VmError> {
+        let value = self.pop_int()?;
+        let index = self.pop_int()?.into_usize_safe();
+        let (field_type, array) = self.pop_array()?;
+        match field_type {
+            Base(BaseType::Char) => match array.borrow_mut().get_mut(index) {
+                None => return Err(VmError::ValidationException),
+                Some(reference) => *reference = Self::i2c(value),
+            },
             _ => return Err(VmError::ValidationException),
         }
         Ok(())
