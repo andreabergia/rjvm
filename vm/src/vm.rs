@@ -522,12 +522,16 @@ impl<'a> CallFrame<'a> {
                 }
 
                 Instruction::Arraylength => self.execute_array_length()?,
+
                 Instruction::Baload => self.execute_baload()?,
                 Instruction::Caload => self.execute_caload()?,
                 Instruction::Saload => self.execute_saload()?,
+                Instruction::Iaload => self.execute_iaload()?,
+
                 Instruction::Bastore => self.execute_bastore()?,
                 Instruction::Castore => self.execute_castore()?,
                 Instruction::Sastore => self.execute_sastore()?,
+                Instruction::Iastore => self.execute_iastore()?,
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
@@ -545,6 +549,9 @@ impl<'a> CallFrame<'a> {
     }
     fn i2s(value: i32) -> Value<'a> {
         Int((value as i16) as i32)
+    }
+    fn i2i(value: i32) -> Value<'a> {
+        Int(value)
     }
     fn i2f(value: i32) -> Value<'a> {
         Float(value as f32)
@@ -957,6 +964,7 @@ impl<'a> CallFrame<'a> {
     );
     generate_execute_array_load!(execute_caload, Base(BaseType::Char));
     generate_execute_array_load!(execute_saload, Base(BaseType::Short));
+    generate_execute_array_load!(execute_iaload, Base(BaseType::Int));
 
     generate_execute_array_store!(
         execute_bastore,
@@ -967,6 +975,7 @@ impl<'a> CallFrame<'a> {
     );
     generate_execute_array_store!(execute_castore, pop_int, i2c, Base(BaseType::Char));
     generate_execute_array_store!(execute_sastore, pop_int, i2s, Base(BaseType::Short));
+    generate_execute_array_store!(execute_iastore, pop_int, i2i, Base(BaseType::Int));
 
     fn debug_start_execution(&self) {
         debug!(

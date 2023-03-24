@@ -149,6 +149,7 @@ fn numeric_arrays() {
             Value::Int(0x03),
             Value::Int('b' as i32),
             Value::Int(-1),
+            Value::Int(12),
         ],
         vm.printed
     );
