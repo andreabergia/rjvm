@@ -23,3 +23,7 @@ generate-test-classes:
 
 count-lines:
     wc -l */{src,tests}/**/*.rs */{src,tests}/*.rs */tests/resources/**/*.java
+
+miri:
+    cargo clean
+    cargo +nightly miri test
