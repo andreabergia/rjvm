@@ -20,6 +20,18 @@ use crate::{
     value::Value::Object, vm_error::VmError,
 };
 
+macro_rules! generate_pop {
+    ($name:ident, $variant:ident, $type:ty) => {
+        fn $name(&mut self) -> Result<$type, VmError> {
+            let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+            match value {
+                $variant(value) => Ok(value),
+                _ => Err(VmError::ValidationException),
+            }
+        }
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct Stack<'a> {
     frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
@@ -450,37 +462,10 @@ impl<'a> CallFrame<'a> {
             ))
     }
 
-    fn pop_int(&mut self) -> Result<i32, VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Int(int) => Ok(int),
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn pop_long(&mut self) -> Result<i64, VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Long(long) => Ok(long),
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn pop_float(&mut self) -> Result<f32, VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Float(float) => Ok(float),
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn pop_double(&mut self) -> Result<f64, VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Double(double) => Ok(double),
-            _ => Err(VmError::ValidationException),
-        }
-    }
+    generate_pop!(pop_int, Int, i32);
+    generate_pop!(pop_long, Long, i64);
+    generate_pop!(pop_float, Float, f32);
+    generate_pop!(pop_double, Double, f64);
 
     fn get_constant(&self, constant_index: u16) -> Result<&ConstantPoolEntry, VmError> {
         self.class_and_method
