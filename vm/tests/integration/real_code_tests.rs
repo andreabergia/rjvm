@@ -125,3 +125,22 @@ fn numeric_types() {
         vm.printed
     );
 }
+
+#[test_log::test]
+fn numeric_arrays() {
+    let mut vm = create_base_vm();
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/NumericArrays.class"),
+    );
+
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/NumericArrays",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(vec![Value::Int(1), Value::Int(0x03)], vm.printed);
+}

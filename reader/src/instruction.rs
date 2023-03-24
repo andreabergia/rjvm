@@ -1,5 +1,17 @@
 use crate::class_reader_error::ClassReaderError;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NewArrayType {
+    Boolean,
+    Char,
+    Float,
+    Double,
+    Byte,
+    Short,
+    Int,
+    Long,
+}
+
 //noinspection SpellCheckingInspection
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -192,7 +204,7 @@ pub enum Instruction {
     Monitorexit,
     Multianewarray(u16, u8),
     New(u16),
-    Newarray,
+    Newarray(NewArrayType),
     Nop,
     Pop,
     Pop2,
@@ -434,8 +446,23 @@ impl Instruction {
             ),
             0xbb => Instruction::New(Self::read_u16(raw_code, &mut address)?),
             0xbc => {
-                /* OpCode::Newarray */
-                todo!()
+                let array_type_byte = Self::read_u8(raw_code, &mut address)?;
+                let array_type = match array_type_byte {
+                    4 => NewArrayType::Boolean,
+                    5 => NewArrayType::Char,
+                    6 => NewArrayType::Float,
+                    7 => NewArrayType::Double,
+                    8 => NewArrayType::Byte,
+                    9 => NewArrayType::Short,
+                    10 => NewArrayType::Int,
+                    11 => NewArrayType::Long,
+                    _ => {
+                        return Err(ClassReaderError::InvalidClassData(format!(
+                            "invalid type for newarray: {array_type_byte:#04x}"
+                        )))
+                    }
+                };
+                Instruction::Newarray(array_type)
             }
             0x00 => Instruction::Nop,
             0x57 => Instruction::Pop,

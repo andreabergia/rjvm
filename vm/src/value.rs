@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
 use crate::class::{Class, ClassId};
 use crate::class_allocator::ClassResolver;
 
-// TODO: do we need short/char/byte? What about boolean?
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {
     #[default]
@@ -16,9 +16,11 @@ pub enum Value<'a> {
     Float(f32),
     Double(f64),
     Object(ObjectRef<'a>),
-    Null,
-    // TODO: return address?
-    // TODO: array?
+    Null, // TODO: should this be merged with Object and use an Option?
+
+    // TODO: avoid RC and use garbage collector to allocate
+    Array(FieldType, Rc<RefCell<Vec<Value<'a>>>>),
+    // TODO: return address
 }
 
 #[derive(Clone, PartialEq)]
@@ -87,7 +89,13 @@ impl<'a> Value<'a> {
                 }
                 _ => false,
             },
+
             Value::Null => false,
+
+            Value::Array(field_type, _) => match expected_type {
+                FieldType::Array(expected_field_type) => *field_type == *expected_field_type,
+                _ => false,
+            },
         }
     }
 }

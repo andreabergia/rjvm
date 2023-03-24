@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use log::{debug, info, warn};
 
+use rjvm_reader::instruction::NewArrayType;
 use rjvm_reader::{
     class_file::ClassFile, class_file_field::ClassFileField, class_file_method::ClassFileMethod,
     constant_pool::ConstantPoolEntry, field_type::BaseType, field_type::FieldType,
@@ -10,14 +11,17 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::class::{ClassId, ClassRef};
-use crate::class_allocator::{ClassAllocator, ClassResolver};
-use crate::gc::ObjectAllocator;
-use crate::value::ObjectRef;
-use crate::value::Value::{Double, Float, Int, Long};
 use crate::{
-    class::Class, class_and_method::ClassAndMethod, class_loader::ClassLoader, value::Value,
-    value::Value::Object, vm_error::VmError,
+    class::Class,
+    class::{ClassId, ClassRef},
+    class_allocator::{ClassAllocator, ClassResolver},
+    class_and_method::ClassAndMethod,
+    class_loader::ClassLoader,
+    gc::ObjectAllocator,
+    value::ObjectRef,
+    value::Value,
+    value::Value::{Array, Double, Float, Int, Long, Object},
+    vm_error::VmError,
 };
 
 macro_rules! generate_pop {
@@ -48,14 +52,14 @@ macro_rules! generate_execute_math {
 }
 
 macro_rules! generate_execute_load {
-    ($name:ident, $variant:ident) => {
+    ($name:ident, $($variant:ident),+) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
             let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
             match local {
-                $variant(_) => {
+                $($variant(..) => {
                     self.stack.push(local.clone());
                     Ok(())
-                }
+                }),+
                 _ => Err(VmError::ValidationException),
             }
         }
@@ -273,12 +277,12 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dstore_2 => self.execute_dstore(2)?,
                 Instruction::Dstore_3 => self.execute_dstore(3)?,
 
-                Instruction::I2b => self.coerce_int(|value| Int((value as i8) as i32))?,
-                Instruction::I2c => self.coerce_int(|value| Int((value as u16) as i32))?,
-                Instruction::I2s => self.coerce_int(|value| Int((value as i16) as i32))?,
-                Instruction::I2f => self.coerce_int(|value| Float(value as f32))?,
-                Instruction::I2l => self.coerce_int(|value| Long(value as i64))?,
-                Instruction::I2d => self.coerce_int(|value| Double(value as f64))?,
+                Instruction::I2b => self.coerce_int(Self::i2b)?,
+                Instruction::I2c => self.coerce_int(Self::i2c)?,
+                Instruction::I2s => self.coerce_int(Self::i2s)?,
+                Instruction::I2f => self.coerce_int(Self::i2f)?,
+                Instruction::I2l => self.coerce_int(Self::i2l)?,
+                Instruction::I2d => self.coerce_int(Self::i2d)?,
 
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
@@ -458,12 +462,54 @@ impl<'a> CallFrame<'a> {
                     self.execute_if_icmp(jump_address, |a, b| a >= b)?
                 }
 
+                Instruction::Newarray(array_type) => {
+                    let length = self.pop_int()?.into_usize_safe();
+
+                    let (elements_type, default_value) = match array_type {
+                        NewArrayType::Boolean => (Base(BaseType::Boolean), Int(0)),
+                        NewArrayType::Char => (Base(BaseType::Char), Int(0)),
+                        NewArrayType::Float => (Base(BaseType::Float), Float(0f32)),
+                        NewArrayType::Double => (Base(BaseType::Double), Double(0f64)),
+                        NewArrayType::Byte => (Base(BaseType::Byte), Int(0)),
+                        NewArrayType::Short => (Base(BaseType::Short), Int(0)),
+                        NewArrayType::Int => (Base(BaseType::Int), Int(0)),
+                        NewArrayType::Long => (Base(BaseType::Long), Long(0)),
+                    };
+
+                    let vec = vec![default_value; length];
+                    let vec = Rc::new(RefCell::new(vec));
+                    let array_value = Array(elements_type, vec);
+                    self.stack.push(array_value);
+                }
+
+                Instruction::Baload => self.execute_baload()?,
+                Instruction::Bastore => self.execute_bastore()?,
+
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
                     return Err(VmError::NotImplemented);
                 }
             }
         }
+    }
+
+    fn i2b(value: i32) -> Value<'a> {
+        Int((value as i8) as i32)
+    }
+    fn i2c(value: i32) -> Value<'a> {
+        Int((value as u16) as i32)
+    }
+    fn i2s(value: i32) -> Value<'a> {
+        Int((value as i16) as i32)
+    }
+    fn i2f(value: i32) -> Value<'a> {
+        Float(value as f32)
+    }
+    fn i2l(value: i32) -> Value<'a> {
+        Long(value as i64)
+    }
+    fn i2d(value: i32) -> Value<'a> {
+        Double(value as f64)
     }
 
     fn invoke_method(
@@ -511,6 +557,14 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_long, Long, i64);
     generate_pop!(pop_float, Float, f32);
     generate_pop!(pop_double, Double, f64);
+
+    fn pop_array(&mut self) -> Result<(FieldType, Rc<RefCell<Vec<Value<'a>>>>), VmError> {
+        let receiver = self.stack.pop().ok_or(VmError::ValidationException)?;
+        match receiver {
+            Array(field_type, vector) => Ok((field_type, vector)),
+            _ => Err(VmError::ValidationException),
+        }
+    }
 
     fn get_constant(&self, constant_index: u16) -> Result<&ConstantPoolEntry, VmError> {
         self.class_and_method
@@ -811,7 +865,7 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    generate_execute_load!(execute_aload, Object);
+    generate_execute_load!(execute_aload, Object, Array);
     generate_execute_load!(execute_iload, Int);
     generate_execute_load!(execute_lload, Long);
     generate_execute_load!(execute_fload, Float);
@@ -841,6 +895,37 @@ impl<'a> CallFrame<'a> {
         match constant_value {
             ConstantPoolEntry::Long(value) => self.stack.push(Long(*value)),
             ConstantPoolEntry::Double(value) => self.stack.push(Double(*value)),
+            _ => return Err(VmError::ValidationException),
+        }
+        Ok(())
+    }
+
+    fn execute_baload(&mut self) -> Result<(), VmError> {
+        let index = self.pop_int()?.into_usize_safe();
+        let (field_type, array) = self.pop_array()?;
+        let value = match field_type {
+            Base(BaseType::Byte) | Base(BaseType::Boolean) => array
+                .borrow()
+                .get(index)
+                .ok_or(VmError::ValidationException)
+                .map(|value| value.clone()),
+            _ => return Err(VmError::ValidationException),
+        }?;
+        self.stack.push(value);
+        Ok(())
+    }
+
+    fn execute_bastore(&mut self) -> Result<(), VmError> {
+        let value = self.pop_int()?;
+        let index = self.pop_int()?.into_usize_safe();
+        let (field_type, array) = self.pop_array()?;
+        match field_type {
+            Base(BaseType::Byte) | Base(BaseType::Boolean) => {
+                match array.borrow_mut().get_mut(index) {
+                    None => return Err(VmError::ValidationException),
+                    Some(reference) => *reference = Self::i2b(value),
+                }
+            }
             _ => return Err(VmError::ValidationException),
         }
         Ok(())
