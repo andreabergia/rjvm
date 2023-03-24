@@ -16,8 +16,8 @@ pub enum NewArrayType {
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Instruction {
-    Aaload(u8),
-    Aastore(u8),
+    Aaload,
+    Aastore,
     Aconst_null,
     Aload(u8),
     Aload_0,
@@ -225,8 +225,8 @@ impl Instruction {
         let op_byte = Self::byte_at(raw_code, address)?;
         let mut address = address + 1;
         let op_code = match op_byte {
-            0x32 => Instruction::Aaload(Self::read_u8(raw_code, &mut address)?),
-            0x53 => Instruction::Aastore(Self::read_u8(raw_code, &mut address)?),
+            0x32 => Instruction::Aaload,
+            0x53 => Instruction::Aastore,
             0x01 => Instruction::Aconst_null,
             0x19 => Instruction::Aload(Self::read_u8(raw_code, &mut address)?),
             0x2a => Instruction::Aload_0,

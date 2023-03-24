@@ -79,6 +79,8 @@ impl<'a> Value<'a> {
             Value::Object(object_ref) => match expected_type {
                 // TODO: with multiple class loaders, we should check the class identity,
                 //  not the name, since the same class could be loaded by multiple class loader
+
+                // TODO: we should check super classes
                 FieldType::Object(class_name) => {
                     let value_class = class_resolver.find_class_by_id(object_ref.class_id);
                     if let Some(class_ref) = value_class {

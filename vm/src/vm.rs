@@ -67,14 +67,14 @@ macro_rules! generate_execute_load {
 }
 
 macro_rules! generate_execute_store {
-    ($name:ident, $variant:ident) => {
+    ($name:ident, $($variant:ident),+) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
             let value = self.stack.pop().ok_or(VmError::ValidationException)?;
             match value {
-                $variant(_) => {
+                $($variant(_, ..) => {
                     self.locals[index] = value;
                     Ok(())
-                }
+                })+
                 _ => Err(VmError::ValidationException),
             }
         }
@@ -512,23 +512,10 @@ impl<'a> CallFrame<'a> {
                 }
 
                 Instruction::Newarray(array_type) => {
-                    let length = self.pop_int()?.into_usize_safe();
-
-                    let (elements_type, default_value) = match array_type {
-                        NewArrayType::Boolean => (Base(BaseType::Boolean), Int(0)),
-                        NewArrayType::Char => (Base(BaseType::Char), Int(0)),
-                        NewArrayType::Float => (Base(BaseType::Float), Float(0f32)),
-                        NewArrayType::Double => (Base(BaseType::Double), Double(0f64)),
-                        NewArrayType::Byte => (Base(BaseType::Byte), Int(0)),
-                        NewArrayType::Short => (Base(BaseType::Short), Int(0)),
-                        NewArrayType::Int => (Base(BaseType::Int), Int(0)),
-                        NewArrayType::Long => (Base(BaseType::Long), Long(0)),
-                    };
-
-                    let vec = vec![default_value; length];
-                    let vec = Rc::new(RefCell::new(vec));
-                    let array_value = Array(elements_type, vec);
-                    self.stack.push(array_value);
+                    self.execute_newarray(array_type)?;
+                }
+                Instruction::Anewarray(constant_index) => {
+                    self.execute_anewarray(constant_index)?;
                 }
 
                 Instruction::Arraylength => self.execute_array_length()?,
@@ -540,6 +527,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Laload => self.execute_laload()?,
                 Instruction::Faload => self.execute_faload()?,
                 Instruction::Daload => self.execute_daload()?,
+                Instruction::Aaload => self.execute_aaload()?,
 
                 Instruction::Bastore => self.execute_bastore()?,
                 Instruction::Castore => self.execute_castore()?,
@@ -548,6 +536,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Lastore => self.execute_lastore()?,
                 Instruction::Fastore => self.execute_fastore()?,
                 Instruction::Dastore => self.execute_dastore()?,
+                Instruction::Aastore => self.execute_aastore(vm)?,
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
@@ -633,6 +622,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_long, Long, i64);
     generate_pop!(pop_float, Float, f32);
     generate_pop!(pop_double, Double, f64);
+    generate_pop!(pop_object, Object, ObjectRef<'a>);
 
     fn pop_array(&mut self) -> Result<(FieldType, Rc<RefCell<Vec<Value<'a>>>>), VmError> {
         let receiver = self.stack.pop().ok_or(VmError::ValidationException)?;
@@ -947,7 +937,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_load!(execute_fload, Float);
     generate_execute_load!(execute_dload, Double);
 
-    generate_execute_store!(execute_astore, Object);
+    generate_execute_store!(execute_astore, Object, Array);
     generate_execute_store!(execute_istore, Int);
     generate_execute_store!(execute_lstore, Long);
     generate_execute_store!(execute_fstore, Float);
@@ -976,6 +966,38 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
+    fn execute_newarray(&mut self, array_type: NewArrayType) -> Result<(), VmError> {
+        let length = self.pop_int()?.into_usize_safe();
+
+        let (elements_type, default_value) = match array_type {
+            NewArrayType::Boolean => (Base(BaseType::Boolean), Int(0)),
+            NewArrayType::Char => (Base(BaseType::Char), Int(0)),
+            NewArrayType::Float => (Base(BaseType::Float), Float(0f32)),
+            NewArrayType::Double => (Base(BaseType::Double), Double(0f64)),
+            NewArrayType::Byte => (Base(BaseType::Byte), Int(0)),
+            NewArrayType::Short => (Base(BaseType::Short), Int(0)),
+            NewArrayType::Int => (Base(BaseType::Int), Int(0)),
+            NewArrayType::Long => (Base(BaseType::Long), Long(0)),
+        };
+
+        let vec = vec![default_value; length];
+        let vec = Rc::new(RefCell::new(vec));
+        let array_value = Array(elements_type, vec);
+        self.stack.push(array_value);
+        Ok(())
+    }
+
+    fn execute_anewarray(&mut self, constant_index: u16) -> Result<(), VmError> {
+        let length = self.pop_int()?.into_usize_safe();
+        let class_name = self.get_constant_class_reference(constant_index)?;
+
+        let vec = vec![Value::Null; length];
+        let vec = Rc::new(RefCell::new(vec));
+        let array_value = Array(FieldType::Object(class_name.to_string()), vec);
+        self.stack.push(array_value);
+        Ok(())
+    }
+
     fn execute_array_length(&mut self) -> Result<(), VmError> {
         let (_, array) = self.pop_array()?;
         self.stack.push(Int(array.borrow().len() as i32));
@@ -993,6 +1015,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_array_load!(execute_laload, Base(BaseType::Long));
     generate_execute_array_load!(execute_faload, Base(BaseType::Float));
     generate_execute_array_load!(execute_daload, Base(BaseType::Double));
+    generate_execute_array_load!(execute_aaload, FieldType::Object(_));
 
     generate_execute_array_store!(
         execute_bastore,
@@ -1007,6 +1030,23 @@ impl<'a> CallFrame<'a> {
     generate_execute_array_store!(execute_lastore, pop_long, l2l, Base(BaseType::Long));
     generate_execute_array_store!(execute_fastore, pop_float, f2f, Base(BaseType::Float));
     generate_execute_array_store!(execute_dastore, pop_double, d2d, Base(BaseType::Double));
+
+    fn execute_aastore(&mut self, vm: &Vm) -> Result<(), VmError> {
+        let value = Object(self.pop_object()?);
+        let index = self.pop_int()?.into_usize_safe();
+        let (field_type, array) = self.pop_array()?;
+        match field_type {
+            FieldType::Object(array_type) => {
+                Self::validate_type(vm, FieldType::Object(array_type), &value)?;
+                match array.borrow_mut().get_mut(index) {
+                    None => return Err(VmError::ArrayIndexOutOfBoundsException),
+                    Some(reference) => *reference = value,
+                }
+            }
+            _ => return Err(VmError::ValidationException),
+        }
+        Ok(())
+    }
 
     fn debug_start_execution(&self) {
         debug!(

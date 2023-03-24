@@ -157,3 +157,26 @@ fn numeric_arrays() {
         vm.printed
     );
 }
+
+#[test_log::test]
+fn object_arrays() {
+    let mut vm = create_base_vm();
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/ObjectArrays.class"),
+    );
+    load_class(
+        &mut vm,
+        include_bytes!("../resources/rjvm/ObjectArrays$Square.class"),
+    );
+
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/ObjectArrays",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(vec![Value::Int(5),], vm.printed);
+}
