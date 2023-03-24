@@ -27,8 +27,8 @@ fn invoke<'a>(
         .find_class_method(class_name, method_name, descriptor)
         .expect("should find main method");
 
-    let mut stack = vm.allocate_stack();
-    let main_result = vm.invoke(&mut stack, main_method, None, vec![]);
+    let mut call_stack = vm.allocate_call_stack();
+    let main_result = vm.invoke(&mut call_stack, main_method, None, vec![]);
     vm.debug_stats();
     print!("result of {class_name}::{method_name}: {main_result:?}");
 

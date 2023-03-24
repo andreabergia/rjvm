@@ -176,11 +176,11 @@ macro_rules! generate_execute_array_store {
 }
 
 #[derive(Debug, Default)]
-pub struct Stack<'a> {
+pub struct CallStack<'a> {
     frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
 }
 
-impl<'a> Stack<'a> {
+impl<'a> CallStack<'a> {
     pub fn new() -> Self {
         Default::default()
     }
@@ -287,7 +287,7 @@ impl<'a> CallFrame<'a> {
     pub fn execute(
         &mut self,
         vm: &mut Vm<'a>,
-        stack: &mut Stack<'a>,
+        call_stack: &mut CallStack<'a>,
     ) -> Result<Option<Value<'a>>, VmError> {
         self.debug_start_execution();
 
@@ -426,13 +426,13 @@ impl<'a> CallFrame<'a> {
                 Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32)),
 
                 Instruction::Invokespecial(constant_index) => {
-                    self.invoke_method(vm, stack, constant_index, InvokeKind::Special)?
+                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Special)?
                 }
                 Instruction::Invokestatic(constant_index) => {
-                    self.invoke_method(vm, stack, constant_index, InvokeKind::Static)?
+                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Static)?
                 }
                 Instruction::Invokevirtual(constant_index) => {
-                    self.invoke_method(vm, stack, constant_index, InvokeKind::Virtual)?
+                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Virtual)?
                 }
 
                 Instruction::Return => {
@@ -699,7 +699,7 @@ impl<'a> CallFrame<'a> {
     fn invoke_method(
         &mut self,
         vm: &mut Vm<'a>,
-        stack: &mut Stack<'a>,
+        call_stack: &mut CallStack<'a>,
         constant_index: u16,
         kind: InvokeKind,
     ) -> Result<(), VmError> {
@@ -716,7 +716,7 @@ impl<'a> CallFrame<'a> {
         self.stack.truncate(new_stack_len);
 
         let method_return_type = class_and_method.return_type();
-        let result = vm.invoke(stack, class_and_method, receiver, params)?;
+        let result = vm.invoke(call_stack, class_and_method, receiver, params)?;
 
         Self::validate_type_opt(vm, method_return_type, &result)?;
         if let Some(value) = result {
@@ -1294,13 +1294,13 @@ impl<'a> Vm<'a> {
     }
 
     // TODO: do we need it?
-    pub fn allocate_stack(&self) -> Stack<'a> {
-        Stack::new()
+    pub fn allocate_call_stack(&self) -> CallStack<'a> {
+        CallStack::new()
     }
 
     pub fn invoke(
         &mut self,
-        stack: &mut Stack<'a>,
+        call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
         object: Option<ObjectRef<'a>>,
         args: Vec<Value<'a>>,
@@ -1318,9 +1318,9 @@ impl<'a> Vm<'a> {
             };
         }
 
-        let frame = stack.add_frame(class_and_method, object, args)?;
-        let result = frame.borrow_mut().execute(self, stack);
-        stack.pop_frame()?;
+        let frame = call_stack.add_frame(class_and_method, object, args)?;
+        let result = frame.borrow_mut().execute(self, call_stack);
+        call_stack.pop_frame()?;
         result
     }
 
