@@ -63,7 +63,7 @@ The current code can execute a [very simple program](./vm/tests/resources/rjvm/S
         - [x] double
         - [x] boolean
         - [x] object
-        - [ ] primitive arrays
+        - [x] primitive arrays
         - [ ] object arrays
         - [ ] multidimensional arrays
   - [x] new object instances creation
