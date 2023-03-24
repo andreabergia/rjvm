@@ -151,6 +151,8 @@ fn numeric_arrays() {
             Value::Int(-1),
             Value::Int(12),
             Value::Long(2),
+            Value::Float(1.2f32 + 0.2f32),
+            Value::Double(0f64),
         ],
         vm.printed
     );

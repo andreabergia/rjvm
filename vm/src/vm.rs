@@ -276,6 +276,16 @@ impl<'a> CallFrame<'a> {
                 Instruction::Iconst_4 => self.stack.push(Int(4)),
                 Instruction::Iconst_5 => self.stack.push(Int(5)),
 
+                Instruction::Lconst_0 => self.stack.push(Long(0)),
+                Instruction::Lconst_1 => self.stack.push(Long(1)),
+
+                Instruction::Fconst_0 => self.stack.push(Float(0f32)),
+                Instruction::Fconst_1 => self.stack.push(Float(1f32)),
+                Instruction::Fconst_2 => self.stack.push(Float(2f32)),
+
+                Instruction::Dconst_0 => self.stack.push(Double(0f64)),
+                Instruction::Dconst_1 => self.stack.push(Double(1f64)),
+
                 Instruction::Lload(index) => self.execute_lload(index.into_usize_safe())?,
                 Instruction::Lload_0 => self.execute_lload(0)?,
                 Instruction::Lload_1 => self.execute_lload(1)?,
@@ -528,12 +538,16 @@ impl<'a> CallFrame<'a> {
                 Instruction::Saload => self.execute_saload()?,
                 Instruction::Iaload => self.execute_iaload()?,
                 Instruction::Laload => self.execute_laload()?,
+                Instruction::Faload => self.execute_faload()?,
+                Instruction::Daload => self.execute_daload()?,
 
                 Instruction::Bastore => self.execute_bastore()?,
                 Instruction::Castore => self.execute_castore()?,
                 Instruction::Sastore => self.execute_sastore()?,
                 Instruction::Iastore => self.execute_iastore()?,
                 Instruction::Lastore => self.execute_lastore()?,
+                Instruction::Fastore => self.execute_fastore()?,
+                Instruction::Dastore => self.execute_dastore()?,
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
@@ -566,6 +580,12 @@ impl<'a> CallFrame<'a> {
     }
     fn l2l(value: i64) -> Value<'a> {
         Long(value)
+    }
+    fn f2f(value: f32) -> Value<'a> {
+        Float(value)
+    }
+    fn d2d(value: f64) -> Value<'a> {
+        Double(value)
     }
 
     fn invoke_method(
@@ -971,6 +991,8 @@ impl<'a> CallFrame<'a> {
     generate_execute_array_load!(execute_saload, Base(BaseType::Short));
     generate_execute_array_load!(execute_iaload, Base(BaseType::Int));
     generate_execute_array_load!(execute_laload, Base(BaseType::Long));
+    generate_execute_array_load!(execute_faload, Base(BaseType::Float));
+    generate_execute_array_load!(execute_daload, Base(BaseType::Double));
 
     generate_execute_array_store!(
         execute_bastore,
@@ -983,6 +1005,8 @@ impl<'a> CallFrame<'a> {
     generate_execute_array_store!(execute_sastore, pop_int, i2s, Base(BaseType::Short));
     generate_execute_array_store!(execute_iastore, pop_int, i2i, Base(BaseType::Int));
     generate_execute_array_store!(execute_lastore, pop_long, l2l, Base(BaseType::Long));
+    generate_execute_array_store!(execute_fastore, pop_float, f2f, Base(BaseType::Float));
+    generate_execute_array_store!(execute_dastore, pop_double, d2d, Base(BaseType::Double));
 
     fn debug_start_execution(&self) {
         debug!(

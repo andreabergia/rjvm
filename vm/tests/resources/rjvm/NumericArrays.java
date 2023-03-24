@@ -8,6 +8,8 @@ public class NumericArrays {
         playWithArrayOfShorts(new short[]{1, 2});
         playWithArrayOfInts(new int[]{3, 4});
         playWithArrayOfLongs(new long[]{4, 2});
+        playWithArrayOfFloats(new float[]{1.2f, 0.2f});
+        playWithArrayOfDoubles(new double[]{0.0, 3.3});
     }
 
     private static void playWithArrayOfBooleans(boolean[] array) {
@@ -36,9 +38,21 @@ public class NumericArrays {
         tempPrint(array[0] / array[1]);
     }
 
+    private static void playWithArrayOfFloats(float[] array) {
+        tempPrint(array[0] + array[1]);
+    }
+
+    private static void playWithArrayOfDoubles(double[] array) {
+        tempPrint(array[0] * array[1]);
+    }
+
     private static native void tempPrint(boolean value);
 
     private static native void tempPrint(int value);
 
     private static native void tempPrint(long value);
+
+    private static native void tempPrint(float value);
+
+    private static native void tempPrint(double value);
 }
