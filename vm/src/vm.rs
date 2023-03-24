@@ -32,6 +32,21 @@ macro_rules! generate_pop {
     };
 }
 
+macro_rules! generate_execute_math {
+    ($name:ident, $pop_fn:ident, $variant:ident, $type:ty) => {
+        fn $name<T>(&mut self, evaluator: T) -> Result<(), VmError>
+        where
+            T: FnOnce($type, $type) -> Result<$type, VmError>,
+        {
+            let val2 = self.$pop_fn()?;
+            let val1 = self.$pop_fn()?;
+            let result = evaluator(val1, val2)?;
+            self.stack.push($variant(result));
+            Ok(())
+        }
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct Stack<'a> {
     frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
@@ -717,55 +732,16 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn execute_int_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
-    where
-        T: FnOnce(i32, i32) -> Result<i32, VmError>,
-    {
-        let val2 = self.pop_int()?;
-        let val1 = self.pop_int()?;
-        let result = evaluator(val1, val2)?;
-        self.stack.push(Int(result));
-        Ok(())
-    }
-
-    fn execute_long_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
-    where
-        T: FnOnce(i64, i64) -> Result<i64, VmError>,
-    {
-        let val2 = self.pop_long()?;
-        let val1 = self.pop_long()?;
-        let result = evaluator(val1, val2)?;
-        self.stack.push(Long(result));
-        Ok(())
-    }
+    generate_execute_math!(execute_int_math, pop_int, Int, i32);
+    generate_execute_math!(execute_long_math, pop_long, Long, i64);
+    generate_execute_math!(execute_float_math, pop_float, Float, f32);
+    generate_execute_math!(execute_double_math, pop_double, Double, f64);
 
     fn is_double_division_returning_nan(a: f64, b: f64) -> bool {
         a.is_nan()
             || b.is_nan()
             || (a.is_infinite() && b.is_infinite())
             || ((a == 0f64 || a == -0f64) && (b == 0f64 || b == -0f64))
-    }
-
-    fn execute_float_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
-    where
-        T: FnOnce(f32, f32) -> Result<f32, VmError>,
-    {
-        let val2 = self.pop_float()?;
-        let val1 = self.pop_float()?;
-        let result = evaluator(val1, val2)?;
-        self.stack.push(Float(result));
-        Ok(())
-    }
-
-    fn execute_double_math<T>(&mut self, evaluator: T) -> Result<(), VmError>
-    where
-        T: FnOnce(f64, f64) -> Result<f64, VmError>,
-    {
-        let val2 = self.pop_double()?;
-        let val1 = self.pop_double()?;
-        let result = evaluator(val1, val2)?;
-        self.stack.push(Double(result));
-        Ok(())
     }
 
     fn coerce_int<T>(&mut self, evaluator: T) -> Result<(), VmError>
