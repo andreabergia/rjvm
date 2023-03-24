@@ -409,16 +409,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dup2_x1 => self.stack.dup2_x1()?,
                 Instruction::Dup2_x2 => self.stack.dup2_x2()?,
                 Instruction::Pop => self.stack.pop().map(|_| ())?,
+                Instruction::Pop2 => self.stack.pop2().map(|_| ())?,
 
-                Instruction::Pop2 => {
-                    let value = self.stack.pop()?;
-                    match value {
-                        Double(_) | Long(_) => {}
-                        _ => {
-                            self.stack.pop()?;
-                        }
-                    }
-                }
                 Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32))?,
 
                 Instruction::Invokespecial(constant_index) => {

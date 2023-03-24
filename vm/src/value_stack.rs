@@ -35,6 +35,14 @@ impl<'a> ValueStack<'a> {
         self.stack.pop().ok_or(ValidationException)
     }
 
+    pub fn pop2(&mut self) -> Result<Value<'a>, VmError> {
+        let value = self.pop()?;
+        match value {
+            Value::Long(_) | Value::Double(_) => Ok(value),
+            _ => self.pop().map(|_| value),
+        }
+    }
+
     pub fn truncate(&mut self, len: usize) -> Result<(), VmError> {
         if len > self.stack.capacity() {
             Err(ValidationException)
@@ -257,5 +265,21 @@ mod tests {
         assert_eq!(Ok(Value::Int(4)), stack.pop());
         assert_eq!(Ok(Value::Int(1)), stack.pop());
         assert_eq!(Ok(Value::Int(2)), stack.pop());
+    }
+
+    #[test]
+    fn can_invoke_pop2() {
+        let mut stack = ValueStack::with_max_size(4);
+        stack
+            .push(Value::Double(0f64))
+            .expect("should be able to push");
+        stack.push(Value::Int(1)).expect("should be able to push");
+        stack.push(Value::Int(2)).expect("should be able to push");
+        stack.push(Value::Long(3)).expect("should be able to push");
+        assert_eq!(Ok(Value::Long(3)), stack.pop2());
+        assert_eq!(3, stack.len());
+        assert_eq!(Ok(Value::Int(2)), stack.pop2());
+        assert_eq!(1, stack.len());
+        assert_eq!(Ok(Value::Double(0f64)), stack.pop2());
     }
 }
