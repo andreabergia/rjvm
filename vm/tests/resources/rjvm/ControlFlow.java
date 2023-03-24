@@ -4,6 +4,7 @@ public class ControlFlow {
     public static void main(String[] args) {
         controlFlowInts();
         controlFlowObjects(new Object());
+        controlFlowLongFloatDouble(1, 1, 1);
     }
 
     private static void controlFlowInts() {
@@ -21,6 +22,18 @@ public class ControlFlow {
     private static void controlFlowObjects(Object a) {
         if (a != null) {
             tempPrint(42);
+        }
+    }
+
+    private static void controlFlowLongFloatDouble(long l, float f, double d) {
+        if (l > 0) {
+            tempPrint(1);
+        }
+        if (f > 0) {
+            tempPrint(1);
+        }
+        if (d > 0) {
+            tempPrint(1);
         }
     }
 

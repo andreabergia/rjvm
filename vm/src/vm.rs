@@ -66,6 +66,23 @@ macro_rules! generate_execute_coerce {
     };
 }
 
+macro_rules! generate_compare {
+    ($name:ident, $pop_fn:ident) => {
+        fn $name(&mut self, sign_for_greater: i32) -> Result<(), VmError> {
+            let val2 = self.$pop_fn()?;
+            let val1 = self.$pop_fn()?;
+            if val1 > val2 {
+                self.stack.push(Int(sign_for_greater))
+            } else if val1 < val2 {
+                self.stack.push(Int(-sign_for_greater))
+            } else {
+                self.stack.push(Int(0))
+            }
+            Ok(())
+        }
+    };
+}
+
 macro_rules! generate_execute_load {
     ($name:ident, $($variant:ident),+) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
@@ -551,6 +568,12 @@ impl<'a> CallFrame<'a> {
                     self.execute_if_icmp(jump_address, |a, b| a >= b)?
                 }
 
+                Instruction::Lcmp => self.execute_long_compare(1)?,
+                Instruction::Fcmpg => self.execute_float_compare(-1)?,
+                Instruction::Fcmpl => self.execute_float_compare(1)?,
+                Instruction::Dcmpg => self.execute_double_compare(-1)?,
+                Instruction::Dcmpl => self.execute_double_compare(1)?,
+
                 Instruction::Newarray(array_type) => {
                     self.execute_newarray(array_type)?;
                 }
@@ -892,12 +915,34 @@ impl<'a> CallFrame<'a> {
                 class_and_method.class,
             )?)
         };
-        let params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
+        let mut params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
+        Self::fix_long_and_double_params(&mut params)?;
         Ok((
             receiver,
             params,
             cur_stack_len - num_params - receiver_count,
         ))
+    }
+
+    // long and double arguments should take two slots in the variable table
+    // Since in our implementation we do not "split" the numbers in two 32-bits parts,
+    // we can just add an empty slot in the variable after a long or a double. All the
+    // bytecode instructions should refer to the "first" value anyway.
+    fn fix_long_and_double_params(params: &mut Vec<Value>) -> Result<(), VmError> {
+        let mut num_params = params.len();
+        let mut i = 0usize;
+        while i < num_params {
+            let val = &params[i];
+            match val {
+                Long(_) | Double(_) => {
+                    params.insert(i + 1, Value::Uninitialized);
+                    num_params += 1;
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        Ok(())
     }
 
     fn get_object_from_stack(
@@ -1015,6 +1060,10 @@ impl<'a> CallFrame<'a> {
         }
         Ok(())
     }
+
+    generate_compare!(execute_long_compare, pop_long);
+    generate_compare!(execute_float_compare, pop_float);
+    generate_compare!(execute_double_compare, pop_double);
 
     generate_execute_load!(execute_aload, Object, Array);
     generate_execute_load!(execute_iload, Int);
