@@ -90,7 +90,7 @@ macro_rules! generate_execute_array_load {
                 $($variant => array
                     .borrow()
                     .get(index)
-                    .ok_or(VmError::ValidationException)
+                    .ok_or(VmError::ArrayIndexOutOfBoundsException)
                     .map(|value| value.clone()),)+
                 _ => return Err(VmError::ValidationException),
             }?;
@@ -109,7 +109,7 @@ macro_rules! generate_execute_array_store {
             match field_type {
                 $($variant => {
                     match array.borrow_mut().get_mut(index) {
-                        None => return Err(VmError::ValidationException),
+                        None => return Err(VmError::ArrayIndexOutOfBoundsException),
                         Some(reference) => *reference = value,
                     }
                 })+
@@ -523,9 +523,11 @@ impl<'a> CallFrame<'a> {
 
                 Instruction::Arraylength => self.execute_array_length()?,
                 Instruction::Baload => self.execute_baload()?,
-                Instruction::Bastore => self.execute_bastore()?,
                 Instruction::Caload => self.execute_caload()?,
+                Instruction::Saload => self.execute_saload()?,
+                Instruction::Bastore => self.execute_bastore()?,
                 Instruction::Castore => self.execute_castore()?,
+                Instruction::Sastore => self.execute_sastore()?,
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
@@ -954,6 +956,7 @@ impl<'a> CallFrame<'a> {
         Base(BaseType::Boolean)
     );
     generate_execute_array_load!(execute_caload, Base(BaseType::Char));
+    generate_execute_array_load!(execute_saload, Base(BaseType::Short));
 
     generate_execute_array_store!(
         execute_bastore,
@@ -963,6 +966,7 @@ impl<'a> CallFrame<'a> {
         Base(BaseType::Boolean)
     );
     generate_execute_array_store!(execute_castore, pop_int, i2c, Base(BaseType::Char));
+    generate_execute_array_store!(execute_sastore, pop_int, i2s, Base(BaseType::Short));
 
     fn debug_start_execution(&self) {
         debug!(

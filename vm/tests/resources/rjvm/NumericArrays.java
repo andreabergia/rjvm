@@ -5,6 +5,7 @@ public class NumericArrays {
         playWithArrayOfBooleans(new boolean[2]);
         playWithArrayOfBytes(new byte[]{0x01, 0x02});
         playWithArrayOfChars(new char[]{'a', 'b'});
+        playWithArrayOfShorts(new short[]{1, 2});
     }
 
     private static void playWithArrayOfBooleans(boolean[] array) {
@@ -19,6 +20,10 @@ public class NumericArrays {
 
     private static void playWithArrayOfChars(char[] array) {
         tempPrint(array[0] > array[1] ? array[0] : array[1]);
+    }
+
+    private static void playWithArrayOfShorts(short[] array) {
+        tempPrint(array[0] - array[1]);
     }
 
     private static native void tempPrint(boolean value);

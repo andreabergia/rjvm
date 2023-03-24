@@ -25,6 +25,9 @@ pub enum VmError {
     #[error("not yet implemented")]
     NotImplemented,
 
+    #[error("array index out of bounds")]
+    ArrayIndexOutOfBoundsException,
+
     #[error("unexpected error")]
     UnexpectedError,
 }
