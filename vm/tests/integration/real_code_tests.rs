@@ -118,9 +118,18 @@ fn numeric_types() {
     assert_eq!(
         vec![
             Value::Int(3),
-            Value::Float(3.45),
+            Value::Float(3.45f32),
+            Value::Int(3),
+            Value::Long(3),
+            Value::Double(3.45f32 as f64),
             Value::Long(2),
-            Value::Double(4.45)
+            Value::Int(2),
+            Value::Float(2f32),
+            Value::Double(2f64),
+            Value::Double(4.45),
+            Value::Int(4),
+            Value::Float(4.45),
+            Value::Long(4),
         ],
         vm.printed
     );

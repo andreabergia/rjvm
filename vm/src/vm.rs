@@ -52,6 +52,20 @@ macro_rules! generate_execute_math {
     };
 }
 
+macro_rules! generate_execute_coerce {
+    ($name:ident, $pop_fn:ident, $type:ty) => {
+        fn $name<T>(&mut self, evaluator: T) -> Result<(), VmError>
+        where
+            T: FnOnce($type) -> Value<'a>,
+        {
+            let value = self.$pop_fn()?;
+            let coerced = evaluator(value);
+            self.stack.push(coerced);
+            Ok(())
+        }
+    };
+}
+
 macro_rules! generate_execute_load {
     ($name:ident, $($variant:ident),+) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
@@ -334,6 +348,18 @@ impl<'a> CallFrame<'a> {
                 Instruction::I2l => self.coerce_int(Self::i2l)?,
                 Instruction::I2d => self.coerce_int(Self::i2d)?,
 
+                Instruction::L2i => self.coerce_long(Self::l2i)?,
+                Instruction::L2f => self.coerce_long(Self::l2f)?,
+                Instruction::L2d => self.coerce_long(Self::l2d)?,
+
+                Instruction::F2i => self.coerce_float(Self::f2i)?,
+                Instruction::F2l => self.coerce_float(Self::f2l)?,
+                Instruction::F2d => self.coerce_float(Self::f2d)?,
+
+                Instruction::D2i => self.coerce_double(Self::d2i)?,
+                Instruction::D2l => self.coerce_double(Self::d2l)?,
+                Instruction::D2f => self.coerce_double(Self::d2f)?,
+
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
@@ -568,11 +594,41 @@ impl<'a> CallFrame<'a> {
     fn i2d(value: i32) -> Value<'a> {
         Double(value as f64)
     }
+
+    fn l2i(value: i64) -> Value<'a> {
+        Int(value as i32)
+    }
+    fn l2f(value: i64) -> Value<'a> {
+        Float(value as f32)
+    }
     fn l2l(value: i64) -> Value<'a> {
         Long(value)
     }
+    fn l2d(value: i64) -> Value<'a> {
+        Double(value as f64)
+    }
+
+    fn f2i(value: f32) -> Value<'a> {
+        Int(value as i32)
+    }
+    fn f2l(value: f32) -> Value<'a> {
+        Long(value as i64)
+    }
     fn f2f(value: f32) -> Value<'a> {
         Float(value)
+    }
+    fn f2d(value: f32) -> Value<'a> {
+        Double(value as f64)
+    }
+
+    fn d2i(value: f64) -> Value<'a> {
+        Int(value as i32)
+    }
+    fn d2f(value: f64) -> Value<'a> {
+        Float(value as f32)
+    }
+    fn d2l(value: f64) -> Value<'a> {
+        Long(value as i64)
     }
     fn d2d(value: f64) -> Value<'a> {
         Double(value)
@@ -895,15 +951,10 @@ impl<'a> CallFrame<'a> {
             || ((a == 0f64 || a == -0f64) && (b == 0f64 || b == -0f64))
     }
 
-    fn coerce_int<T>(&mut self, evaluator: T) -> Result<(), VmError>
-    where
-        T: FnOnce(i32) -> Value<'a>,
-    {
-        let value = self.pop_int()?;
-        let coerced = evaluator(value);
-        self.stack.push(coerced);
-        Ok(())
-    }
+    generate_execute_coerce!(coerce_int, pop_int, i32);
+    generate_execute_coerce!(coerce_long, pop_long, i64);
+    generate_execute_coerce!(coerce_float, pop_float, f32);
+    generate_execute_coerce!(coerce_double, pop_double, f64);
 
     fn goto(&mut self, jump_address: u16) {
         self.pc = jump_address.into_usize_safe();
