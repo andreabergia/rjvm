@@ -7,6 +7,7 @@ public class NumericArrays {
         playWithArrayOfChars(new char[]{'a', 'b'});
         playWithArrayOfShorts(new short[]{1, 2});
         playWithArrayOfInts(new int[]{3, 4});
+        playWithArrayOfLongs(new long[]{4, 2});
     }
 
     private static void playWithArrayOfBooleans(boolean[] array) {
@@ -31,7 +32,13 @@ public class NumericArrays {
         tempPrint(array[0] * array[1]);
     }
 
+    private static void playWithArrayOfLongs(long[] array) {
+        tempPrint(array[0] / array[1]);
+    }
+
     private static native void tempPrint(boolean value);
 
     private static native void tempPrint(int value);
+
+    private static native void tempPrint(long value);
 }
