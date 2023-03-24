@@ -62,6 +62,21 @@ macro_rules! generate_execute_load {
     };
 }
 
+macro_rules! generate_execute_store {
+    ($name:ident, $variant:ident) => {
+        fn $name(&mut self, index: usize) -> Result<(), VmError> {
+            let value = self.stack.pop().ok_or(VmError::ValidationException)?;
+            match value {
+                $variant(_) => {
+                    self.locals[index] = value;
+                    Ok(())
+                }
+                _ => Err(VmError::ValidationException),
+            }
+        }
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct Stack<'a> {
     frames: Vec<Rc<RefCell<CallFrame<'a>>>>,
@@ -802,60 +817,11 @@ impl<'a> CallFrame<'a> {
     generate_execute_load!(execute_fload, Float);
     generate_execute_load!(execute_dload, Double);
 
-    fn execute_astore(&mut self, index: usize) -> Result<(), VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Object(_) => {
-                self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn execute_istore(&mut self, index: usize) -> Result<(), VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Int(_) => {
-                self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn execute_lstore(&mut self, index: usize) -> Result<(), VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Long(_) => {
-                self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn execute_fstore(&mut self, index: usize) -> Result<(), VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Float(_) => {
-                self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
-
-    fn execute_dstore(&mut self, index: usize) -> Result<(), VmError> {
-        let value = self.stack.pop().ok_or(VmError::ValidationException)?;
-        match value {
-            Double(_) => {
-                self.locals[index] = value;
-                Ok(())
-            }
-            _ => Err(VmError::ValidationException),
-        }
-    }
+    generate_execute_store!(execute_astore, Object);
+    generate_execute_store!(execute_istore, Int);
+    generate_execute_store!(execute_lstore, Long);
+    generate_execute_store!(execute_fstore, Float);
+    generate_execute_store!(execute_dstore, Double);
 
     fn execute_ldc(&mut self, index: u16) -> Result<(), VmError> {
         let constant_value = self.get_constant(index)?;
