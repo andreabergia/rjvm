@@ -10,9 +10,10 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::call_stack::CallStack;
 use crate::value::ArrayRef;
 use crate::value_stack::ValueStack;
-use crate::vm::{CallStack, Vm};
+use crate::vm::Vm;
 use crate::{
     class::Class,
     class_and_method::ClassAndMethod,
