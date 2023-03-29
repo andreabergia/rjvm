@@ -1,3 +1,4 @@
+mod call_frame;
 pub mod class;
 mod class_allocator;
 pub mod class_and_method;
