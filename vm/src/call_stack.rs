@@ -1,12 +1,12 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use rjvm_reader::method_flags::MethodFlags;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::value::Value::Object;
 use crate::{
-    call_frame::CallFrame, class_and_method::ClassAndMethod, value::ObjectRef, value::Value,
+    call_frame::CallFrame,
+    class_and_method::ClassAndMethod,
+    value::{ObjectRef, Value, Value::Object},
     vm_error::VmError,
 };
 

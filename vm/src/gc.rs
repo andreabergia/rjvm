@@ -1,11 +1,11 @@
-use std::fmt;
-use std::fmt::Formatter;
-use std::marker::PhantomData;
+use std::{fmt, fmt::Formatter, marker::PhantomData};
 
 use typed_arena::Arena;
 
-use crate::class::Class;
-use crate::value::{ObjectRef, ObjectValue};
+use crate::{
+    class::Class,
+    value::{ObjectRef, ObjectValue},
+};
 
 pub struct ObjectAllocator<'a> {
     arena: Arena<ObjectValue<'a>>,

@@ -1,7 +1,5 @@
 use rjvm_reader::utils;
-use rjvm_vm::value::Value;
-use rjvm_vm::vm::Vm;
-use rjvm_vm::vm_error::VmError;
+use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 
 fn load_class(vm: &mut Vm, bytes: &[u8]) {
     let class_file = utils::read_class_from_bytes(bytes);

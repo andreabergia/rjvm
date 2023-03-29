@@ -17,6 +17,9 @@ lint:
 clean:
     cargo clean
 
+fmt:
+    cargo +nightly fmt
+
 generate-test-classes:
     cd ./reader/tests/resources && ./compile.sh
     cd ./vm/tests/resources && ./compile.sh

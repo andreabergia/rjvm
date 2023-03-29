@@ -1,25 +1,26 @@
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use log::{debug, warn};
 
 use rjvm_reader::{
-    class_file_field::ClassFileField, class_file_method::ClassFileMethod,
-    constant_pool::ConstantPoolEntry, field_type::BaseType, field_type::FieldType,
-    field_type::FieldType::Base, instruction::Instruction, instruction::NewArrayType,
+    class_file_field::ClassFileField,
+    class_file_method::ClassFileMethod,
+    constant_pool::ConstantPoolEntry,
+    field_type::{BaseType, FieldType, FieldType::Base},
+    instruction::{Instruction, NewArrayType},
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::call_stack::CallStack;
-use crate::value::ArrayRef;
-use crate::value_stack::ValueStack;
-use crate::vm::Vm;
 use crate::{
+    call_stack::CallStack,
     class::Class,
     class_and_method::ClassAndMethod,
-    value::ObjectRef,
-    value::Value,
-    value::Value::{Array, Double, Float, Int, Long, Object},
+    value::{
+        ArrayRef, ObjectRef, Value,
+        Value::{Array, Double, Float, Int, Long, Object},
+    },
+    value_stack::ValueStack,
+    vm::Vm,
     vm_error::VmError,
 };
 

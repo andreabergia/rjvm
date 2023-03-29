@@ -1,13 +1,14 @@
-use std::fmt;
-use std::fmt::Formatter;
+use std::{fmt, fmt::Formatter};
 
 use result::prelude::*;
 use typed_arena::Arena;
 
 use rjvm_reader::class_file::ClassFile;
 
-use crate::class::{ClassId, ClassRef};
-use crate::{class::Class, vm_error::VmError};
+use crate::{
+    class::{Class, ClassId, ClassRef},
+    vm_error::VmError,
+};
 
 pub trait ClassResolver<'a> {
     fn find_class_by_id(&self, id: ClassId) -> Option<ClassRef<'a>>;

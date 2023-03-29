@@ -1,11 +1,15 @@
-use std::cell::RefCell;
-use std::fmt::{Debug, Formatter};
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    fmt::{Debug, Formatter},
+    rc::Rc,
+};
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::class::{Class, ClassId};
-use crate::class_allocator::ClassResolver;
+use crate::{
+    class::{Class, ClassId},
+    class_allocator::ClassResolver,
+};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {

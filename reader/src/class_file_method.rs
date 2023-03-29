@@ -1,10 +1,8 @@
-use std::fmt;
-use std::fmt::Formatter;
+use std::{fmt, fmt::Formatter};
 
-use crate::instruction::Instruction;
 use crate::{
-    attribute::Attribute, field_type::FieldType, method_descriptor::MethodDescriptor,
-    method_flags::MethodFlags,
+    attribute::Attribute, field_type::FieldType, instruction::Instruction,
+    method_descriptor::MethodDescriptor, method_flags::MethodFlags,
 };
 
 #[derive(Debug, PartialEq)]

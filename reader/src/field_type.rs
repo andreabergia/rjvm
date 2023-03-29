@@ -1,6 +1,4 @@
-use std::fmt;
-use std::fmt::Formatter;
-use std::str::Chars;
+use std::{fmt, fmt::Formatter, str::Chars};
 
 use itertools::Itertools;
 

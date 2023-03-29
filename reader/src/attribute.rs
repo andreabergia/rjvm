@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::Formatter;
+use std::{fmt, fmt::Formatter};
 
 #[derive(Debug, Default, PartialEq)]
 pub struct Attribute {

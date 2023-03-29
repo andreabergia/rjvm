@@ -1,10 +1,11 @@
-use std::ops::Index;
-use std::slice::{Iter, SliceIndex};
+use std::{
+    ops::Index,
+    slice::{Iter, SliceIndex},
+};
 
 use VmError::ValidationException;
 
-use crate::value::Value;
-use crate::vm_error::VmError;
+use crate::{value::Value, vm_error::VmError};
 
 #[derive(Debug)]
 pub struct ValueStack<'a> {
@@ -166,8 +167,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::value::Value;
-    use crate::value_stack::ValueStack;
+    use crate::{value::Value, value_stack::ValueStack};
 
     #[test]
     fn can_do_push_pop_and_indexing() {

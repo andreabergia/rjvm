@@ -2,11 +2,15 @@ use log::{debug, info};
 
 use rjvm_reader::class_file::ClassFile;
 
-use crate::call_stack::CallStack;
 use crate::{
-    class::ClassId, class::ClassRef, class_allocator::ClassAllocator,
-    class_allocator::ClassResolver, class_and_method::ClassAndMethod, class_loader::ClassLoader,
-    gc::ObjectAllocator, value::ObjectRef, value::Value, vm_error::VmError,
+    call_stack::CallStack,
+    class::{ClassId, ClassRef},
+    class_allocator::{ClassAllocator, ClassResolver},
+    class_and_method::ClassAndMethod,
+    class_loader::ClassLoader,
+    gc::ObjectAllocator,
+    value::{ObjectRef, Value},
+    vm_error::VmError,
 };
 
 #[derive(Debug, Default)]

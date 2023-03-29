@@ -1,12 +1,12 @@
 extern crate rjvm_reader;
 
-use rjvm_reader::class_file_method::{LineNumber, ProgramCounter};
 use rjvm_reader::{
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
     class_file_field::ClassFileField,
-    class_file_method::ClassFileMethod,
-    class_file_method::{LineNumberTable, LineNumberTableEntry},
+    class_file_method::{
+        ClassFileMethod, LineNumber, LineNumberTable, LineNumberTableEntry, ProgramCounter,
+    },
     class_file_version::ClassFileVersion,
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},

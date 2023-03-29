@@ -1,7 +1,6 @@
 use thiserror::Error;
 
-use crate::constant_pool::InvalidConstantPoolIndexError;
-use crate::instruction::Instruction;
+use crate::{constant_pool::InvalidConstantPoolIndexError, instruction::Instruction};
 use rjvm_utils::buffer::BufferError;
 
 #[derive(Error, Debug, PartialEq)]

@@ -1,10 +1,10 @@
 extern crate rjvm_reader;
 
-use rjvm_reader::utils;
 use rjvm_reader::{
     class_file_field::{ClassFileField, FieldConstantValue},
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
+    utils,
 };
 
 #[test_log::test]

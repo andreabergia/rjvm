@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::Formatter;
+use std::{fmt, fmt::Formatter};
 
 use crate::{field_flags::FieldFlags, field_type::FieldType};
 
@@ -17,7 +16,10 @@ impl fmt::Display for ClassFileField {
         write!(
             f,
             "{:?} {}: {} constant {:?}{}",
-            self.flags, self.name, self.type_descriptor, self.constant_value,
+            self.flags,
+            self.name,
+            self.type_descriptor,
+            self.constant_value,
             if self.deprecated { " (deprecated)" } else { "" }
         )
     }

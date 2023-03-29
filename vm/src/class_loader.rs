@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
-use crate::class::ClassId;
-use crate::{class::ClassRef, class_allocator::ClassResolver};
+use crate::{
+    class::{ClassId, ClassRef},
+    class_allocator::ClassResolver,
+};
 
 // TODO: class loaders should be a hierarchy
 
