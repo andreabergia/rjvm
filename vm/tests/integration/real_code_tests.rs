@@ -1,17 +1,20 @@
-use rjvm_reader::utils;
+
+
+
 use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 
-fn load_class(vm: &mut Vm, bytes: &[u8]) {
-    let class_file = utils::read_class_from_bytes(bytes);
-    vm.load_class(class_file).unwrap();
+fn ensure_class_is_resolved(vm: &mut Vm, class_name: &str) {
+    vm.resolve_class(class_name)
+        .unwrap_or_else(|_| panic!("should be able to load class {class_name}"));
 }
 
 fn create_base_vm() -> Vm<'static> {
-    let mut vm = Vm::new();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/jre-8-rt/java/lang/Object.class"),
-    );
+    let resources_dir = env!("CARGO_MANIFEST_DIR");
+    let mut vm = Vm::new(&format!(
+        "{resources_dir}/tests/resources:{resources_dir}/tests/resources/jre-8-rt",
+    ))
+    .expect("should be able to create the vm");
+    ensure_class_is_resolved(&mut vm, "java/lang/Object");
     vm
 }
 
@@ -36,14 +39,8 @@ fn invoke<'a>(
 #[test_log::test]
 fn simple_main() {
     let mut vm = create_base_vm();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/SimpleMain.class"),
-    );
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/SimpleMain$Generator.class"),
-    );
+    ensure_class_is_resolved(&mut vm, "rjvm/SimpleMain");
+    ensure_class_is_resolved(&mut vm, "rjvm/SimpleMain$Generator.class");
 
     let main_result = invoke(&mut vm, "rjvm/SimpleMain", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
@@ -54,18 +51,9 @@ fn simple_main() {
 #[test_log::test]
 fn superclasses() {
     let mut vm = create_base_vm();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/SuperClasses.class"),
-    );
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/SuperClasses$BaseClass.class"),
-    );
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/SuperClasses$DerivedClass.class"),
-    );
+    ensure_class_is_resolved(&mut vm, "rjvm/SuperClasses");
+    ensure_class_is_resolved(&mut vm, "rjvm/SuperClasses$BaseClass");
+    ensure_class_is_resolved(&mut vm, "rjvm/SuperClasses$DerivedClass");
 
     let main_result = invoke(
         &mut vm,
@@ -81,10 +69,7 @@ fn superclasses() {
 #[test_log::test]
 fn control_flow() {
     let mut vm = create_base_vm();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/ControlFlow.class"),
-    );
+    ensure_class_is_resolved(&mut vm, "rjvm/ControlFlow");
 
     let main_result = invoke(
         &mut vm,
@@ -109,10 +94,7 @@ fn control_flow() {
 #[test_log::test]
 fn numeric_types() {
     let mut vm = create_base_vm();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/NumericTypes.class"),
-    );
+    ensure_class_is_resolved(&mut vm, "rjvm/NumericTypes");
 
     let main_result = invoke(
         &mut vm,
@@ -155,10 +137,7 @@ fn numeric_types() {
 #[test_log::test]
 fn numeric_arrays() {
     let mut vm = create_base_vm();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/NumericArrays.class"),
-    );
+    ensure_class_is_resolved(&mut vm, "rjvm/NumericArrays");
 
     let main_result = invoke(
         &mut vm,
@@ -187,14 +166,8 @@ fn numeric_arrays() {
 #[test_log::test]
 fn object_arrays() {
     let mut vm = create_base_vm();
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/ObjectArrays.class"),
-    );
-    load_class(
-        &mut vm,
-        include_bytes!("../resources/rjvm/ObjectArrays$Square.class"),
-    );
+    ensure_class_is_resolved(&mut vm, "rjvm/ObjectArrays");
+    ensure_class_is_resolved(&mut vm, "rjvm/ObjectArrays$Square");
 
     let main_result = invoke(
         &mut vm,

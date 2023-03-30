@@ -4,6 +4,9 @@ use rjvm_reader::class_reader_error::ClassReaderError;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum VmError {
+    #[error("unexpected error loading class")]
+    ClassLoadingError,
+
     #[error("null pointer exception")]
     NullPointerException,
 

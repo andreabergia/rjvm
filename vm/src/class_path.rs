@@ -5,7 +5,7 @@ use crate::class_path_entry::{
 };
 
 #[allow(dead_code)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ClassPath {
     entries: Vec<Box<dyn ClassPathEntry>>,
 }

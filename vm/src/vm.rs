@@ -1,6 +1,6 @@
 use log::{debug, info};
 
-use rjvm_reader::class_file::ClassFile;
+use rjvm_reader::{class_file::ClassFile, class_reader};
 
 use crate::{
     call_stack::CallStack,
@@ -8,6 +8,7 @@ use crate::{
     class_allocator::{ClassAllocator, ClassResolver},
     class_and_method::ClassAndMethod,
     class_loader::ClassLoader,
+    class_path::{ClassPath, ClassPathParseError},
     gc::ObjectAllocator,
     value::{ObjectRef, Value},
     vm_error::VmError,
@@ -15,6 +16,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct Vm<'a> {
+    class_path: ClassPath,
     class_allocator: ClassAllocator<'a>,
     pub(crate) class_loader: ClassLoader<'a>,
     object_allocator: ObjectAllocator<'a>,
@@ -22,8 +24,23 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn new(class_path: &str) -> Result<Self, ClassPathParseError> {
+        let class_path = ClassPath::parse(class_path)?;
+        Ok(Self {
+            class_path,
+            ..Default::default()
+        })
+    }
+
+    pub fn resolve_class(&mut self, class_name: &str) -> Result<(), VmError> {
+        let class_file_bytes = self
+            .class_path
+            .resolve(class_name)
+            .map_err(|_| VmError::ClassLoadingError)?
+            .ok_or(VmError::ClassNotFoundException(class_name.to_string()))?;
+        let class_file =
+            class_reader::read_buffer(&class_file_bytes).map_err(|_| VmError::ClassLoadingError)?;
+        self.load_class(class_file)
     }
 
     pub fn load_class(&mut self, class_file: ClassFile) -> Result<(), VmError> {

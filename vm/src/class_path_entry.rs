@@ -19,7 +19,7 @@ impl From<Error> for ClassLoadingError {
     }
 }
 
-pub trait ClassPathEntry {
+pub trait ClassPathEntry: core::fmt::Debug {
     // TODO: should `class_name` be a newtype?
     fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError>;
 }
