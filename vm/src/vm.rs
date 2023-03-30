@@ -24,12 +24,12 @@ pub struct Vm<'a> {
 }
 
 impl<'a> Vm<'a> {
-    pub fn new(class_path: &str) -> Result<Self, ClassPathParseError> {
-        let class_path = ClassPath::parse(class_path)?;
-        Ok(Self {
-            class_path,
-            ..Default::default()
-        })
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn append_class_path(&mut self, class_path: &str) -> Result<(), ClassPathParseError> {
+        self.class_path.push(class_path)
     }
 
     pub fn resolve_class(&mut self, class_name: &str) -> Result<(), VmError> {

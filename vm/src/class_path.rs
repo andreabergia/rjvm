@@ -17,13 +17,14 @@ pub enum ClassPathParseError {
 }
 
 impl ClassPath {
-    pub fn parse(string: &str) -> Result<ClassPath, ClassPathParseError> {
-        let mut class_path: ClassPath = Default::default();
+    pub fn push(&mut self, string: &str) -> Result<(), ClassPathParseError> {
+        let mut entries_to_add: Vec<Box<dyn ClassPathEntry>> = Vec::new();
         for entry in string.split(':') {
             let parsed_entry = Self::try_parse_entry(entry)?;
-            class_path.push(parsed_entry);
+            entries_to_add.push(parsed_entry);
         }
-        Ok(class_path)
+        self.entries.append(&mut entries_to_add);
+        Ok(())
     }
 
     fn try_parse_entry(path: &str) -> Result<Box<dyn ClassPathEntry>, ClassPathParseError> {
@@ -44,10 +45,6 @@ impl ClassPath {
         Ok(Box::new(entry))
     }
 
-    pub fn push(&mut self, entry: Box<dyn ClassPathEntry>) {
-        self.entries.push(entry)
-    }
-
     pub fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError> {
         for entry in self.entries.iter() {
             if let Ok(Some(class_bytes)) = entry.resolve(class_name) {
@@ -65,8 +62,12 @@ mod tests {
     #[test]
     fn can_parse_valid_classpath_entries() {
         let dir = env!("CARGO_MANIFEST_DIR");
-        let class_path = format!("{}/tests/resources/sample.jar:{}/tests/resources", dir, dir);
-        let class_path = ClassPath::parse(&class_path).expect("should be able to parse classpath");
+        let mut class_path: ClassPath = Default::default();
+        class_path
+            .push(&format!(
+                "{dir}/tests/resources/sample.jar:{dir}/tests/resources",
+            ))
+            .expect("should be able to parse classpath");
         assert_can_find_class(&class_path, "rjvm/NumericTypes"); // From jar
         assert_can_find_class(&class_path, "rjvm/SimpleMain"); // From directory
         assert_cannot_find_class(&class_path, "foo");

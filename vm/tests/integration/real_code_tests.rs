@@ -1,6 +1,3 @@
-
-
-
 use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 
 fn ensure_class_is_resolved(vm: &mut Vm, class_name: &str) {
@@ -9,11 +6,13 @@ fn ensure_class_is_resolved(vm: &mut Vm, class_name: &str) {
 }
 
 fn create_base_vm() -> Vm<'static> {
+    let mut vm = Vm::new();
+
     let resources_dir = env!("CARGO_MANIFEST_DIR");
-    let mut vm = Vm::new(&format!(
+    vm.append_class_path(&format!(
         "{resources_dir}/tests/resources:{resources_dir}/tests/resources/jre-8-rt",
     ))
-    .expect("should be able to create the vm");
+    .expect("should be able to add entries to the classpath");
     ensure_class_is_resolved(&mut vm, "java/lang/Object");
     vm
 }
