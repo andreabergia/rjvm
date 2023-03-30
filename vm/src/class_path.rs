@@ -10,11 +10,13 @@ impl From<Error> for ClassLoadingError {
     }
 }
 
+#[allow(dead_code)]
 pub struct ClassPath {
     entries: Vec<Box<dyn ClassPathEntry>>,
 }
 
 impl ClassPath {
+    #[allow(dead_code)]
     pub fn push(&mut self, entry: Box<dyn ClassPathEntry>) {
         self.entries.push(entry)
     }
@@ -33,6 +35,7 @@ pub struct FileSystemClassPathEntry {
 }
 
 impl FileSystemClassPathEntry {
+    #[allow(dead_code)]
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         let mut base_directory = PathBuf::new();
         base_directory.push(path);
