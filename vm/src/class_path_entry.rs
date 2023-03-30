@@ -106,7 +106,7 @@ impl ClassPathEntry for JarFileClassPathEntry {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::class_path::{
+    use crate::class_path_entry::{
         ClassPathEntry, FileSystemClassPathEntry, JarFileClassPathEntry, JarFileError,
     };
 
