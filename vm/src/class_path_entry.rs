@@ -24,6 +24,12 @@ pub trait ClassPathEntry {
     fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError>;
 }
 
+#[derive(Error, Debug, PartialEq)]
+pub enum FileSystemClassPathEntryError {
+    #[error("invalid directory")]
+    InvalidDirectory,
+}
+
 /// Implementation of [ClassPathEntry] that searches for `.class` files,
 /// using the given directory as the root package
 #[derive(Debug)]
@@ -32,11 +38,15 @@ pub struct FileSystemClassPathEntry {
 }
 
 impl FileSystemClassPathEntry {
-    #[allow(dead_code)]
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, FileSystemClassPathEntryError> {
         let mut base_directory = PathBuf::new();
         base_directory.push(path);
-        Self { base_directory }
+
+        if !base_directory.exists() || !base_directory.is_dir() {
+            Err(FileSystemClassPathEntryError::InvalidDirectory)
+        } else {
+            Ok(Self { base_directory })
+        }
     }
 }
 
@@ -70,7 +80,6 @@ pub struct JarFileClassPathEntry {
 }
 
 impl JarFileClassPathEntry {
-    #[allow(dead_code)]
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, JarFileError> {
         if !path.as_ref().exists() {
             return Err(NotFound);
@@ -107,14 +116,25 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::class_path_entry::{
-        ClassPathEntry, FileSystemClassPathEntry, JarFileClassPathEntry, JarFileError,
+        ClassPathEntry, FileSystemClassPathEntry, FileSystemClassPathEntryError,
+        JarFileClassPathEntry, JarFileError,
     };
+
+    #[test]
+    fn directory_not_found() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("foobar");
+        assert_eq!(
+            FileSystemClassPathEntryError::InvalidDirectory,
+            FileSystemClassPathEntry::new(path).expect_err("should not have found directory")
+        );
+    }
 
     #[test]
     fn file_system_class_path_entry_works() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("tests/resources");
-        let entry = FileSystemClassPathEntry::new(path);
+        let entry = FileSystemClassPathEntry::new(path).expect("should find directory");
 
         assert_can_find_class(&entry, "rjvm/NumericTypes");
         assert_can_find_class(&entry, "rjvm/ControlFlow");
