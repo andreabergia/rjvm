@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fs::File,
-    io::{Error, Read},
+    io::{BufReader, Error, Read},
     path::{Path, PathBuf},
 };
 
@@ -76,7 +76,7 @@ pub enum JarFileError {
 /// Implementation of [ClassPathEntry] that searches for `.class` file inside a `.jar` file
 #[derive(Debug)]
 pub struct JarFileClassPathEntry {
-    zip: RefCell<ZipArchive<File>>,
+    zip: RefCell<ZipArchive<BufReader<File>>>,
 }
 
 impl JarFileClassPathEntry {
@@ -85,7 +85,8 @@ impl JarFileClassPathEntry {
             return Err(NotFound);
         }
         let file = File::open(path).map_err(|_| ReadingError)?;
-        let zip = ZipArchive::new(file).map_err(|_| InvalidJar)?;
+        let buf_reader = BufReader::new(file);
+        let zip = ZipArchive::new(buf_reader).map_err(|_| InvalidJar)?;
         Ok(Self {
             zip: RefCell::new(zip),
         })

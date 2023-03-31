@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, path::Path};
+use std::path::Path;
 
 use log::warn;
 use result::prelude::*;
@@ -460,10 +460,7 @@ impl<'a> ClassFileReader<'a> {
 }
 
 pub fn read(path: &Path) -> Result<ClassFile> {
-    let mut file = File::open(path)?;
-    let mut buf: Vec<u8> = Vec::new();
-    file.read_to_end(&mut buf)?;
-
+    let buf = std::fs::read(path)?;
     read_buffer(&buf)
 }
 
