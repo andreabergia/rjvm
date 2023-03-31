@@ -3,11 +3,9 @@ use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 fn create_base_vm() -> Vm<'static> {
     let mut vm = Vm::new();
 
-    let resources_dir = env!("CARGO_MANIFEST_DIR");
-    vm.append_class_path(&format!(
-        "{resources_dir}/tests/resources:{resources_dir}/tests/resources/jre-8-rt",
-    ))
-    .expect("should be able to add entries to the classpath");
+    let src_dir = env!("CARGO_MANIFEST_DIR");
+    vm.append_class_path(&format!("{src_dir}/rt.jar:{src_dir}/tests/resources",))
+        .expect("should be able to add entries to the classpath");
     vm
 }
 
