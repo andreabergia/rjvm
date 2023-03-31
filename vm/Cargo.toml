@@ -13,3 +13,6 @@ env_logger = "*"
 result = "1.0.0"
 typed-arena = "2.0.2"
 zip = { version = "0.6.4", features = ["deflate"] }
+
+[profile.bench]
+debug = true

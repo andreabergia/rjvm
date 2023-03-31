@@ -4,3 +4,6 @@ members = [
     "reader",
     "vm"
 ]
+
+[profile.bench]
+debug = true
