@@ -6,10 +6,7 @@ use std::{
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::{
-    class::{Class, ClassId},
-    class_allocator::ClassResolver,
-};
+use crate::class::{Class, ClassId, ClassRef};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {
@@ -57,11 +54,10 @@ pub type ObjectRef<'a> = &'a ObjectValue<'a>;
 pub type ArrayRef<'a> = Rc<RefCell<Vec<Value<'a>>>>;
 
 impl<'a> Value<'a> {
-    pub fn matches_type<'b>(
-        &self,
-        expected_type: FieldType,
-        class_resolver: &impl ClassResolver<'b>,
-    ) -> bool {
+    pub fn matches_type<'b, T>(&self, expected_type: FieldType, class_resolver: T) -> bool
+    where
+        T: FnOnce(ClassId) -> Option<ClassRef<'b>>,
+    {
         match self {
             Value::Uninitialized => false,
             Value::Int(_) => match expected_type {
@@ -87,7 +83,7 @@ impl<'a> Value<'a> {
 
                 // TODO: we should check super classes
                 FieldType::Object(class_name) => {
-                    let value_class = class_resolver.find_class_by_id(object_ref.class_id);
+                    let value_class = class_resolver(object_ref.class_id);
                     if let Some(class_ref) = value_class {
                         class_ref.name == class_name
                     } else {

@@ -1,9 +1,9 @@
 mod call_frame;
 mod call_stack;
 pub mod class;
-mod class_allocator;
 pub mod class_and_method;
-pub mod class_loader;
+mod class_loader;
+mod class_manager;
 mod class_path;
 mod class_path_entry;
 mod gc;

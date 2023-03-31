@@ -1,10 +1,5 @@
 use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 
-fn ensure_class_is_resolved(vm: &mut Vm, class_name: &str) {
-    vm.resolve_class(class_name)
-        .unwrap_or_else(|_| panic!("should be able to load class {class_name}"));
-}
-
 fn create_base_vm() -> Vm<'static> {
     let mut vm = Vm::new();
 
@@ -13,7 +8,6 @@ fn create_base_vm() -> Vm<'static> {
         "{resources_dir}/tests/resources:{resources_dir}/tests/resources/jre-8-rt",
     ))
     .expect("should be able to add entries to the classpath");
-    ensure_class_is_resolved(&mut vm, "java/lang/Object");
     vm
 }
 
@@ -24,7 +18,7 @@ fn invoke<'a>(
     descriptor: &str,
 ) -> Result<Option<Value<'a>>, VmError> {
     let main_method = vm
-        .find_class_method(class_name, method_name, descriptor)
+        .resolve_class_method(class_name, method_name, descriptor)
         .expect("should find main method");
 
     let mut call_stack = vm.allocate_call_stack();
@@ -38,9 +32,6 @@ fn invoke<'a>(
 #[test_log::test]
 fn simple_main() {
     let mut vm = create_base_vm();
-    ensure_class_is_resolved(&mut vm, "rjvm/SimpleMain");
-    ensure_class_is_resolved(&mut vm, "rjvm/SimpleMain$Generator.class");
-
     let main_result = invoke(&mut vm, "rjvm/SimpleMain", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
 
@@ -50,10 +41,6 @@ fn simple_main() {
 #[test_log::test]
 fn superclasses() {
     let mut vm = create_base_vm();
-    ensure_class_is_resolved(&mut vm, "rjvm/SuperClasses");
-    ensure_class_is_resolved(&mut vm, "rjvm/SuperClasses$BaseClass");
-    ensure_class_is_resolved(&mut vm, "rjvm/SuperClasses$DerivedClass");
-
     let main_result = invoke(
         &mut vm,
         "rjvm/SuperClasses",
@@ -68,8 +55,6 @@ fn superclasses() {
 #[test_log::test]
 fn control_flow() {
     let mut vm = create_base_vm();
-    ensure_class_is_resolved(&mut vm, "rjvm/ControlFlow");
-
     let main_result = invoke(
         &mut vm,
         "rjvm/ControlFlow",
@@ -93,8 +78,6 @@ fn control_flow() {
 #[test_log::test]
 fn numeric_types() {
     let mut vm = create_base_vm();
-    ensure_class_is_resolved(&mut vm, "rjvm/NumericTypes");
-
     let main_result = invoke(
         &mut vm,
         "rjvm/NumericTypes",
@@ -136,8 +119,6 @@ fn numeric_types() {
 #[test_log::test]
 fn numeric_arrays() {
     let mut vm = create_base_vm();
-    ensure_class_is_resolved(&mut vm, "rjvm/NumericArrays");
-
     let main_result = invoke(
         &mut vm,
         "rjvm/NumericArrays",
@@ -165,9 +146,6 @@ fn numeric_arrays() {
 #[test_log::test]
 fn object_arrays() {
     let mut vm = create_base_vm();
-    ensure_class_is_resolved(&mut vm, "rjvm/ObjectArrays");
-    ensure_class_is_resolved(&mut vm, "rjvm/ObjectArrays$Square");
-
     let main_result = invoke(
         &mut vm,
         "rjvm/ObjectArrays",

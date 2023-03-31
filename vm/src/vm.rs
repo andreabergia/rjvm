@@ -1,14 +1,11 @@
 use log::{debug, info};
 
-use rjvm_reader::{class_file::ClassFile, class_reader};
-
 use crate::{
     call_stack::CallStack,
     class::{ClassId, ClassRef},
-    class_allocator::{ClassAllocator, ClassResolver},
     class_and_method::ClassAndMethod,
-    class_loader::ClassLoader,
-    class_path::{ClassPath, ClassPathParseError},
+    class_manager::ClassManager,
+    class_path::ClassPathParseError,
     gc::ObjectAllocator,
     value::{ObjectRef, Value},
     vm_error::VmError,
@@ -16,9 +13,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct Vm<'a> {
-    class_path: ClassPath,
-    class_allocator: ClassAllocator<'a>,
-    pub(crate) class_loader: ClassLoader<'a>,
+    class_manager: ClassManager<'a>,
     object_allocator: ObjectAllocator<'a>,
     pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 }
@@ -29,53 +24,28 @@ impl<'a> Vm<'a> {
     }
 
     pub fn append_class_path(&mut self, class_path: &str) -> Result<(), ClassPathParseError> {
-        self.class_path.push(class_path)
+        self.class_manager.append_class_path(class_path)
     }
 
-    pub fn resolve_class(&mut self, class_name: &str) -> Result<(), VmError> {
-        let class_file_bytes = self
-            .class_path
-            .resolve(class_name)
-            .map_err(|_| VmError::ClassLoadingError)?
-            .ok_or(VmError::ClassNotFoundException(class_name.to_string()))?;
-        let class_file =
-            class_reader::read_buffer(&class_file_bytes).map_err(|_| VmError::ClassLoadingError)?;
-        self.load_class(class_file)
+    pub fn get_or_resolve_class(&mut self, class_name: &str) -> Result<ClassRef<'a>, VmError> {
+        self.class_manager.get_or_resolve_class(class_name)
     }
 
-    pub fn load_class(&mut self, class_file: ClassFile) -> Result<(), VmError> {
-        let class = self
-            .class_allocator
-            .allocate(class_file, &self.class_loader)?;
-        self.class_loader.register_class(class);
-        Ok(())
+    pub fn find_class_by_id(&self, class_id: ClassId) -> Option<ClassRef<'a>> {
+        self.class_manager.find_class_by_id(class_id)
     }
 
-    pub fn find_class<'b>(&'b self, class_name: &str) -> Option<ClassRef<'a>> {
-        self.class_loader.find_class_by_name(class_name)
-    }
-
-    pub fn get_class(&self, class_name: &str) -> Result<ClassRef<'a>, VmError> {
-        self.find_class(class_name)
-            .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
-    }
-
-    pub fn get_class_by_id(&self, class_id: ClassId) -> Result<ClassRef<'a>, VmError> {
-        self.class_loader
-            .find_class_by_id(class_id)
-            .ok_or(VmError::ClassNotFoundException(class_id.to_string()))
-    }
-
-    pub fn find_class_method(
-        &self,
+    pub fn resolve_class_method(
+        &mut self,
         class_name: &str,
         method_name: &str,
         method_type_descriptor: &str,
-    ) -> Option<ClassAndMethod<'a>> {
-        self.find_class(class_name).and_then(|class| {
+    ) -> Result<ClassAndMethod<'a>, VmError> {
+        self.get_or_resolve_class(class_name).and_then(|class| {
             class
                 .find_method(method_name, method_type_descriptor)
                 .map(|method| ClassAndMethod { class, method })
+                .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
         })
     }
 
@@ -113,7 +83,7 @@ impl<'a> Vm<'a> {
     pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef<'a>, VmError> {
         debug!("allocating new instance of {}", class_name);
 
-        let class = self.get_class(class_name)?;
+        let class = self.get_or_resolve_class(class_name)?;
         let instance = self.object_allocator.allocate(class);
         Ok(instance)
     }
@@ -121,7 +91,7 @@ impl<'a> Vm<'a> {
     pub fn debug_stats(&self) {
         debug!(
             "VM classes={:?}, objects = {:?}",
-            self.class_allocator, self.object_allocator
+            self.class_manager, self.object_allocator
         )
     }
 }

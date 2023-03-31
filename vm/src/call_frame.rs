@@ -786,13 +786,13 @@ impl<'a> CallFrame<'a> {
 
     fn get_method_to_invoke_statically(
         &self,
-        vm: &Vm<'a>,
+        vm: &mut Vm<'a>,
         constant_index: u16,
         kind: InvokeKind,
     ) -> Result<ClassAndMethod<'a>, VmError> {
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
-        let class = vm.get_class(method_reference.class_name)?;
+        let class = vm.get_or_resolve_class(method_reference.class_name)?;
         match kind {
             InvokeKind::Special | InvokeKind::Static => {
                 Self::get_method_of_class(class, method_reference)
@@ -854,7 +854,9 @@ impl<'a> CallFrame<'a> {
         match receiver {
             None => Err(VmError::ValidationException),
             Some(receiver) => {
-                let receiver_class = vm.get_class_by_id(receiver.class_id)?;
+                let receiver_class = vm.find_class_by_id(receiver.class_id).ok_or(
+                    VmError::ClassNotFoundException(receiver.class_id.to_string()),
+                )?;
                 let resolved_method = Self::get_method_checking_superclasses(
                     receiver_class,
                     MethodReference {
@@ -958,7 +960,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn validate_type(vm: &Vm, expected_type: FieldType, value: &Value) -> Result<(), VmError> {
-        if value.matches_type(expected_type, &vm.class_loader) {
+        if value.matches_type(expected_type, |class_id| vm.find_class_by_id(class_id)) {
             Ok(())
         } else {
             Err(VmError::ValidationException)
