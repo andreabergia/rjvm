@@ -292,8 +292,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Lstore_2 => self.execute_lstore(2)?,
                 Instruction::Lstore_3 => self.execute_lstore(3)?,
 
-                Instruction::Ldc(index) => self.execute_ldc(index as u16)?,
-                Instruction::Ldc_w(index) => self.execute_ldc(index)?,
+                Instruction::Ldc(index) => self.execute_ldc(vm, index as u16)?,
+                Instruction::Ldc_w(index) => self.execute_ldc(vm, index)?,
                 Instruction::Ldc2_w(index) => self.execute_ldc_long_double(index)?,
 
                 Instruction::Fload(index) => self.execute_fload(index.into_usize_safe())?,
@@ -1079,11 +1079,39 @@ impl<'a> CallFrame<'a> {
     generate_execute_store!(execute_fstore, Float);
     generate_execute_store!(execute_dstore, Double);
 
-    fn execute_ldc(&mut self, index: u16) -> Result<(), VmError> {
+    fn execute_ldc(&mut self, vm: &mut Vm<'a>, index: u16) -> Result<(), VmError> {
         let constant_value = self.get_constant(index)?;
         match constant_value {
             ConstantPoolEntry::Integer(value) => self.stack.push(Int(*value)),
             ConstantPoolEntry::Float(value) => self.stack.push(Float(*value)),
+            ConstantPoolEntry::StringReference(string_index) => {
+                let constant = self.get_constant(*string_index)?;
+                match constant {
+                    ConstantPoolEntry::Utf8(string) => {
+                        let char_array: Vec<Value<'a>> =
+                            string.encode_utf16().map(|c| Int(c as i32)).collect();
+                        let char_array = Rc::new(RefCell::new(char_array));
+                        let char_array = Array(Base(BaseType::Char), char_array);
+
+                        // TODO: static fields
+                        // In our JRE's rt.jar, the fields for String are:
+                        //    private final char[] value;
+                        //    private int hash;
+                        //    private static final long serialVersionUID = -6849794470754667710L;
+                        //    private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[0];
+                        //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
+                        //    private static final int HASHING_SEED;
+                        //    private transient int hash32;
+                        let string_object = vm.new_object("java/lang/String")?;
+                        string_object.set_field(0, char_array);
+                        string_object.set_field(1, Int(0));
+                        string_object.set_field(6, Int(0));
+
+                        self.stack.push(Object(string_object))
+                    }
+                    _ => Err(VmError::ValidationException),
+                }
+            }
             // TODO: StringReference
             // TODO: ClassReference
             // TODO: method type or method handle
