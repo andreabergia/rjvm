@@ -364,7 +364,7 @@ impl<'a> ClassFileReader<'a> {
                 let code_length = buf.read_u32()?.into_usize_safe();
                 let code = Vec::from(buf.read_bytes(code_length)?);
                 let exception_table_length = buf.read_u16()?.into_usize_safe();
-                let exception_table = Vec::from(buf.read_bytes(exception_table_length)?);
+                let exception_table = Vec::from(buf.read_bytes(exception_table_length * 8)?);
                 let attributes =
                     Self::read_raw_attributes_from(&self.class_file.constants, &mut buf)?;
                 let line_number_table = self.extract_line_number_table(&attributes)?;
