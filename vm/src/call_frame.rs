@@ -1130,35 +1130,53 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*string_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(string) => {
-                        let char_array: Vec<Value<'a>> =
-                            string.encode_utf16().map(|c| Int(c as i32)).collect();
-                        let char_array = Rc::new(RefCell::new(char_array));
-                        let char_array = Array(Base(BaseType::Char), char_array);
-
-                        // TODO: static fields
-                        // In our JRE's rt.jar, the fields for String are:
-                        //    private final char[] value;
-                        //    private int hash;
-                        //    private static final long serialVersionUID = -6849794470754667710L;
-                        //    private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[0];
-                        //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
-                        //    private static final int HASHING_SEED;
-                        //    private transient int hash32;
-                        let string_object = vm.new_object(call_stack, "java/lang/String")?;
-                        string_object.set_field(0, char_array);
-                        string_object.set_field(1, Int(0));
-                        string_object.set_field(6, Int(0));
-
+                        let string_object = Self::create_string_instance(vm, call_stack, string)?;
                         self.stack.push(Object(string_object))
                     }
                     _ => Err(VmError::ValidationException),
                 }
             }
-            // TODO: StringReference
-            // TODO: ClassReference
+            ConstantPoolEntry::ClassReference(class_index) => {
+                let constant = self.get_constant(*class_index)?;
+                match constant {
+                    ConstantPoolEntry::Utf8(class_name) => {
+                        // TODO: build a proper instance of Class object
+                        let class_object = vm.new_object(call_stack, "java/lang/Class")?;
+                        let string_object =
+                            Self::create_string_instance(vm, call_stack, class_name)?;
+                        class_object.set_field(5, Object(string_object));
+                        self.stack.push(Object(class_object))
+                    }
+                    _ => Err(VmError::ValidationException),
+                }
+            }
             // TODO: method type or method handle
             _ => Err(VmError::ValidationException),
         }
+    }
+
+    fn create_string_instance(
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        string: &str,
+    ) -> Result<ObjectRef<'a>, VmError> {
+        let char_array: Vec<Value<'a>> = string.encode_utf16().map(|c| Int(c as i32)).collect();
+        let char_array = Rc::new(RefCell::new(char_array));
+        let char_array = Array(Base(BaseType::Char), char_array);
+
+        // In our JRE's rt.jar, the fields for String are:
+        //    private final char[] value;
+        //    private int hash;
+        //    private static final long serialVersionUID = -6849794470754667710L;
+        //    private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[0];
+        //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
+        //    private static final int HASHING_SEED;
+        //    private transient int hash32;
+        let string_object = vm.new_object(call_stack, "java/lang/String")?;
+        string_object.set_field(0, char_array);
+        string_object.set_field(1, Int(0));
+        string_object.set_field(6, Int(0));
+        Ok(string_object)
     }
 
     fn execute_ldc_long_double(&mut self, index: u16) -> Result<(), VmError> {

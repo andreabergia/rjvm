@@ -5,7 +5,6 @@ use log::{debug, info, warn};
 use crate::class_manager::ResolvedClass;
 use crate::native_methods::NativeMethodsRegistry;
 use crate::time::{get_current_time_millis, get_nano_time};
-use crate::value::Value::Long;
 use crate::{
     call_stack::CallStack,
     class::{ClassId, ClassRef},
@@ -67,16 +66,40 @@ impl<'a> Vm<'a> {
             |_, _, _, _, _| Ok(None),
         );
         self.native_methods_registry.register(
+            "java/lang/Class",
+            "registerNatives",
+            "()V",
+            |_, _, _, _, _| Ok(None),
+        );
+        self.native_methods_registry.register(
             "java/lang/System",
             "nanoTime",
             "()J",
-            |_, _, _, _, _| Ok(Some(Long(get_nano_time()))),
+            |_, _, _, _, _| Ok(Some(Value::Long(get_nano_time()))),
         );
         self.native_methods_registry.register(
             "java/lang/System",
             "currentTimeMillis",
             "()J",
-            |_, _, _, _, _| Ok(Some(Long(get_current_time_millis()))),
+            |_, _, _, _, _| Ok(Some(Value::Long(get_current_time_millis()))),
+        );
+        self.native_methods_registry.register(
+            "java/lang/System",
+            "identityHashCode",
+            "(Ljava/lang/Object;)I",
+            |_, _, _, _, args| {
+                let arg = args.get(0).ok_or(VmError::ValidationException)?;
+                let arg = arg as &Value<'a>;
+                if let Value::Object(object) = arg {
+                    // TODO: we need some sort of object id when we implement the GC
+                    //  For the moment we'll use the raw address
+                    let ptr = object as *const ObjectRef<'a>;
+                    let address: i32 = ptr as i32;
+                    Ok(Some(Value::Int(address)))
+                } else {
+                    Err(VmError::ValidationException)
+                }
+            },
         );
     }
 
