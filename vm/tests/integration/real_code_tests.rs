@@ -157,6 +157,15 @@ fn object_arrays() {
 }
 
 #[test_log::test]
+fn statics() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(&mut vm, "rjvm/Statics", "main", "([Ljava/lang/String;)V");
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(vec![Value::Int(311), Value::Int(322),], vm.printed);
+}
+
+#[test_log::test]
 fn strings() {
     let mut vm = create_base_vm();
     let main_result = invoke(&mut vm, "rjvm/Strings", "main", "([Ljava/lang/String;)V");
