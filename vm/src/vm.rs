@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use log::{debug, info};
+use log::{debug, info, warn};
 
 use crate::class_manager::ResolvedClass;
+use crate::native_methods::NativeMethodsRegistry;
+use crate::time::{get_current_time_millis, get_nano_time};
+use crate::value::Value::Long;
 use crate::{
     call_stack::CallStack,
     class::{ClassId, ClassRef},
@@ -16,18 +19,65 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct Vm<'a> {
+    /// Responsible for allocating and storing classes
     class_manager: ClassManager<'a>,
+
+    /// Responsible for allocating objects
     object_allocator: ObjectAllocator<'a>,
-    pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 
     /// To model static fields, we will create one special instance of each class
     /// and we will store it in this map
     statics: HashMap<ClassId, ObjectRef<'a>>,
+
+    /// Stores native methods
+    pub native_methods_registry: NativeMethodsRegistry<'a>,
+
+    pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 }
 
 impl<'a> Vm<'a> {
     pub fn new() -> Self {
-        Default::default()
+        let mut result: Self = Default::default();
+        result.register_natives();
+        result
+    }
+
+    fn register_natives(&mut self) {
+        self.native_methods_registry
+            .register_temp_print(|vm, _, _, _, args| {
+                let arg = args.get(0).ok_or(VmError::ValidationException)?;
+                info!(
+                    "TEMP implementation of native method: printing value {:?}",
+                    args
+                );
+                vm.printed.push(arg.clone());
+                Ok(None)
+            });
+
+        self.native_methods_registry.register(
+            "java/lang/Object",
+            "registerNatives",
+            "()V",
+            |_, _, _, _, _| Ok(None),
+        );
+        self.native_methods_registry.register(
+            "java/lang/System",
+            "registerNatives",
+            "()V",
+            |_, _, _, _, _| Ok(None),
+        );
+        self.native_methods_registry.register(
+            "java/lang/System",
+            "nanoTime",
+            "()J",
+            |_, _, _, _, _| Ok(Some(Long(get_nano_time()))),
+        );
+        self.native_methods_registry.register(
+            "java/lang/System",
+            "currentTimeMillis",
+            "()J",
+            |_, _, _, _, _| Ok(Some(Long(get_current_time_millis()))),
+        );
     }
 
     pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectRef<'a>> {
@@ -101,21 +151,16 @@ impl<'a> Vm<'a> {
         args: Vec<Value<'a>>,
     ) -> Result<Option<Value<'a>>, VmError> {
         if class_and_method.method.is_native() {
-            // TODO: need a map of native methods
-            return if class_and_method.class.name.starts_with("rjvm/")
-                && class_and_method.method.name == "tempPrint"
-            {
-                let arg = args.get(0).ok_or(VmError::ValidationException)?;
-                info!("TEMP implementation of native method: printing value {arg:?}");
-                self.printed.push(arg.clone());
-                Ok(None)
-            } else if (class_and_method.class.name == "java/lang/Object"
-                || class_and_method.class.name == "java/lang/System")
-                && class_and_method.method.name == "registerNatives"
-            {
-                // Nothing to do
-                Ok(None)
+            let native_callback = self.native_methods_registry.get_method(&class_and_method);
+            return if let Some(native_callback) = native_callback {
+                native_callback(self, call_stack, class_and_method, object, args)
             } else {
+                warn!(
+                    "cannot resolve native method {}::{} {}",
+                    class_and_method.class.name,
+                    class_and_method.method.name,
+                    class_and_method.method.type_descriptor
+                );
                 Err(VmError::NotImplemented)
             };
         }
