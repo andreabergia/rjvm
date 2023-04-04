@@ -449,16 +449,16 @@ impl<'a> CallFrame<'a> {
                     }
                 }
 
-                Instruction::Iadd => self.execute_int_math(|a, b| Ok(a + b))?,
-                Instruction::Isub => self.execute_int_math(|a, b| Ok(a - b))?,
-                Instruction::Imul => self.execute_int_math(|a, b| Ok(a * b))?,
+                Instruction::Iadd => self.execute_int_math(|a, b| Ok(a.wrapping_add(b)))?,
+                Instruction::Isub => self.execute_int_math(|a, b| Ok(a.wrapping_sub(b)))?,
+                Instruction::Imul => self.execute_int_math(|a, b| Ok(a.wrapping_mul(b)))?,
                 Instruction::Idiv => self.execute_int_math(|a, b| match b {
                     0 => Err(VmError::ArithmeticException),
-                    _ => Ok(a / b),
+                    _ => Ok(a.wrapping_div(b)),
                 })?,
                 Instruction::Irem => self.execute_int_math(|a, b| match b {
                     0 => Err(VmError::ArithmeticException),
-                    _ => Ok(a % b),
+                    _ => Ok(a.wrapping_rem(b)),
                 })?,
                 Instruction::Iand => self.execute_int_math(|a, b| Ok(a & b))?,
                 Instruction::Ior => self.execute_int_math(|a, b| Ok(a | b))?,
