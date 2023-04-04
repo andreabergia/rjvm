@@ -38,7 +38,11 @@ impl<'a> Vm<'a> {
         self.class_manager.append_class_path(class_path)
     }
 
-    pub fn get_or_resolve_class(&mut self, class_name: &str) -> Result<ClassRef<'a>, VmError> {
+    pub fn get_or_resolve_class(
+        &mut self,
+        stack: &mut CallStack<'a>,
+        class_name: &str,
+    ) -> Result<ClassRef<'a>, VmError> {
         let class = self.class_manager.get_or_resolve_class(class_name)?;
         if let ResolvedClass::NewClass(classes_to_init) = &class {
             for class_to_init in classes_to_init.to_initialize.iter() {
@@ -49,7 +53,7 @@ impl<'a> Vm<'a> {
 
                     // TODO: stack
                     self.invoke(
-                        &mut self.allocate_call_stack(),
+                        stack,
                         ClassAndMethod {
                             class: class_to_init,
                             method: clinit_method,
@@ -70,16 +74,18 @@ impl<'a> Vm<'a> {
 
     pub fn resolve_class_method(
         &mut self,
+        call_stack: &mut CallStack<'a>,
         class_name: &str,
         method_name: &str,
         method_type_descriptor: &str,
     ) -> Result<ClassAndMethod<'a>, VmError> {
-        self.get_or_resolve_class(class_name).and_then(|class| {
-            class
-                .find_method(method_name, method_type_descriptor)
-                .map(|method| ClassAndMethod { class, method })
-                .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
-        })
+        self.get_or_resolve_class(call_stack, class_name)
+            .and_then(|class| {
+                class
+                    .find_method(method_name, method_type_descriptor)
+                    .map(|method| ClassAndMethod { class, method })
+                    .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
+            })
     }
 
     // TODO: do we need it?
@@ -120,8 +126,12 @@ impl<'a> Vm<'a> {
         result
     }
 
-    pub fn new_object(&mut self, class_name: &str) -> Result<ObjectRef<'a>, VmError> {
-        let class = self.get_or_resolve_class(class_name)?;
+    pub fn new_object(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        class_name: &str,
+    ) -> Result<ObjectRef<'a>, VmError> {
+        let class = self.get_or_resolve_class(call_stack, class_name)?;
         Ok(self.new_object_of_class(class))
     }
 

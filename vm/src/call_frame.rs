@@ -292,8 +292,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Lstore_2 => self.execute_lstore(2)?,
                 Instruction::Lstore_3 => self.execute_lstore(3)?,
 
-                Instruction::Ldc(index) => self.execute_ldc(vm, index as u16)?,
-                Instruction::Ldc_w(index) => self.execute_ldc(vm, index)?,
+                Instruction::Ldc(index) => self.execute_ldc(vm, call_stack, index as u16)?,
+                Instruction::Ldc_w(index) => self.execute_ldc(vm, call_stack, index)?,
                 Instruction::Ldc2_w(index) => self.execute_ldc_long_double(index)?,
 
                 Instruction::Fload(index) => self.execute_fload(index.into_usize_safe())?,
@@ -342,7 +342,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::New(constant_index) => {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
-                    let new_object = vm.new_object(new_object_class_name)?;
+                    let new_object = vm.new_object(call_stack, new_object_class_name)?;
                     self.stack.push(Object(new_object))?;
                 }
 
@@ -696,7 +696,7 @@ impl<'a> CallFrame<'a> {
         kind: InvokeKind,
     ) -> Result<(), VmError> {
         let static_method_reference =
-            self.get_method_to_invoke_statically(vm, constant_index, kind)?;
+            self.get_method_to_invoke_statically(vm, call_stack, constant_index, kind)?;
         let (receiver, params, new_stack_len) =
             self.get_method_receiver_and_params(&static_method_reference)?;
         let class_and_method = match kind {
@@ -823,12 +823,13 @@ impl<'a> CallFrame<'a> {
     fn get_method_to_invoke_statically(
         &self,
         vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
         constant_index: u16,
         kind: InvokeKind,
     ) -> Result<ClassAndMethod<'a>, VmError> {
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
-        let class = vm.get_or_resolve_class(method_reference.class_name)?;
+        let class = vm.get_or_resolve_class(call_stack, method_reference.class_name)?;
         match kind {
             InvokeKind::Special | InvokeKind::Static => {
                 Self::get_method_of_class(class, method_reference)
@@ -1115,7 +1116,12 @@ impl<'a> CallFrame<'a> {
     generate_execute_store!(execute_fstore, Float);
     generate_execute_store!(execute_dstore, Double);
 
-    fn execute_ldc(&mut self, vm: &mut Vm<'a>, index: u16) -> Result<(), VmError> {
+    fn execute_ldc(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        index: u16,
+    ) -> Result<(), VmError> {
         let constant_value = self.get_constant(index)?;
         match constant_value {
             ConstantPoolEntry::Integer(value) => self.stack.push(Int(*value)),
@@ -1138,7 +1144,7 @@ impl<'a> CallFrame<'a> {
                         //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
                         //    private static final int HASHING_SEED;
                         //    private transient int hash32;
-                        let string_object = vm.new_object("java/lang/String")?;
+                        let string_object = vm.new_object(call_stack, "java/lang/String")?;
                         string_object.set_field(0, char_array);
                         string_object.set_field(1, Int(0));
                         string_object.set_field(6, Int(0));
