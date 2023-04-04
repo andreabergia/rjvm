@@ -33,7 +33,23 @@ pub struct ObjectValue<'a> {
 impl<'a> ObjectValue<'a> {
     pub fn new(class: &Class<'a>) -> Self {
         let fields = (0..class.num_total_fields)
-            .map(|_| Value::Uninitialized)
+            .map(|index| {
+                let field = class.field_at_index(index).unwrap();
+                match &field.type_descriptor {
+                    FieldType::Base(base_type) => match base_type {
+                        BaseType::Byte => Value::Int(0),
+                        BaseType::Char => Value::Int(0),
+                        BaseType::Double => Value::Double(0f64),
+                        BaseType::Float => Value::Float(0f32),
+                        BaseType::Int => Value::Int(0),
+                        BaseType::Long => Value::Long(0),
+                        BaseType::Short => Value::Int(0),
+                        BaseType::Boolean => Value::Int(0),
+                    },
+                    FieldType::Object(_) => Value::Null,
+                    FieldType::Array(_) => Value::Null,
+                }
+            })
             .collect();
         Self {
             class_id: class.id,

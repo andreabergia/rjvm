@@ -66,4 +66,13 @@ impl<'a> Class<'a> {
             None
         }
     }
+
+    pub fn field_at_index(&self, index: usize) -> Option<&ClassFileField> {
+        if index < self.first_field_index {
+            self.superclass
+                .and_then(|superclass| superclass.field_at_index(index))
+        } else {
+            self.fields.get(index - self.first_field_index)
+        }
+    }
 }
