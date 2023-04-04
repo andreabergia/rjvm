@@ -376,6 +376,7 @@ impl<'a> CallFrame<'a> {
                     self.debug_done_execution(None);
                     return Ok(None);
                 }
+                Instruction::Areturn => return self.execute_areturn(),
                 Instruction::Ireturn => return self.execute_ireturn(),
                 Instruction::Lreturn => return self.execute_lreturn(),
                 Instruction::Freturn => return self.execute_freturn(),
@@ -384,7 +385,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Putfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, field) =
+                    let (index, _field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let value = self.stack.pop()?;
@@ -400,7 +401,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Putstatic(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, field) =
+                    let (index, _field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let value = self.stack.pop()?;
@@ -419,7 +420,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Getfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, field) =
+                    let (index, _field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let object = self.stack.pop()?;
@@ -435,7 +436,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Getstatic(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, field) =
+                    let (index, _field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let object = vm.get_static_instance(self.class_and_method.class.id);
@@ -1002,6 +1003,12 @@ impl<'a> CallFrame<'a> {
         } else {
             Err(VmError::ValidationException)
         }
+    }
+
+    fn execute_areturn(&mut self) -> Result<Option<Value<'a>>, VmError> {
+        let result = self.stack.pop()?;
+        self.debug_done_execution(Some(&result));
+        Ok(Some(result))
     }
 
     generate_execute_return!(execute_ireturn, Int);
