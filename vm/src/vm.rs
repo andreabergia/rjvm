@@ -2,9 +2,13 @@ use std::collections::HashMap;
 
 use log::{debug, info, warn};
 
+use rjvm_reader::field_type::FieldType;
+use rjvm_utils::type_conversion::ToUsizeSafe;
+
 use crate::class_manager::ResolvedClass;
 use crate::native_methods::NativeMethodsRegistry;
 use crate::time::{get_current_time_millis, get_nano_time};
+use crate::value::ArrayRef;
 use crate::{
     call_stack::CallStack,
     class::{ClassId, ClassRef},
@@ -88,19 +92,38 @@ impl<'a> Vm<'a> {
             "identityHashCode",
             "(Ljava/lang/Object;)I",
             |_, _, _, _, args| {
-                let arg = args.get(0).ok_or(VmError::ValidationException)?;
-                let arg = arg as &Value<'a>;
-                if let Value::Object(object) = arg {
-                    // TODO: we need some sort of object id when we implement the GC
-                    //  For the moment we'll use the raw address
-                    let ptr = object as *const ObjectRef<'a>;
-                    let address: i32 = ptr as i32;
-                    Ok(Some(Value::Int(address)))
-                } else {
-                    Err(VmError::ValidationException)
-                }
+                let object = expect_object_at(&args, 0)?;
+                // TODO: we need some sort of object id when we implement the GC
+                //  For the moment we'll use the raw address
+                let ptr = &object as *const ObjectRef<'a>;
+                let address: i32 = ptr as i32;
+                Ok(Some(Value::Int(address)))
             },
         );
+        self.native_methods_registry.register(
+            "java/lang/System",
+            "arraycopy",
+            "(Ljava/lang/Object;ILjava/lang/Object;II)V",
+            |_, _, _, _, args| {
+                let (src_type, src) = expect_array_at(&args, 0)?;
+                let src_pos = expect_int_at(&args, 1)?;
+                let (dest_type, dest) = expect_array_at(&args, 2)?;
+                let dest_pos = expect_int_at(&args, 3)?;
+                let length = expect_int_at(&args, 4)?;
+
+                // TODO: handle NullPointerException
+                // TODO: validate coherence of arrays types, or throw ArrayStoreException
+                // TODO: validate length and indexes, or throw IndexOutOfBoundsException
+
+                for i in 0..length {
+                    let src_index = (src_pos + i).into_usize_safe();
+                    let dest_index = (dest_pos + i).into_usize_safe();
+                    dest.borrow_mut()[dest_index] = src.borrow()[src_index].clone();
+                }
+
+                Ok(None)
+            },
+        )
     }
 
     pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectRef<'a>> {
@@ -176,6 +199,12 @@ impl<'a> Vm<'a> {
         if class_and_method.method.is_native() {
             let native_callback = self.native_methods_registry.get_method(&class_and_method);
             return if let Some(native_callback) = native_callback {
+                debug!(
+                    "executing native method {}::{} {}",
+                    class_and_method.class.name,
+                    class_and_method.method.name,
+                    class_and_method.method.type_descriptor
+                );
                 native_callback(self, call_stack, class_and_method, object, args)
             } else {
                 warn!(
@@ -213,5 +242,35 @@ impl<'a> Vm<'a> {
             "VM classes={:?}, objects = {:?}",
             self.class_manager, self.object_allocator
         )
+    }
+}
+
+fn expect_object_at<'a>(vec: &Vec<Value<'a>>, index: usize) -> Result<ObjectRef<'a>, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Object(object)) = value {
+        Ok(object)
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+fn expect_array_at<'a, 'b>(
+    vec: &'b Vec<Value<'a>>,
+    index: usize,
+) -> Result<(&'b FieldType, &'b ArrayRef<'a>), VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Array(field_type, array_ref)) = value {
+        Ok((field_type, array_ref))
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+fn expect_int_at(vec: &Vec<Value>, index: usize) -> Result<i32, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Int(int)) = value {
+        Ok(*int)
+    } else {
+        Err(VmError::ValidationException)
     }
 }
