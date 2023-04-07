@@ -138,23 +138,32 @@ impl<'a> Vm<'a> {
         let class = self.class_manager.get_or_resolve_class(class_name)?;
         if let ResolvedClass::NewClass(classes_to_init) = &class {
             for class_to_init in classes_to_init.to_initialize.iter() {
-                let static_instance = self.new_object_of_class(class_to_init);
-                self.statics.insert(class_to_init.id, static_instance);
-                if let Some(clinit_method) = class_to_init.find_method("<clinit>", "()V") {
-                    debug!("invoking {}::<clinit>()", class_to_init.name);
-                    self.invoke(
-                        stack,
-                        ClassAndMethod {
-                            class: class_to_init,
-                            method: clinit_method,
-                        },
-                        None,
-                        Vec::new(),
-                    )?;
-                }
+                self.init_class(stack, class_to_init)?;
             }
         }
         Ok(class.get_class())
+    }
+
+    fn init_class(
+        &mut self,
+        stack: &mut CallStack<'a>,
+        class_to_init: &ClassRef<'a>,
+    ) -> Result<(), VmError> {
+        let static_instance = self.new_object_of_class(class_to_init);
+        self.statics.insert(class_to_init.id, static_instance);
+        if let Some(clinit_method) = class_to_init.find_method("<clinit>", "()V") {
+            debug!("invoking {}::<clinit>()", class_to_init.name);
+            self.invoke(
+                stack,
+                ClassAndMethod {
+                    class: class_to_init,
+                    method: clinit_method,
+                },
+                None,
+                Vec::new(),
+            )?;
+        }
+        Ok(())
     }
 
     pub fn get_class_by_id(&self, class_id: ClassId) -> Result<ClassRef<'a>, VmError> {
