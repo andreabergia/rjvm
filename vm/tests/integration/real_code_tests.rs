@@ -67,11 +67,18 @@ fn control_flow() {
 
     assert_eq!(
         vec![
+            // Ints
             Value::Int(241),
+            // Objects
             Value::Int(42),
+            Value::Int(43),
+            // Double
             Value::Int(1),
             Value::Int(1),
             Value::Int(1),
+            // Arrays
+            Value::Int(51),
+            Value::Int(52),
         ],
         vm.printed
     );

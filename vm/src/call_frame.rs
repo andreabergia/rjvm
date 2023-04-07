@@ -510,6 +510,10 @@ impl<'a> CallFrame<'a> {
                 Instruction::Ifnonnull(jump_address) => {
                     self.execute_if_null(jump_address, false)?
                 }
+                Instruction::If_acmpeq(jump_address) => self.execute_if_acmp(jump_address, true)?,
+                Instruction::If_acmpne(jump_address) => {
+                    self.execute_if_acmp(jump_address, false)?
+                }
 
                 Instruction::If_icmpeq(jump_address) => {
                     self.execute_if_icmp(jump_address, |a, b| a == b)?
@@ -591,8 +595,6 @@ impl<'a> CallFrame<'a> {
                 Instruction::Athrow => {}
                 Instruction::Checkcast(_) => {}
                 Instruction::Goto_w => {}
-                Instruction::If_acmpeq(_) => {}
-                Instruction::If_acmpne(_) => {}
                 Instruction::Invokedynamic(_) => {}
                 Instruction::Invokeinterface(_, _) => {}
                 Instruction::Jsr(_) => {}
@@ -1079,17 +1081,48 @@ impl<'a> CallFrame<'a> {
     fn execute_if_null(&mut self, jump_address: u16, jump_on_null: bool) -> Result<(), VmError> {
         let value = self.stack.pop()?;
         match value {
-            Object(_) => {
+            Object(_) | Array(..) => {
                 if !jump_on_null {
                     self.goto(jump_address);
                 }
             }
-            Value::Null => {
+            Null => {
                 if jump_on_null {
                     self.goto(jump_address);
                 }
             }
             _ => return Err(VmError::ValidationException),
+        }
+        Ok(())
+    }
+
+    fn execute_if_acmp(&mut self, jump_address: u16, jump_on_equal: bool) -> Result<(), VmError> {
+        let value2 = self.stack.pop()?;
+        let value1 = self.stack.pop()?;
+        let equal = match value1 {
+            Object(object1) => match value2 {
+                Object(object2) => std::ptr::eq(object1, object2),
+                Null | Array(..) => false,
+                _ => return Err(VmError::ValidationException),
+            },
+            Null => match value2 {
+                Null => true,
+                Object(..) | Array(..) => false,
+                _ => return Err(VmError::ValidationException),
+            },
+            Array(_, array1) => match value2 {
+                Array(_, array2) => {
+                    let x = array1.borrow();
+                    let y = array2.borrow();
+                    x.as_ptr() == y.as_ptr()
+                }
+                Null | Object(..) => false,
+                _ => return Err(VmError::ValidationException),
+            },
+            _ => return Err(VmError::ValidationException),
+        };
+        if (jump_on_equal && equal) || (!jump_on_equal && !equal) {
+            self.goto(jump_address);
         }
         Ok(())
     }
@@ -1316,7 +1349,7 @@ impl<'a> CallFrame<'a> {
             self.stack.push(field_value)?;
             Ok(())
         } else {
-            return Err(VmError::ValidationException);
+            Err(VmError::ValidationException)
         }
     }
 

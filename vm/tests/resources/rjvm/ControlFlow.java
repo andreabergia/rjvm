@@ -2,9 +2,13 @@ package rjvm;
 
 public class ControlFlow {
     public static void main(String[] args) {
+        Object o = new Object();
+        Object[] arr = new Object[]{o};
+
         controlFlowInts();
-        controlFlowObjects(new Object());
+        controlFlowObjects(o, o, new Object());
         controlFlowLongFloatDouble(1, 1, 1);
+        controlFlowArrays(arr, arr, new Object[2]);
     }
 
     private static void controlFlowInts() {
@@ -19,9 +23,15 @@ public class ControlFlow {
         tempPrint(x);
     }
 
-    private static void controlFlowObjects(Object a) {
+    private static void controlFlowObjects(Object a, Object b, Object c) {
         if (a != null) {
             tempPrint(42);
+        }
+        if (a == b) {
+            tempPrint(43);
+        }
+        if (a == c) {
+            tempPrint(44);
         }
     }
 
@@ -34,6 +44,18 @@ public class ControlFlow {
         }
         if (d > 0) {
             tempPrint(1);
+        }
+    }
+
+    private static void controlFlowArrays(Object[] a, Object[] b, Object[] c) {
+        if (a != null) {
+            tempPrint(51);
+        }
+        if (a == b) {
+            tempPrint(52);
+        }
+        if (a == c) {
+            tempPrint(53);
         }
     }
 
