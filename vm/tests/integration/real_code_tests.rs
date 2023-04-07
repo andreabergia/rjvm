@@ -247,5 +247,5 @@ fn strings() {
     let string = vm
         .extract_str_from_java_lang_string(string)
         .expect("should have a valid string");
-    assert_eq!("Hello, andrea", string);
+    assert_eq!("Hello, Andrea, you were born in 1985", string);
 }
