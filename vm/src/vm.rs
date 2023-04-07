@@ -91,38 +91,13 @@ impl<'a> Vm<'a> {
             "java/lang/System",
             "identityHashCode",
             "(Ljava/lang/Object;)I",
-            |_, _, _, _, args| {
-                let object = expect_object_at(&args, 0)?;
-                // TODO: we need some sort of object id when we implement the GC
-                //  For the moment we'll use the raw address
-                let ptr = &object as *const ObjectRef<'a>;
-                let address: i32 = ptr as i32;
-                Ok(Some(Value::Int(address)))
-            },
+            |_, _, _, _, args| identity_hash_code(args),
         );
         self.native_methods_registry.register(
             "java/lang/System",
             "arraycopy",
             "(Ljava/lang/Object;ILjava/lang/Object;II)V",
-            |_, _, _, _, args| {
-                let (src_type, src) = expect_array_at(&args, 0)?;
-                let src_pos = expect_int_at(&args, 1)?;
-                let (dest_type, dest) = expect_array_at(&args, 2)?;
-                let dest_pos = expect_int_at(&args, 3)?;
-                let length = expect_int_at(&args, 4)?;
-
-                // TODO: handle NullPointerException
-                // TODO: validate coherence of arrays types, or throw ArrayStoreException
-                // TODO: validate length and indexes, or throw IndexOutOfBoundsException
-
-                for i in 0..length {
-                    let src_index = (src_pos + i).into_usize_safe();
-                    let dest_index = (dest_pos + i).into_usize_safe();
-                    dest.borrow_mut()[dest_index] = src.borrow()[src_index].clone();
-                }
-
-                Ok(None)
-            },
+            |_, _, _, _, args| array_copy(args),
         )
     }
 
@@ -252,6 +227,35 @@ impl<'a> Vm<'a> {
             self.class_manager, self.object_allocator
         )
     }
+}
+
+fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> Result<Option<Value<'a>>, VmError> {
+    let object = expect_object_at(&args, 0)?;
+    // TODO: we need some sort of object id when we implement the GC
+    //  For the moment we'll use the raw address
+    let ptr = &object as *const ObjectRef<'a>;
+    let address: i32 = ptr as i32;
+    Ok(Some(Value::Int(address)))
+}
+
+fn array_copy(args: Vec<Value>) -> Result<Option<Value>, VmError> {
+    let (_src_type, src) = expect_array_at(&args, 0)?;
+    let src_pos = expect_int_at(&args, 1)?;
+    let (_dest_type, dest) = expect_array_at(&args, 2)?;
+    let dest_pos = expect_int_at(&args, 3)?;
+    let length = expect_int_at(&args, 4)?;
+
+    // TODO: handle NullPointerException
+    // TODO: validate coherence of arrays types, or throw ArrayStoreException
+    // TODO: validate length and indexes, or throw IndexOutOfBoundsException
+
+    for i in 0..length {
+        let src_index = (src_pos + i).into_usize_safe();
+        let dest_index = (dest_pos + i).into_usize_safe();
+        dest.borrow_mut()[dest_index] = src.borrow()[src_index].clone();
+    }
+
+    Ok(None)
 }
 
 fn expect_object_at<'a>(vec: &Vec<Value<'a>>, index: usize) -> Result<ObjectRef<'a>, VmError> {
