@@ -1,4 +1,8 @@
-use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
+use rjvm_vm::{
+    value::{expect_object_at, Value},
+    vm::Vm,
+    vm_error::VmError,
+};
 
 fn create_base_vm() -> Vm<'static> {
     let mut vm = Vm::new();
@@ -239,13 +243,9 @@ fn strings() {
     assert_eq!(Ok(None), main_result);
 
     assert_eq!(1, vm.printed.len());
-    match vm.printed.get(0).expect("should have an object") {
-        Value::Object(string) => {
-            let string = vm
-                .extract_str_from_java_lang_string(string)
-                .expect("should have a string");
-            assert_eq!("Hello, andrea", string);
-        }
-        _ => panic!("should have had a String instance"),
-    }
+    let string = expect_object_at(&vm.printed, 0).expect("should have printed an object");
+    let string = vm
+        .extract_str_from_java_lang_string(string)
+        .expect("should have a valid string");
+    assert_eq!("Hello, andrea", string);
 }

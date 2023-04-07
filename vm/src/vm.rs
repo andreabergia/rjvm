@@ -4,6 +4,7 @@ use log::{debug, info, warn};
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 use rjvm_utils::type_conversion::ToUsizeSafe;
+use value::{expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_object_at};
 
 use crate::{
     call_stack::CallStack,
@@ -14,7 +15,8 @@ use crate::{
     gc::ObjectAllocator,
     native_methods::NativeMethodsRegistry,
     time::{get_current_time_millis, get_nano_time},
-    value::{ArrayRef, ObjectRef, Value},
+    value,
+    value::{ObjectRef, Value},
     vm_error::VmError,
 };
 
@@ -380,52 +382,4 @@ fn array_copy(args: Vec<Value>) -> Result<Option<Value>, VmError> {
     }
 
     Ok(None)
-}
-
-fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<ObjectRef<'a>, VmError> {
-    let value = vec.get(index);
-    if let Some(Value::Object(object)) = value {
-        Ok(object)
-    } else {
-        Err(VmError::ValidationException)
-    }
-}
-
-fn expect_array_at<'a, 'b>(
-    vec: &'b [Value<'a>],
-    index: usize,
-) -> Result<(&'b FieldType, &'b ArrayRef<'a>), VmError> {
-    let value = vec.get(index);
-    if let Some(Value::Array(field_type, array_ref)) = value {
-        Ok((field_type, array_ref))
-    } else {
-        Err(VmError::ValidationException)
-    }
-}
-
-fn expect_int_at(vec: &[Value], index: usize) -> Result<i32, VmError> {
-    let value = vec.get(index);
-    if let Some(Value::Int(int)) = value {
-        Ok(*int)
-    } else {
-        Err(VmError::ValidationException)
-    }
-}
-
-fn expect_float_at(vec: &[Value], index: usize) -> Result<f32, VmError> {
-    let value = vec.get(index);
-    if let Some(Value::Float(float)) = value {
-        Ok(*float)
-    } else {
-        Err(VmError::ValidationException)
-    }
-}
-
-fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
-    let value = vec.get(index);
-    if let Some(Value::Double(double)) = value {
-        Ok(*double)
-    } else {
-        Err(VmError::ValidationException)
-    }
 }

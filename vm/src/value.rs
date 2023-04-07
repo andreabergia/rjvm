@@ -6,7 +6,10 @@ use std::{
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::class::{Class, ClassId, ClassRef};
+use crate::{
+    class::{Class, ClassId, ClassRef},
+    vm_error::VmError,
+};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {
@@ -140,5 +143,53 @@ impl<'a> Value<'a> {
 impl<'a> Debug for ObjectValue<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "class: {} fields {:?}", self.class_id, self.fields)
+    }
+}
+
+pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<ObjectRef<'a>, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Object(object)) = value {
+        Ok(object)
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+pub fn expect_array_at<'a, 'b>(
+    vec: &'b [Value<'a>],
+    index: usize,
+) -> Result<(&'b FieldType, &'b ArrayRef<'a>), VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Array(field_type, array_ref)) = value {
+        Ok((field_type, array_ref))
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+pub fn expect_int_at(vec: &[Value], index: usize) -> Result<i32, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Int(int)) = value {
+        Ok(*int)
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+pub fn expect_float_at(vec: &[Value], index: usize) -> Result<f32, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Float(float)) = value {
+        Ok(*float)
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Double(double)) = value {
+        Ok(*double)
+    } else {
+        Err(VmError::ValidationException)
     }
 }
