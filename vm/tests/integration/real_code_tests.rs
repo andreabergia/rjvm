@@ -256,3 +256,20 @@ fn strings() {
         .expect("should have a valid string");
     assert_eq!("Hello, Andrea, you were born in 1985", string);
 }
+
+#[test_log::test]
+fn invoke_interface() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/InvokeInterface",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(
+        vec![Value::Int(12), Value::Int(4), Value::Int(10)],
+        vm.printed
+    );
+}

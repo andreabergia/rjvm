@@ -197,6 +197,7 @@ enum InvokeKind {
     Special,
     Static,
     Virtual,
+    Interface,
 }
 
 impl<'a> CallFrame<'a> {
@@ -367,6 +368,9 @@ impl<'a> CallFrame<'a> {
                 }
                 Instruction::Invokevirtual(constant_index) => {
                     self.invoke_method(vm, call_stack, constant_index, InvokeKind::Virtual)?
+                }
+                Instruction::Invokeinterface(constant_index, _) => {
+                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Interface)?
                 }
 
                 Instruction::Return => {
@@ -596,7 +600,6 @@ impl<'a> CallFrame<'a> {
                 Instruction::Checkcast(_) => {}
                 Instruction::Goto_w => {}
                 Instruction::Invokedynamic(_) => {}
-                Instruction::Invokeinterface(_, _) => {}
                 Instruction::Jsr(_) => {}
                 Instruction::Jsr_w => {}
                 Instruction::Lookupswitch => {}
@@ -686,7 +689,7 @@ impl<'a> CallFrame<'a> {
         let (receiver, params, new_stack_len) =
             self.get_method_receiver_and_params(&static_method_reference)?;
         let class_and_method = match kind {
-            InvokeKind::Virtual => {
+            InvokeKind::Virtual | InvokeKind::Interface => {
                 Self::resolve_virtual_method(vm, receiver, static_method_reference)?
             }
             _ => static_method_reference,
@@ -751,26 +754,28 @@ impl<'a> CallFrame<'a> {
         constant_index: u16,
     ) -> Result<MethodReference, VmError> {
         let constant = self.get_constant(constant_index)?;
-        if let &ConstantPoolEntry::MethodReference(
-            class_name_index,
-            name_and_type_descriptor_index,
-        ) = constant
+
+        let (class_name_index, name_and_type_descriptor_index) = match *constant {
+            ConstantPoolEntry::MethodReference(c, n) => (c, n),
+            ConstantPoolEntry::InterfaceMethodReference(c, n) => (c, n),
+            _ => return Err(VmError::ValidationException),
+        };
+
+        let class_name = self.get_constant_class_reference(class_name_index)?;
+        let constant = self.get_constant(name_and_type_descriptor_index)?;
+        if let &ConstantPoolEntry::NameAndTypeDescriptor(name_index, type_descriptor_index) =
+            constant
         {
-            let class_name = self.get_constant_class_reference(class_name_index)?;
-            let constant = self.get_constant(name_and_type_descriptor_index)?;
-            if let &ConstantPoolEntry::NameAndTypeDescriptor(name_index, type_descriptor_index) =
-                constant
-            {
-                let method_name = self.get_constant_utf8(name_index)?;
-                let type_descriptor = self.get_constant_utf8(type_descriptor_index)?;
-                return Ok(MethodReference {
-                    class_name,
-                    method_name,
-                    type_descriptor,
-                });
-            }
+            let method_name = self.get_constant_utf8(name_index)?;
+            let type_descriptor = self.get_constant_utf8(type_descriptor_index)?;
+            Ok(MethodReference {
+                class_name,
+                method_name,
+                type_descriptor,
+            })
+        } else {
+            Err(VmError::ValidationException)
         }
-        Err(VmError::ValidationException)
     }
 
     fn get_constant_field_reference(&self, constant_index: u16) -> Result<FieldReference, VmError> {
@@ -821,7 +826,9 @@ impl<'a> CallFrame<'a> {
                 Self::get_method_of_class(class, method_reference)
                     .map(|method| ClassAndMethod { class, method })
             }
-            InvokeKind::Virtual => Self::get_method_checking_superclasses(class, method_reference),
+            InvokeKind::Virtual | InvokeKind::Interface => {
+                Self::get_method_checking_superclasses(class, method_reference)
+            }
         }
     }
 
