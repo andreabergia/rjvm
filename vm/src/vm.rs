@@ -1,8 +1,10 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use log::{debug, info, warn};
 
-use rjvm_reader::field_type::FieldType;
+use rjvm_reader::field_type::{BaseType, FieldType};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::class_manager::ResolvedClass;
@@ -98,7 +100,16 @@ impl<'a> Vm<'a> {
             "arraycopy",
             "(Ljava/lang/Object;ILjava/lang/Object;II)V",
             |_, _, _, _, args| array_copy(args),
-        )
+        );
+        self.native_methods_registry.register(
+            "java/lang/Class",
+            "getClassLoader0",
+            "()Ljava/lang/ClassLoader;",
+            |_, _, _, _, args| {
+                debug!("get class loader");
+                Ok(None)
+            },
+        );
     }
 
     pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectRef<'a>> {
@@ -219,6 +230,44 @@ impl<'a> Vm<'a> {
     pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> ObjectRef<'a> {
         debug!("allocating new instance of {}", class.name);
         self.object_allocator.allocate(class)
+    }
+
+    pub fn create_string_instance(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        string: &str,
+    ) -> Result<ObjectRef<'a>, VmError> {
+        let char_array: Vec<Value<'a>> = string
+            .encode_utf16()
+            .map(|c| Value::Int(c as i32))
+            .collect();
+        let char_array = Rc::new(RefCell::new(char_array));
+        let char_array = Value::Array(FieldType::Base(BaseType::Char), char_array);
+
+        // In our JRE's rt.jar, the fields for String are:
+        //    private final char[] value;
+        //    private int hash;
+        //    private static final long serialVersionUID = -6849794470754667710L;
+        //    private static final ObjectStreamField[] serialPersistentFields = new ObjectStreamField[0];
+        //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
+        //    private static final int HASHING_SEED;
+        //    private transient int hash32;
+        let string_object = self.new_object(call_stack, "java/lang/String")?;
+        string_object.set_field(0, char_array);
+        string_object.set_field(1, Value::Int(0));
+        string_object.set_field(6, Value::Int(0));
+        Ok(string_object)
+    }
+
+    pub fn create_class_instance(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        class_name: &String,
+    ) -> Result<ObjectRef<'a>, VmError> {
+        let class_object = self.new_object(call_stack, "java/lang/Class")?;
+        let string_object = Self::create_string_instance(self, call_stack, class_name)?;
+        class_object.set_field(5, Value::Object(string_object));
+        Ok(class_object)
     }
 
     pub fn debug_stats(&self) {
