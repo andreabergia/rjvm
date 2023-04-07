@@ -17,7 +17,7 @@ use crate::{
     class_and_method::ClassAndMethod,
     value::{
         ArrayRef, ObjectRef, Value,
-        Value::{Array, Double, Float, Int, Long, Object},
+        Value::{Array, Double, Float, Int, Long, Null, Object},
     },
     value_stack::ValueStack,
     vm::Vm,
@@ -116,14 +116,14 @@ macro_rules! generate_execute_load {
 }
 
 macro_rules! generate_execute_store {
-    ($name:ident, $($variant:ident),+) => {
+    ($name:ident, $variant:ident) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
             let value = self.stack.pop()?;
             match value {
-                $($variant(..) => {
+                $variant(..) => {
                     self.locals[index] = value;
                     Ok(())
-                })+
+                }
                 _ => Err(VmError::ValidationException),
             }
         }
@@ -387,15 +387,13 @@ impl<'a> CallFrame<'a> {
                 }
 
                 Instruction::Putfield(field_index) => {
-                    let field_reference = self.get_constant_field_reference(field_index)?;
-
-                    let (index, field) =
-                        Self::get_field(self.class_and_method.class, field_reference)?;
-
                     let value = self.stack.pop()?;
-                    Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
                     let object = self.stack.pop()?;
                     if let Object(object_ref) = object {
+                        let field_reference = self.get_constant_field_reference(field_index)?;
+                        let object_class = vm.get_class_by_id(object_ref.class_id)?;
+                        let (index, field) = Self::get_field(object_class, field_reference)?;
+                        Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
                         object_ref.set_field(index, value);
                     } else {
                         return Err(VmError::ValidationException);
@@ -403,10 +401,9 @@ impl<'a> CallFrame<'a> {
                 }
                 Instruction::Putstatic(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
-
-                    let (index, field) =
-                        Self::get_field(self.class_and_method.class, field_reference)?;
-
+                    let object_class =
+                        vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
+                    let (index, field) = Self::get_field(object_class, field_reference)?;
                     let value = self.stack.pop()?;
                     Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
                     let object = vm.get_static_instance(self.class_and_method.class.id);
@@ -418,13 +415,11 @@ impl<'a> CallFrame<'a> {
                 }
 
                 Instruction::Getfield(field_index) => {
-                    let field_reference = self.get_constant_field_reference(field_index)?;
-
-                    let (index, field) =
-                        Self::get_field(self.class_and_method.class, field_reference)?;
-
                     let object = self.stack.pop()?;
                     if let Object(object_ref) = object {
+                        let field_reference = self.get_constant_field_reference(field_index)?;
+                        let object_class = vm.get_class_by_id(object_ref.class_id)?;
+                        let (index, field) = Self::get_field(object_class, field_reference)?;
                         let field_value = object_ref.get_field(index);
                         Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
                         self.stack.push(field_value)?;
@@ -434,10 +429,9 @@ impl<'a> CallFrame<'a> {
                 }
                 Instruction::Getstatic(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
-
-                    let (index, field) =
-                        Self::get_field(self.class_and_method.class, field_reference)?;
-
+                    let object_class =
+                        vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
+                    let (index, field) = Self::get_field(object_class, field_reference)?;
                     let object = vm.get_static_instance(self.class_and_method.class.id);
                     if let Some(object_ref) = object {
                         let field_value = object_ref.get_field(index);
@@ -1113,13 +1107,34 @@ impl<'a> CallFrame<'a> {
     generate_compare!(execute_float_compare, pop_float);
     generate_compare!(execute_double_compare, pop_double);
 
-    generate_execute_load!(execute_aload, Object, Array);
+    fn execute_aload(&mut self, index: usize) -> Result<(), VmError> {
+        let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
+        match local {
+            Object(..) | Array(..) | Null => self.stack.push(local.clone()),
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
     generate_execute_load!(execute_iload, Int);
     generate_execute_load!(execute_lload, Long);
     generate_execute_load!(execute_fload, Float);
     generate_execute_load!(execute_dload, Double);
 
-    generate_execute_store!(execute_astore, Object, Array);
+    fn execute_astore(&mut self, index: usize) -> Result<(), VmError> {
+        let value = self.stack.pop()?;
+        match value {
+            Object(..) | Array(..) => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            Null => {
+                self.locals[index] = value;
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
     generate_execute_store!(execute_istore, Int);
     generate_execute_store!(execute_lstore, Long);
     generate_execute_store!(execute_fstore, Float);
