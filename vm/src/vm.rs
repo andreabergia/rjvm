@@ -1,24 +1,20 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::{debug, info, warn};
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::class_manager::ResolvedClass;
-use crate::native_methods::NativeMethodsRegistry;
-use crate::time::{get_current_time_millis, get_nano_time};
-use crate::value::ArrayRef;
 use crate::{
     call_stack::CallStack,
     class::{ClassId, ClassRef},
     class_and_method::ClassAndMethod,
-    class_manager::ClassManager,
+    class_manager::{ClassManager, ResolvedClass},
     class_path::ClassPathParseError,
     gc::ObjectAllocator,
-    value::{ObjectRef, Value},
+    native_methods::NativeMethodsRegistry,
+    time::{get_current_time_millis, get_nano_time},
+    value::{ArrayRef, ObjectRef, Value},
     vm_error::VmError,
 };
 

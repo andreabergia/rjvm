@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use std::fmt;
-use std::fmt::Formatter;
+use std::{collections::HashMap, fmt, fmt::Formatter};
 
-use crate::call_stack::CallStack;
-use crate::class_and_method::ClassAndMethod;
-use crate::value::{ObjectRef, Value};
-use crate::vm::Vm;
-use crate::vm_error::VmError;
+use crate::{
+    call_stack::CallStack,
+    class_and_method::ClassAndMethod,
+    value::{ObjectRef, Value},
+    vm::Vm,
+    vm_error::VmError,
+};
 
 pub type NativeCallback<'a> = fn(
     &mut Vm<'a>,

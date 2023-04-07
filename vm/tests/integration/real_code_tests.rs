@@ -1,4 +1,3 @@
-
 use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 
 fn create_base_vm() -> Vm<'static> {

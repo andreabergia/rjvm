@@ -1,9 +1,11 @@
 use std::{fmt, fmt::Formatter};
 
-use crate::field_type::BaseType;
 use crate::{
-    attribute::Attribute, field_type::FieldType, instruction::Instruction,
-    method_descriptor::MethodDescriptor, method_flags::MethodFlags,
+    attribute::Attribute,
+    field_type::{BaseType, FieldType},
+    instruction::Instruction,
+    method_descriptor::MethodDescriptor,
+    method_flags::MethodFlags,
 };
 
 #[derive(Debug, PartialEq)]
