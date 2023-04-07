@@ -58,23 +58,20 @@ impl<'a> Class<'a> {
             .find(|method| method.name == method_name && method.type_descriptor == type_descriptor)
     }
 
-    pub fn find_field(
-        &self,
-        class_name: &str,
-        field_name: &str,
-    ) -> Option<(usize, &ClassFileField)> {
+    pub fn find_field(&self, field_name: &str) -> Option<(usize, &ClassFileField)> {
         // TODO: maybe replace linear search with something faster?
-        if class_name == self.name {
-            self.fields
-                .iter()
-                .enumerate()
-                .find(|entry| entry.1.name == field_name)
-                .map(|(index, field)| (index + self.first_field_index, field))
-        } else if let Some(superclass) = &self.superclass {
-            superclass.find_field(class_name, field_name)
-        } else {
-            None
-        }
+        self.fields
+            .iter()
+            .enumerate()
+            .find(|entry| entry.1.name == field_name)
+            .map(|(index, field)| (index + self.first_field_index, field))
+            .or_else(|| {
+                if let Some(superclass) = &self.superclass {
+                    superclass.find_field(field_name)
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn field_at_index(&self, index: usize) -> Option<&ClassFileField> {

@@ -721,7 +721,7 @@ impl<'a> CallFrame<'a> {
         field_reference: FieldReference,
     ) -> Result<(usize, &'a ClassFileField), VmError> {
         class
-            .find_field(field_reference.class_name, field_reference.field_name)
+            .find_field( field_reference.field_name)
             .ok_or(VmError::FieldNotFoundException(
                 field_reference.class_name.to_string(),
                 field_reference.field_name.to_string(),
