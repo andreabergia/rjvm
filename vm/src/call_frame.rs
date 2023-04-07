@@ -384,25 +384,7 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dreturn => return self.execute_dreturn(),
 
                 Instruction::Instanceof(constant_index) => {
-                    let class_name = self.get_constant_class_reference(constant_index)?;
-
-                    // TODO: this would not work for arrays
-                    let expected_class = vm.get_or_resolve_class(call_stack, class_name)?;
-
-                    let value = self.stack.pop()?;
-                    let is_instance_of = match value {
-                        Value::Null => false,
-                        Object(object) => {
-                            let object_class = vm.get_class_by_id(object.class_id)?;
-                            object_class.is_instance_of(expected_class)
-                        }
-
-                        // TODO: arrays
-                        Array(_, _) => false,
-
-                        _ => return Err(ValidationException),
-                    };
-                    self.stack.push(Int(if is_instance_of { 1 } else { 0 }))?;
+                    self.execute_instanceof(vm, call_stack, constant_index)?
                 }
 
                 Instruction::Putfield(field_index) => {
@@ -1296,6 +1278,54 @@ impl<'a> CallFrame<'a> {
             _ => return Err(VmError::ValidationException),
         }
         Ok(())
+    }
+
+    fn execute_instanceof(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        constant_index: u16,
+    ) -> Result<(), VmError> {
+        let class_name = self.get_constant_class_reference(constant_index)?;
+
+        // TODO: multidimensional arrays
+        let (is_array, expected_class) = {
+            if class_name.starts_with("[L") && class_name.ends_with(';') {
+                (
+                    true,
+                    vm.get_or_resolve_class(call_stack, &class_name[2..class_name.len() - 1])?,
+                )
+            } else {
+                (false, vm.get_or_resolve_class(call_stack, class_name)?)
+            }
+        };
+
+        let value = self.stack.pop()?;
+        let is_instance_of = match value {
+            Value::Null => false,
+
+            Object(object) => {
+                if is_array {
+                    false
+                } else {
+                    let object_class = vm.get_class_by_id(object.class_id)?;
+                    object_class.is_instance_of(expected_class)
+                }
+            }
+
+            Array(components_type, _) => match components_type {
+                Base(_) => false,
+                FieldType::Object(components_class_name) => {
+                    let components_class =
+                        vm.get_or_resolve_class(call_stack, &components_class_name)?;
+                    components_class.is_instance_of(expected_class)
+                }
+                FieldType::Array(_) => false,
+            },
+
+            _ => return Err(ValidationException),
+        };
+        self.stack.push(Int(is_instance_of as i32))
     }
 
     fn debug_start_execution(&self) {

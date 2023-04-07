@@ -206,6 +206,34 @@ fn instance_of() {
 }
 
 #[test_log::test]
+fn instance_of_array() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/InstanceOfArray",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(
+        vec![
+            // C0
+            Value::Int(1),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(0),
+            // C1
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(1),
+        ],
+        vm.printed
+    );
+}
+
+#[test_log::test]
 fn strings() {
     let mut vm = create_base_vm();
     let main_result = invoke(&mut vm, "rjvm/Strings", "main", "([Ljava/lang/String;)V");
