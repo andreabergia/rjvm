@@ -111,15 +111,77 @@ impl<'a> Vm<'a> {
             "java/lang/Class",
             "getClassLoader0",
             "()Ljava/lang/ClassLoader;",
-            |vm, call_stack, _, receiver, _| {
+            |_, _, _, receiver, _| {
                 debug!(
                     "invoked get class loader for class {:?}",
                     receiver.map(|r| r.class_id)
                 );
-                vm.create_class_loader_instance(call_stack)
-                    .map(|v| Some(Value::Object(v)))
+                // TODO: it seems ok to return just null for the moment
+                Ok(Some(Value::Null))
             },
         );
+        self.native_methods_registry.register(
+            "java/lang/Class",
+            "desiredAssertionStatus0",
+            "(Ljava/lang/Class;)Z",
+            |_, _, _, _, _| Ok(Some(Value::Int(1))),
+        );
+        self.native_methods_registry.register(
+            "java/lang/Class",
+            "getPrimitiveClass",
+            "(Ljava/lang/String;)Ljava/lang/Class;",
+            |vm, stack, _, _, args| {
+                let arg = expect_object_at(&args, 0)?;
+                let class_name = vm.extract_str_from_java_lang_string(arg)?;
+                let java_lang_class_instance =
+                    vm.create_instance_of_java_lang_class(stack, &class_name)?;
+                Ok(Some(Value::Object(java_lang_class_instance)))
+            },
+        );
+        self.native_methods_registry.register(
+            "java/lang/Float",
+            "floatToRawIntBits",
+            "(F)I",
+            |_, _, _, _, args| {
+                let arg = expect_float_at(&args, 0)?;
+                let int_bits: i32 = arg.to_bits() as i32;
+                Ok(Some(Value::Int(int_bits)))
+            },
+        );
+        self.native_methods_registry.register(
+            "java/lang/Double",
+            "doubleToRawLongBits",
+            "(D)J",
+            |_, _, _, _, args| {
+                let arg = expect_double_at(&args, 0)?;
+                let long_bits: i64 = arg.to_bits() as i64;
+                Ok(Some(Value::Long(long_bits)))
+            },
+        );
+    }
+
+    pub fn extract_str_from_java_lang_string(
+        &self,
+        object: ObjectRef<'a>,
+    ) -> Result<String, VmError> {
+        let class = self.get_class_by_id(object.class_id)?;
+        if class.name == "java/lang/String" {
+            // In our JRE's rt.jar, the first fields of String is
+            //    private final char[] value;
+            if let Value::Array(_, array_ref) = object.get_field(0) {
+                let string_bytes: Vec<u8> = array_ref
+                    .borrow()
+                    .iter()
+                    .map(|v| match v {
+                        Value::Int(c) => *c as u8,
+                        _ => panic!("array items should be chars"),
+                    })
+                    .collect();
+                let string = String::from_utf8(string_bytes).expect("should have valid utf8 bytes");
+                return Ok(string);
+            }
+        }
+        Err(VmError::ValidationException)
     }
 
     pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectRef<'a>> {
@@ -248,7 +310,7 @@ impl<'a> Vm<'a> {
         self.object_allocator.allocate(class)
     }
 
-    pub fn create_string_instance(
+    pub fn create_java_lang_string_instance(
         &mut self,
         call_stack: &mut CallStack<'a>,
         string: &str,
@@ -275,25 +337,16 @@ impl<'a> Vm<'a> {
         Ok(string_object)
     }
 
-    pub fn create_class_instance(
+    pub fn create_instance_of_java_lang_class(
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
     ) -> Result<ObjectRef<'a>, VmError> {
         let class_object = self.new_object(call_stack, "java/lang/Class")?;
-        // TODO: we should init the various fields...
-        let string_object = Self::create_string_instance(self, call_stack, class_name)?;
+        // TODO: build a proper instance of Class object
+        let string_object = Self::create_java_lang_string_instance(self, call_stack, class_name)?;
         class_object.set_field(5, Value::Object(string_object));
         Ok(class_object)
-    }
-
-    pub fn create_class_loader_instance(
-        &mut self,
-        call_stack: &mut CallStack<'a>,
-    ) -> Result<ObjectRef<'a>, VmError> {
-        let class_loader_object = self.new_object(call_stack, "java/lang/ClassLoader")?;
-        // TODO: we should init the various fields...
-        Ok(class_loader_object)
     }
 
     pub fn debug_stats(&self) {
@@ -333,7 +386,7 @@ fn array_copy(args: Vec<Value>) -> Result<Option<Value>, VmError> {
     Ok(None)
 }
 
-fn expect_object_at<'a>(vec: &Vec<Value<'a>>, index: usize) -> Result<ObjectRef<'a>, VmError> {
+fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<ObjectRef<'a>, VmError> {
     let value = vec.get(index);
     if let Some(Value::Object(object)) = value {
         Ok(object)
@@ -343,7 +396,7 @@ fn expect_object_at<'a>(vec: &Vec<Value<'a>>, index: usize) -> Result<ObjectRef<
 }
 
 fn expect_array_at<'a, 'b>(
-    vec: &'b Vec<Value<'a>>,
+    vec: &'b [Value<'a>],
     index: usize,
 ) -> Result<(&'b FieldType, &'b ArrayRef<'a>), VmError> {
     let value = vec.get(index);
@@ -354,10 +407,28 @@ fn expect_array_at<'a, 'b>(
     }
 }
 
-fn expect_int_at(vec: &Vec<Value>, index: usize) -> Result<i32, VmError> {
+fn expect_int_at(vec: &[Value], index: usize) -> Result<i32, VmError> {
     let value = vec.get(index);
     if let Some(Value::Int(int)) = value {
         Ok(*int)
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+fn expect_float_at(vec: &[Value], index: usize) -> Result<f32, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Float(float)) = value {
+        Ok(*float)
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
+    let value = vec.get(index);
+    if let Some(Value::Double(double)) = value {
+        Ok(*double)
     } else {
         Err(VmError::ValidationException)
     }

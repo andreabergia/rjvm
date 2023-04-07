@@ -1,5 +1,6 @@
 use std::{fmt, fmt::Formatter};
 
+use crate::field_type::BaseType;
 use crate::{
     attribute::Attribute, field_type::FieldType, instruction::Instruction,
     method_descriptor::MethodDescriptor, method_flags::MethodFlags,
@@ -47,7 +48,16 @@ impl ClassFileMethod {
     }
 
     pub fn returns(&self, expected_type: FieldType) -> bool {
-        self.parsed_type_descriptor.return_type == Some(expected_type)
+        match self.parsed_type_descriptor.return_type {
+            Some(FieldType::Base(BaseType::Int))
+            | Some(FieldType::Base(BaseType::Short))
+            | Some(FieldType::Base(BaseType::Char))
+            | Some(FieldType::Base(BaseType::Byte))
+            | Some(FieldType::Base(BaseType::Boolean)) => {
+                FieldType::Base(BaseType::Int) == expected_type
+            }
+            _ => self.parsed_type_descriptor.return_type == Some(expected_type),
+        }
     }
 }
 

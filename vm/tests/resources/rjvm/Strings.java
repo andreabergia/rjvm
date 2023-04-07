@@ -6,8 +6,7 @@ public class Strings {
     }
 
     private static void sayHello(String name) {
-//        tempPrint("Hello, " + name);
-        tempPrint(name);
+        tempPrint("Hello, " + name);
     }
 
     private static native void tempPrint(String value);

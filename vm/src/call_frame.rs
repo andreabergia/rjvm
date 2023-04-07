@@ -612,6 +612,44 @@ impl<'a> CallFrame<'a> {
 
                 Instruction::Nop => {}
 
+                Instruction::Monitorenter => {
+                    let obj = self.stack.pop()?;
+                    match obj {
+                        Object(_) => {
+                            // We don't really have monitors or lock, since we are single-threaded,
+                            // so any monitor access will succeed
+                        }
+                        _ => return Err(VmError::ValidationException),
+                    }
+                }
+                Instruction::Monitorexit => {
+                    let obj = self.stack.pop()?;
+                    match obj {
+                        Object(_) => {
+                            // We don't really have monitors or lock, since we are single-threaded,
+                            // so any monitor access will succeed
+                            // TODO: check we actually have acquired monitor
+                        }
+                        _ => return Err(VmError::ValidationException),
+                    }
+                }
+
+                /* Unsupported instructions:
+                Instruction::Athrow => {}
+                Instruction::Checkcast(_) => {}
+                Instruction::Goto_w => {}
+                Instruction::If_acmpeq(_) => {}
+                Instruction::If_acmpne(_) => {}
+                Instruction::Invokedynamic(_) => {}
+                Instruction::Invokeinterface(_, _) => {}
+                Instruction::Jsr(_) => {}
+                Instruction::Jsr_w => {}
+                Instruction::Lookupswitch => {}
+                Instruction::Multianewarray(_, _) => {}
+                Instruction::Ret(_) => {}
+                Instruction::Tableswitch => {}
+                Instruction::Wide => {}
+                */
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
                     return Err(VmError::NotImplemented);
@@ -1154,7 +1192,8 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*string_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(string) => {
-                        let string_object = vm.create_string_instance(call_stack, string)?;
+                        let string_object =
+                            vm.create_java_lang_string_instance(call_stack, string)?;
                         self.stack.push(Object(string_object))
                     }
                     _ => Err(VmError::ValidationException),
@@ -1164,8 +1203,8 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*class_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(class_name) => {
-                        // TODO: build a proper instance of Class object
-                        let class_object = vm.create_class_instance(call_stack, class_name)?;
+                        let class_object =
+                            vm.create_instance_of_java_lang_class(call_stack, class_name)?;
                         self.stack.push(Object(class_object))
                     }
                     _ => Err(VmError::ValidationException),

@@ -1,4 +1,4 @@
-use rjvm_reader::field_type::{BaseType, FieldType};
+
 use rjvm_vm::{value::Value, vm::Vm, vm_error::VmError};
 
 fn create_base_vm() -> Vm<'static> {
@@ -242,22 +242,10 @@ fn strings() {
     assert_eq!(1, vm.printed.len());
     match vm.printed.get(0).expect("should have an object") {
         Value::Object(string) => {
-            let first_field = string.get_field(0);
-            match first_field {
-                Value::Array(FieldType::Base(BaseType::Char), array_ref) => {
-                    let string: Vec<u8> = array_ref
-                        .borrow()
-                        .iter()
-                        .map(|v| match v {
-                            Value::Int(c) => *c as u8,
-                            _ => panic!("array items should be chars"),
-                        })
-                        .collect();
-                    let string = String::from_utf8(string).expect("should have valid utf8 bytes");
-                    assert_eq!("andrea", string);
-                }
-                _ => panic!("should have had an array of char as first field"),
-            }
+            let string = vm
+                .extract_str_from_java_lang_string(string)
+                .expect("should have a string");
+            assert_eq!("Hello, andrea", string);
         }
         _ => panic!("should have had a String instance"),
     }
