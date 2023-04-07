@@ -78,6 +78,12 @@ impl<'a> Vm<'a> {
             |_, _, _, _, _| Ok(None),
         );
         self.native_methods_registry.register(
+            "java/lang/ClassLoader",
+            "registerNatives",
+            "()V",
+            |_, _, _, _, _| Ok(None),
+        );
+        self.native_methods_registry.register(
             "java/lang/System",
             "nanoTime",
             "()J",
@@ -105,9 +111,13 @@ impl<'a> Vm<'a> {
             "java/lang/Class",
             "getClassLoader0",
             "()Ljava/lang/ClassLoader;",
-            |_, _, _, _, args| {
-                debug!("get class loader");
-                Ok(None)
+            |vm, call_stack, _, receiver, _| {
+                debug!(
+                    "invoked get class loader for class {:?}",
+                    receiver.map(|r| r.class_id)
+                );
+                vm.create_class_loader_instance(call_stack)
+                    .map(|v| Some(Value::Object(v)))
             },
         );
     }
@@ -132,8 +142,6 @@ impl<'a> Vm<'a> {
                 self.statics.insert(class_to_init.id, static_instance);
                 if let Some(clinit_method) = class_to_init.find_method("<clinit>", "()V") {
                     debug!("invoking {}::<clinit>()", class_to_init.name);
-
-                    // TODO: stack
                     self.invoke(
                         stack,
                         ClassAndMethod {
@@ -144,7 +152,6 @@ impl<'a> Vm<'a> {
                         Vec::new(),
                     )?;
                 }
-                // TODO: invoke <clinit>
             }
         }
         Ok(class.get_class())
@@ -262,12 +269,22 @@ impl<'a> Vm<'a> {
     pub fn create_class_instance(
         &mut self,
         call_stack: &mut CallStack<'a>,
-        class_name: &String,
+        class_name: &str,
     ) -> Result<ObjectRef<'a>, VmError> {
         let class_object = self.new_object(call_stack, "java/lang/Class")?;
+        // TODO: we should init the various fields...
         let string_object = Self::create_string_instance(self, call_stack, class_name)?;
         class_object.set_field(5, Value::Object(string_object));
         Ok(class_object)
+    }
+
+    pub fn create_class_loader_instance(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+    ) -> Result<ObjectRef<'a>, VmError> {
+        let class_loader_object = self.new_object(call_stack, "java/lang/ClassLoader")?;
+        // TODO: we should init the various fields...
+        Ok(class_loader_object)
     }
 
     pub fn debug_stats(&self) {
