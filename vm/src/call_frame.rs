@@ -237,7 +237,7 @@ impl<'a> CallFrame<'a> {
             self.pc = new_address;
 
             match instruction {
-                Instruction::Aconst_null => self.stack.push(Value::Null)?,
+                Instruction::Aconst_null => self.stack.push(Null)?,
                 Instruction::Aload(index) => self.execute_aload(index.into_usize_safe())?,
                 Instruction::Aload_0 => self.execute_aload(0)?,
                 Instruction::Aload_1 => self.execute_aload(1)?,
@@ -1234,7 +1234,7 @@ impl<'a> CallFrame<'a> {
         let length = self.pop_int()?.into_usize_safe();
         let class_name = self.get_constant_class_reference(constant_index)?;
 
-        let vec = vec![Value::Null; length];
+        let vec = vec![Null; length];
         let vec = Rc::new(RefCell::new(vec));
         let array_value = Array(FieldType::Object(class_name.to_string()), vec);
         self.stack.push(array_value)
@@ -1312,7 +1312,7 @@ impl<'a> CallFrame<'a> {
 
         let value = self.stack.pop()?;
         let is_instance_of = match value {
-            Value::Null => false,
+            Null => false,
 
             Object(object) => {
                 if is_array {
