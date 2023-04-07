@@ -11,6 +11,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::vm_error::VmError::ValidationException;
 use crate::{
     call_stack::CallStack,
     class::Class,
@@ -381,6 +382,28 @@ impl<'a> CallFrame<'a> {
                 Instruction::Lreturn => return self.execute_lreturn(),
                 Instruction::Freturn => return self.execute_freturn(),
                 Instruction::Dreturn => return self.execute_dreturn(),
+
+                Instruction::Instanceof(constant_index) => {
+                    let class_name = self.get_constant_class_reference(constant_index)?;
+
+                    // TODO: this would not work for arrays
+                    let expected_class = vm.get_or_resolve_class(call_stack, class_name)?;
+
+                    let value = self.stack.pop()?;
+                    let is_instance_of = match value {
+                        Value::Null => false,
+                        Object(object) => {
+                            let object_class = vm.get_class_by_id(object.class_id)?;
+                            object_class.is_instance_of(expected_class)
+                        }
+
+                        // TODO: arrays
+                        Array(_, _) => false,
+
+                        _ => return Err(ValidationException),
+                    };
+                    self.stack.push(Int(if is_instance_of { 1 } else { 0 }))?;
+                }
 
                 Instruction::Putfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;

@@ -34,6 +34,16 @@ pub struct Class<'a> {
     pub num_total_fields: usize,
 }
 
+impl<'a> Class<'a> {
+    pub fn is_instance_of(&self, base: ClassRef) -> bool {
+        self.name == base.name
+            || self
+                .superclass
+                .map_or(false, |superclass| superclass.is_instance_of(base))
+            || self.interfaces.iter().any(|intf| intf.is_instance_of(base))
+    }
+}
+
 pub type ClassRef<'a> = &'a Class<'a>;
 
 impl<'a> Class<'a> {

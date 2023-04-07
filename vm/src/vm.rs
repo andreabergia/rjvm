@@ -164,6 +164,11 @@ impl<'a> Vm<'a> {
         Ok(class.get_class())
     }
 
+    pub fn get_class_by_id(&self, class_id: ClassId) -> Result<ClassRef<'a>, VmError> {
+        self.find_class_by_id(class_id)
+            .ok_or(VmError::ValidationException)
+    }
+
     pub fn find_class_by_id(&self, class_id: ClassId) -> Option<ClassRef<'a>> {
         self.class_manager.find_class_by_id(class_id)
     }

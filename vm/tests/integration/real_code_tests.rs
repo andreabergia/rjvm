@@ -166,6 +166,46 @@ fn statics() {
 }
 
 #[test_log::test]
+fn instance_of() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(&mut vm, "rjvm/InstanceOf", "main", "([Ljava/lang/String;)V");
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(
+        vec![
+            Value::Int(1),
+            Value::Int(1),
+            // C1
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(0),
+            // C2
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(0),
+            // C3
+            Value::Int(1),
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(0),
+            // C4
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(1),
+            // C5
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(1),
+        ],
+        vm.printed
+    );
+}
+
+#[test_log::test]
 fn strings() {
     let mut vm = create_base_vm();
     let main_result = invoke(&mut vm, "rjvm/Strings", "main", "([Ljava/lang/String;)V");
