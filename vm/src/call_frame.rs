@@ -386,60 +386,13 @@ impl<'a> CallFrame<'a> {
                     self.execute_instanceof(vm, call_stack, constant_index)?
                 }
 
-                Instruction::Putfield(field_index) => {
-                    let value = self.stack.pop()?;
-                    let object = self.stack.pop()?;
-                    if let Object(object_ref) = object {
-                        let field_reference = self.get_constant_field_reference(field_index)?;
-                        let object_class = vm.get_class_by_id(object_ref.class_id)?;
-                        let (index, field) = Self::get_field(object_class, field_reference)?;
-                        Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
-                        object_ref.set_field(index, value);
-                    } else {
-                        return Err(VmError::ValidationException);
-                    }
-                }
+                Instruction::Putfield(field_index) => self.execute_putfield(vm, field_index)?,
                 Instruction::Putstatic(field_index) => {
-                    let field_reference = self.get_constant_field_reference(field_index)?;
-                    let object_class =
-                        vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
-                    let (index, field) = Self::get_field(object_class, field_reference)?;
-                    let value = self.stack.pop()?;
-                    Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
-                    let object = vm.get_static_instance(self.class_and_method.class.id);
-                    if let Some(object_ref) = object {
-                        object_ref.set_field(index, value);
-                    } else {
-                        return Err(VmError::ValidationException);
-                    }
+                    self.execute_putstatic(vm, call_stack, field_index)?
                 }
-
-                Instruction::Getfield(field_index) => {
-                    let object = self.stack.pop()?;
-                    if let Object(object_ref) = object {
-                        let field_reference = self.get_constant_field_reference(field_index)?;
-                        let object_class = vm.get_class_by_id(object_ref.class_id)?;
-                        let (index, field) = Self::get_field(object_class, field_reference)?;
-                        let field_value = object_ref.get_field(index);
-                        Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-                        self.stack.push(field_value)?;
-                    } else {
-                        return Err(VmError::ValidationException);
-                    }
-                }
+                Instruction::Getfield(field_index) => self.execute_getfield(vm, field_index)?,
                 Instruction::Getstatic(field_index) => {
-                    let field_reference = self.get_constant_field_reference(field_index)?;
-                    let object_class =
-                        vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
-                    let (index, field) = Self::get_field(object_class, field_reference)?;
-                    let object = vm.get_static_instance(self.class_and_method.class.id);
-                    if let Some(object_ref) = object {
-                        let field_value = object_ref.get_field(index);
-                        Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-                        self.stack.push(field_value)?;
-                    } else {
-                        return Err(VmError::ValidationException);
-                    }
+                    self.execute_getstatic(vm, call_stack, field_index)?
                 }
 
                 Instruction::Iadd => self.execute_int_math(|a, b| Ok(a.wrapping_add(b)))?,
@@ -1350,6 +1303,76 @@ impl<'a> CallFrame<'a> {
             _ => return Err(VmError::ValidationException),
         };
         self.stack.push(Int(is_instance_of as i32))
+    }
+
+    fn execute_getfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {
+        let object = self.stack.pop()?;
+        if let Object(object_ref) = object {
+            let field_reference = self.get_constant_field_reference(field_index)?;
+            let object_class = vm.get_class_by_id(object_ref.class_id)?;
+            let (index, field) = Self::get_field(object_class, field_reference)?;
+            let field_value = object_ref.get_field(index);
+            Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
+            self.stack.push(field_value)?;
+            Ok(())
+        } else {
+            return Err(VmError::ValidationException);
+        }
+    }
+
+    fn execute_putfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {
+        let value = self.stack.pop()?;
+        let object = self.stack.pop()?;
+        if let Object(object_ref) = object {
+            let field_reference = self.get_constant_field_reference(field_index)?;
+            let object_class = vm.get_class_by_id(object_ref.class_id)?;
+            let (index, field) = Self::get_field(object_class, field_reference)?;
+            Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
+            object_ref.set_field(index, value);
+            Ok(())
+        } else {
+            Err(VmError::ValidationException)
+        }
+    }
+
+    fn execute_getstatic(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        field_index: u16,
+    ) -> Result<(), VmError> {
+        let field_reference = self.get_constant_field_reference(field_index)?;
+        let object_class = vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
+        let (index, field) = Self::get_field(object_class, field_reference)?;
+        let object = vm.get_static_instance(self.class_and_method.class.id);
+        if let Some(object_ref) = object {
+            let field_value = object_ref.get_field(index);
+            Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
+            self.stack.push(field_value)?;
+            Ok(())
+        } else {
+            Err(VmError::ValidationException)
+        }
+    }
+
+    fn execute_putstatic(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        field_index: u16,
+    ) -> Result<(), VmError> {
+        let field_reference = self.get_constant_field_reference(field_index)?;
+        let object_class = vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
+        let (index, field) = Self::get_field(object_class, field_reference)?;
+        let value = self.stack.pop()?;
+        Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
+        let object = vm.get_static_instance(self.class_and_method.class.id);
+        if let Some(object_ref) = object {
+            object_ref.set_field(index, value);
+            Ok(())
+        } else {
+            Err(VmError::ValidationException)
+        }
     }
 
     fn debug_start_execution(&self) {
