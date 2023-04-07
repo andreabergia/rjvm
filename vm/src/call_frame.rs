@@ -11,7 +11,6 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::vm_error::VmError::ValidationException;
 use crate::{
     call_stack::CallStack,
     class::Class,
@@ -390,12 +389,11 @@ impl<'a> CallFrame<'a> {
                 Instruction::Putfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, _field) =
+                    let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let value = self.stack.pop()?;
-                    // TODO: we need instanceof
-                    // Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
+                    Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
                     let object = self.stack.pop()?;
                     if let Object(object_ref) = object {
                         object_ref.set_field(index, value);
@@ -406,15 +404,12 @@ impl<'a> CallFrame<'a> {
                 Instruction::Putstatic(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, _field) =
+                    let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let value = self.stack.pop()?;
-                    // TODO: we need instanceof
-                    // Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
-
+                    Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
                     let object = vm.get_static_instance(self.class_and_method.class.id);
-
                     if let Some(object_ref) = object {
                         object_ref.set_field(index, value);
                     } else {
@@ -425,14 +420,13 @@ impl<'a> CallFrame<'a> {
                 Instruction::Getfield(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, _field) =
+                    let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let object = self.stack.pop()?;
                     if let Object(object_ref) = object {
                         let field_value = object_ref.get_field(index);
-                        // TODO: we need instanceof
-                        // Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
+                        Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
                         self.stack.push(field_value)?;
                     } else {
                         return Err(VmError::ValidationException);
@@ -441,14 +435,13 @@ impl<'a> CallFrame<'a> {
                 Instruction::Getstatic(field_index) => {
                     let field_reference = self.get_constant_field_reference(field_index)?;
 
-                    let (index, _field) =
+                    let (index, field) =
                         Self::get_field(self.class_and_method.class, field_reference)?;
 
                     let object = vm.get_static_instance(self.class_and_method.class.id);
                     if let Some(object_ref) = object {
                         let field_value = object_ref.get_field(index);
-                        // TODO: we need instanceof
-                        // Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
+                        Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
                         self.stack.push(field_value)?;
                     } else {
                         return Err(VmError::ValidationException);
@@ -1003,7 +996,11 @@ impl<'a> CallFrame<'a> {
     }
 
     fn validate_type(vm: &Vm, expected_type: FieldType, value: &Value) -> Result<(), VmError> {
-        if value.matches_type(expected_type, |class_id| vm.find_class_by_id(class_id)) {
+        if value.matches_type(
+            expected_type,
+            |class_id| vm.find_class_by_id(class_id),
+            |class_name| vm.find_class_by_name(class_name),
+        ) {
             Ok(())
         } else {
             Err(VmError::ValidationException)
@@ -1323,7 +1320,7 @@ impl<'a> CallFrame<'a> {
                 FieldType::Array(_) => false,
             },
 
-            _ => return Err(ValidationException),
+            _ => return Err(VmError::ValidationException),
         };
         self.stack.push(Int(is_instance_of as i32))
     }

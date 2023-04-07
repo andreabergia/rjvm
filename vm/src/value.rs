@@ -70,14 +70,27 @@ pub type ObjectRef<'a> = &'a ObjectValue<'a>;
 pub type ArrayRef<'a> = Rc<RefCell<Vec<Value<'a>>>>;
 
 impl<'a> Value<'a> {
-    pub fn matches_type<'b, T>(&self, expected_type: FieldType, class_resolver: T) -> bool
+    pub fn matches_type<'b, ResById, ResByName>(
+        &self,
+        expected_type: FieldType,
+        class_resolver_by_id: ResById,
+        class_resolver_by_name: ResByName,
+    ) -> bool
     where
-        T: FnOnce(ClassId) -> Option<ClassRef<'b>>,
+        ResById: FnOnce(ClassId) -> Option<ClassRef<'b>>,
+        ResByName: FnOnce(&str) -> Option<ClassRef<'b>>,
     {
         match self {
             Value::Uninitialized => false,
             Value::Int(_) => match expected_type {
-                FieldType::Base(base_type) => base_type == BaseType::Int,
+                FieldType::Base(base_type) => matches!(
+                    base_type,
+                    BaseType::Int
+                        | BaseType::Byte
+                        | BaseType::Char
+                        | BaseType::Short
+                        | BaseType::Boolean
+                ),
                 _ => false,
             },
             Value::Long(_) => match expected_type {
@@ -96,12 +109,13 @@ impl<'a> Value<'a> {
             Value::Object(object_ref) => match expected_type {
                 // TODO: with multiple class loaders, we should check the class identity,
                 //  not the name, since the same class could be loaded by multiple class loader
-
-                // TODO: we should check super classes
-                FieldType::Object(class_name) => {
-                    let value_class = class_resolver(object_ref.class_id);
-                    if let Some(class_ref) = value_class {
-                        class_ref.name == class_name
+                FieldType::Object(expected_class_name) => {
+                    let value_class = class_resolver_by_id(object_ref.class_id);
+                    if let Some(object_class) = value_class {
+                        let expected_class = class_resolver_by_name(&expected_class_name);
+                        expected_class.map_or(false, |expected_class| {
+                            object_class.is_instance_of(expected_class)
+                        })
                     } else {
                         false
                     }
@@ -109,7 +123,11 @@ impl<'a> Value<'a> {
                 _ => false,
             },
 
-            Value::Null => false,
+            Value::Null => match expected_type {
+                FieldType::Base(_) => false,
+                FieldType::Object(_) => true,
+                FieldType::Array(_) => true,
+            },
 
             Value::Array(field_type, _) => match expected_type {
                 FieldType::Array(expected_field_type) => *field_type == *expected_field_type,

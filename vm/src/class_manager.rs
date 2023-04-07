@@ -71,17 +71,17 @@ impl<'a> ClassManager<'a> {
         self.classes_by_id.get(&id).cloned()
     }
 
+    pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {
+        self.classes_by_name.get(class_name).cloned()
+    }
+
     pub fn get_or_resolve_class(&mut self, class_name: &str) -> Result<ResolvedClass<'a>, VmError> {
-        if let Some(already_loaded_class) = self.get_class(class_name) {
+        if let Some(already_loaded_class) = self.find_class_by_name(class_name) {
             Ok(ResolvedClass::AlreadyLoaded(already_loaded_class))
         } else {
             self.resolve_and_load_class(class_name)
                 .map(ResolvedClass::NewClass)
         }
-    }
-
-    fn get_class(&self, class_name: &str) -> Option<ClassRef<'a>> {
-        self.classes_by_name.get(class_name).cloned()
     }
 
     fn resolve_and_load_class(

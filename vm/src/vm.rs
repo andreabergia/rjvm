@@ -173,6 +173,10 @@ impl<'a> Vm<'a> {
         self.class_manager.find_class_by_id(class_id)
     }
 
+    pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {
+        self.class_manager.find_class_by_name(class_name)
+    }
+
     pub fn resolve_class_method(
         &mut self,
         call_stack: &mut CallStack<'a>,
