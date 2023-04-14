@@ -573,27 +573,8 @@ impl<'a> CallFrame<'a> {
 
                 Instruction::Nop => {}
 
-                Instruction::Monitorenter => {
-                    let obj = self.stack.pop()?;
-                    match obj {
-                        Object(_) => {
-                            // We don't really have monitors or lock, since we are single-threaded,
-                            // so any monitor access will succeed
-                        }
-                        _ => return Err(VmError::ValidationException),
-                    }
-                }
-                Instruction::Monitorexit => {
-                    let obj = self.stack.pop()?;
-                    match obj {
-                        Object(_) => {
-                            // We don't really have monitors or lock, since we are single-threaded,
-                            // so any monitor access will succeed
-                            // TODO: check we actually have acquired monitor
-                        }
-                        _ => return Err(VmError::ValidationException),
-                    }
-                }
+                Instruction::Monitorenter => self.execute_monitorenter()?,
+                Instruction::Monitorexit => self.execute_monitorexit()?,
 
                 /* Unsupported instructions:
                 Instruction::Athrow => {}
@@ -1412,6 +1393,31 @@ impl<'a> CallFrame<'a> {
             Ok(())
         } else {
             Err(VmError::ValidationException)
+        }
+    }
+
+    fn execute_monitorenter(&mut self) -> Result<(), VmError> {
+        let obj = self.stack.pop()?;
+        match obj {
+            Object(_) => {
+                // We don't really have monitors or lock, since we are single-threaded,
+                // so any monitor access will succeed
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
+        }
+    }
+
+    fn execute_monitorexit(&mut self) -> Result<(), VmError> {
+        let obj = self.stack.pop()?;
+        match obj {
+            Object(_) => {
+                // We don't really have monitors or lock, since we are single-threaded,
+                // so any monitor access will succeed
+                // TODO: check we actually have acquired monitor
+                Ok(())
+            }
+            _ => Err(VmError::ValidationException),
         }
     }
 
