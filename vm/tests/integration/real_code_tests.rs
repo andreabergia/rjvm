@@ -273,3 +273,12 @@ fn invoke_interface() {
         vm.printed
     );
 }
+
+#[test_log::test]
+fn check_cast() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(&mut vm, "rjvm/CheckCast", "main", "([Ljava/lang/String;)V");
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(vec![Value::Int(1)], vm.printed);
+}

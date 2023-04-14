@@ -389,6 +389,9 @@ impl<'a> CallFrame<'a> {
                 Instruction::Instanceof(constant_index) => {
                     self.execute_instanceof(vm, call_stack, constant_index)?
                 }
+                Instruction::Checkcast(constant_index) => {
+                    self.execute_checkcast(vm, call_stack, constant_index)?
+                }
 
                 Instruction::Putfield(field_index) => self.execute_putfield(vm, field_index)?,
                 Instruction::Putstatic(field_index) => {
@@ -571,14 +574,11 @@ impl<'a> CallFrame<'a> {
                 Instruction::Dastore => self.execute_dastore()?,
                 Instruction::Aastore => self.execute_aastore(vm)?,
 
-                Instruction::Nop => {}
-
                 Instruction::Monitorenter => self.execute_monitorenter()?,
                 Instruction::Monitorexit => self.execute_monitorexit()?,
 
                 /* Unsupported instructions:
                 Instruction::Athrow => {}
-                Instruction::Checkcast(_) => {}
                 Instruction::Goto_w => {}
                 Instruction::Invokedynamic(_) => {}
                 Instruction::Jsr(_) => {}
@@ -589,6 +589,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Tableswitch => {}
                 Instruction::Wide => {}
                 */
+                Instruction::Nop => {}
+
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
                     return Err(VmError::NotImplemented);
@@ -1284,6 +1286,30 @@ impl<'a> CallFrame<'a> {
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
     ) -> Result<(), VmError> {
+        let (is_instance_of, _) = self.is_instanceof(vm, call_stack, constant_index)?;
+        self.stack.push(Int(is_instance_of as i32))
+    }
+
+    fn execute_checkcast(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        constant_index: u16,
+    ) -> Result<(), VmError> {
+        let (is_instance_of, value) = self.is_instanceof(vm, call_stack, constant_index)?;
+        if is_instance_of {
+            self.stack.push(value)
+        } else {
+            Err(VmError::ClassCastException)
+        }
+    }
+
+    fn is_instanceof(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        constant_index: u16,
+    ) -> Result<(bool, Value<'a>), VmError> {
         let class_name = self.get_constant_class_reference(constant_index)?;
 
         // TODO: multidimensional arrays
@@ -1299,7 +1325,7 @@ impl<'a> CallFrame<'a> {
         };
 
         let value = self.stack.pop()?;
-        let is_instance_of = match value {
+        let is_instance_of = match &value {
             Null => false,
 
             Object(object) => {
@@ -1315,7 +1341,7 @@ impl<'a> CallFrame<'a> {
                 Base(_) => false,
                 FieldType::Object(components_class_name) => {
                     let components_class =
-                        vm.get_or_resolve_class(call_stack, &components_class_name)?;
+                        vm.get_or_resolve_class(call_stack, components_class_name)?;
                     components_class.is_instance_of(expected_class)
                 }
                 FieldType::Array(_) => false,
@@ -1323,7 +1349,7 @@ impl<'a> CallFrame<'a> {
 
             _ => return Err(VmError::ValidationException),
         };
-        self.stack.push(Int(is_instance_of as i32))
+        Ok((is_instance_of, value))
     }
 
     fn execute_getfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {

@@ -31,6 +31,9 @@ pub enum VmError {
     #[error("array index out of bounds")]
     ArrayIndexOutOfBoundsException,
 
+    #[error("class cast exception")]
+    ClassCastException,
+
     #[error("unexpected error")]
     UnexpectedError,
 }
