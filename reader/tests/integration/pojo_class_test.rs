@@ -4,13 +4,14 @@ use rjvm_reader::{
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
     class_file_field::ClassFileField,
-    class_file_method::{
-        ClassFileMethod, LineNumber, LineNumberTable, LineNumberTableEntry, ProgramCounter,
-    },
+    class_file_method::ClassFileMethod,
     class_file_version::ClassFileVersion,
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
+    line_number::LineNumber,
+    line_number_table::{LineNumberTable, LineNumberTableEntry},
     method_flags::MethodFlags,
+    program_counter::ProgramCounter,
     utils,
 };
 

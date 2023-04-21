@@ -24,6 +24,7 @@ impl ClassId {
 pub struct Class<'a> {
     pub id: ClassId,
     pub name: String,
+    pub source_file: Option<String>,
     pub constants: ConstantPool,
     pub flags: ClassAccessFlags,
     pub superclass: Option<ClassRef<'a>>,

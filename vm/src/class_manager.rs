@@ -199,6 +199,7 @@ impl<'a> ClassManager<'a> {
         Ok(Class {
             id,
             name: class_file.name,
+            source_file: class_file.source_file,
             constants: class_file.constants,
             flags: class_file.flags,
             superclass,

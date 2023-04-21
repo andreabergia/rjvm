@@ -4,6 +4,7 @@ use crate::{
     attribute::Attribute,
     field_type::{BaseType, FieldType},
     instruction::Instruction,
+    line_number_table::LineNumberTable,
     method_descriptor::MethodDescriptor,
     method_flags::MethodFlags,
 };
@@ -90,37 +91,5 @@ impl fmt::Display for ClassFileMethodCode {
             writeln!(f, "    unparseable code: {:?}", self.code)?;
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct LineNumberTable {
-    entries: Vec<LineNumberTableEntry>,
-}
-
-impl LineNumberTable {
-    pub fn new(entries: Vec<LineNumberTableEntry>) -> Self {
-        Self { entries }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct ProgramCounter(pub u16);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct LineNumber(pub u16);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct LineNumberTableEntry {
-    pub program_counter: ProgramCounter,
-    pub line_number: LineNumber,
-}
-
-impl LineNumberTableEntry {
-    pub fn new(program_counter: ProgramCounter, line_number: LineNumber) -> Self {
-        Self {
-            program_counter,
-            line_number,
-        }
     }
 }

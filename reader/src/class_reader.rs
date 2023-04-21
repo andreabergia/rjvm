@@ -10,17 +10,17 @@ use crate::{
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
     class_file_field::{ClassFileField, FieldConstantValue},
-    class_file_method::{
-        ClassFileMethod, ClassFileMethodCode, LineNumber, LineNumberTable, LineNumberTableEntry,
-        ProgramCounter,
-    },
+    class_file_method::{ClassFileMethod, ClassFileMethodCode},
     class_file_version::ClassFileVersion,
     class_reader_error::{ClassReaderError::InvalidClassData, Result},
     constant_pool::{ConstantPool, ConstantPoolEntry},
     field_flags::FieldFlags,
     field_type::FieldType,
+    line_number::LineNumber,
+    line_number_table::{LineNumberTable, LineNumberTableEntry},
     method_descriptor::MethodDescriptor,
     method_flags::MethodFlags,
+    program_counter::ProgramCounter,
 };
 
 struct ClassFileReader<'a> {

@@ -8,6 +8,8 @@ use rjvm_reader::{
     constant_pool::ConstantPoolEntry,
     field_type::{BaseType, FieldType, FieldType::Base},
     instruction::{Instruction, NewArrayType},
+    line_number::LineNumber,
+    program_counter::ProgramCounter,
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
@@ -186,7 +188,7 @@ struct FieldReference<'a> {
 #[derive(Debug)]
 pub struct CallFrame<'a> {
     class_and_method: ClassAndMethod<'a>,
-    pc: usize,
+    pc: ProgramCounter,
     locals: Vec<Value<'a>>,
     stack: ValueStack<'a>,
     code: &'a Vec<u8>,
@@ -217,11 +219,35 @@ impl<'a> CallFrame<'a> {
             .code;
         CallFrame {
             class_and_method,
-            pc: 0,
+            pc: ProgramCounter(0),
             locals,
             stack: ValueStack::with_max_size(max_stack_size),
             code,
         }
+    }
+
+    pub fn to_stack_trace_element(&self) -> String {
+        let name = format!(
+            "{}::{}",
+            self.class_and_method.class.name, self.class_and_method.method.name,
+        );
+
+        if let Some(file_name) = &self.class_and_method.class.source_file {
+            if let Some(line_number) = self.get_line_number() {
+                return format!("{} ({}:{})", name, file_name, line_number);
+            }
+            return format!("{} ({})", name, file_name);
+        }
+        name
+    }
+
+    fn get_line_number(&self) -> Option<LineNumber> {
+        if let Some(code) = self.class_and_method.method.code.as_ref() {
+            if let Some(line_number_table) = &code.line_number_table {
+                return Some(line_number_table.lookup_pc(self.pc));
+            }
+        }
+        None
     }
 
     pub fn execute(
@@ -233,9 +259,10 @@ impl<'a> CallFrame<'a> {
 
         loop {
             let (instruction, new_address) =
-                Instruction::parse(self.code, self.pc).map_err(|_| VmError::ValidationException)?;
+                Instruction::parse(self.code, self.pc.0.into_usize_safe())
+                    .map_err(|_| VmError::ValidationException)?;
             self.debug_print_status(&instruction);
-            self.pc = new_address;
+            self.pc = ProgramCounter(new_address as u16);
 
             match instruction {
                 Instruction::Aconst_null => self.stack.push(Null)?,
@@ -1042,7 +1069,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_coerce!(coerce_double, pop_double, f64);
 
     fn goto(&mut self, jump_address: u16) {
-        self.pc = jump_address.into_usize_safe();
+        self.pc = ProgramCounter(jump_address);
     }
 
     fn execute_if<T>(&mut self, jump_address: u16, comparator: T) -> Result<(), VmError>
@@ -1455,7 +1482,11 @@ impl<'a> CallFrame<'a> {
     }
 
     fn debug_print_status(&self, instruction: &Instruction) {
-        debug!("FRAME STATUS: pc: {}", self.pc);
+        debug!(
+            "FRAME STATUS: executing {} - pc: {}",
+            self.to_stack_trace_element(),
+            self.pc
+        );
         debug!("  stack:");
         for stack_entry in self.stack.iter() {
             debug!("  - {:?}", stack_entry);
