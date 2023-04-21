@@ -1,9 +1,9 @@
 use log::{debug, info};
 
-use crate::call_stack::CallStack;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{
+    call_stack::CallStack,
     native_methods_registry::NativeMethodsRegistry,
     time::{get_current_time_millis, get_nano_time},
     value::{
@@ -16,63 +16,11 @@ use crate::{
 
 pub(crate) fn register_natives(registry: &mut NativeMethodsRegistry) {
     registry.register_temp_print(|vm, _, _, args| temp_print(vm, args));
-
     register_noops(registry);
-
-    registry.register("java/lang/System", "nanoTime", "()J", |_, _, _, _| {
-        Ok(Some(Value::Long(get_nano_time())))
-    });
-    registry.register(
-        "java/lang/System",
-        "currentTimeMillis",
-        "()J",
-        |_, _, _, _| Ok(Some(Value::Long(get_current_time_millis()))),
-    );
-    registry.register(
-        "java/lang/System",
-        "identityHashCode",
-        "(Ljava/lang/Object;)I",
-        |_, _, _, args| identity_hash_code(args),
-    );
-    registry.register(
-        "java/lang/System",
-        "arraycopy",
-        "(Ljava/lang/Object;ILjava/lang/Object;II)V",
-        |_, _, _, args| array_copy(args),
-    );
-
-    registry.register(
-        "java/lang/Class",
-        "getClassLoader0",
-        "()Ljava/lang/ClassLoader;",
-        |_, _, receiver, _| get_class_loader(receiver),
-    );
-    registry.register(
-        "java/lang/Class",
-        "desiredAssertionStatus0",
-        "(Ljava/lang/Class;)Z",
-        |_, _, _, _| Ok(Some(Value::Int(1))),
-    );
-
-    registry.register(
-        "java/lang/Class",
-        "getPrimitiveClass",
-        "(Ljava/lang/String;)Ljava/lang/Class;",
-        |vm, stack, _, args| get_primitive_class(vm, stack, &args),
-    );
-
-    registry.register(
-        "java/lang/Float",
-        "floatToRawIntBits",
-        "(F)I",
-        |_, _, _, args| float_to_raw_int_bits(&args),
-    );
-    registry.register(
-        "java/lang/Double",
-        "doubleToRawLongBits",
-        "(D)J",
-        |_, _, _, args| double_to_raw_long_bits(&args),
-    );
+    register_time_methods(registry);
+    register_gc_methods(registry);
+    register_native_repr_methods(registry);
+    register_reflection_methods(registry);
 }
 
 fn register_noops(registry: &mut NativeMethodsRegistry) {
@@ -96,6 +44,69 @@ fn register_noops(registry: &mut NativeMethodsRegistry) {
         "registerNatives",
         "()V",
         |_, _, _, _| Ok(None),
+    );
+}
+
+fn register_time_methods(registry: &mut NativeMethodsRegistry) {
+    registry.register("java/lang/System", "nanoTime", "()J", |_, _, _, _| {
+        Ok(Some(Value::Long(get_nano_time())))
+    });
+    registry.register(
+        "java/lang/System",
+        "currentTimeMillis",
+        "()J",
+        |_, _, _, _| Ok(Some(Value::Long(get_current_time_millis()))),
+    );
+}
+
+fn register_gc_methods(registry: &mut NativeMethodsRegistry) {
+    registry.register(
+        "java/lang/System",
+        "identityHashCode",
+        "(Ljava/lang/Object;)I",
+        |_, _, _, args| identity_hash_code(args),
+    );
+}
+
+fn register_native_repr_methods(registry: &mut NativeMethodsRegistry) {
+    registry.register(
+        "java/lang/System",
+        "arraycopy",
+        "(Ljava/lang/Object;ILjava/lang/Object;II)V",
+        |_, _, _, args| array_copy(args),
+    );
+    registry.register(
+        "java/lang/Float",
+        "floatToRawIntBits",
+        "(F)I",
+        |_, _, _, args| float_to_raw_int_bits(&args),
+    );
+    registry.register(
+        "java/lang/Double",
+        "doubleToRawLongBits",
+        "(D)J",
+        |_, _, _, args| double_to_raw_long_bits(&args),
+    );
+}
+
+fn register_reflection_methods(registry: &mut NativeMethodsRegistry) {
+    registry.register(
+        "java/lang/Class",
+        "getClassLoader0",
+        "()Ljava/lang/ClassLoader;",
+        |_, _, receiver, _| get_class_loader(receiver),
+    );
+    registry.register(
+        "java/lang/Class",
+        "desiredAssertionStatus0",
+        "(Ljava/lang/Class;)Z",
+        |_, _, _, _| Ok(Some(Value::Int(1))),
+    );
+    registry.register(
+        "java/lang/Class",
+        "getPrimitiveClass",
+        "(Ljava/lang/String;)Ljava/lang/Class;",
+        |vm, stack, _, args| get_primitive_class(vm, stack, &args),
     );
 }
 
@@ -138,6 +149,18 @@ fn array_copy(args: Vec<Value>) -> Result<Option<Value>, VmError> {
     Ok(None)
 }
 
+fn float_to_raw_int_bits<'a>(args: &[Value<'a>]) -> Result<Option<Value<'a>>, VmError> {
+    let arg = expect_float_at(args, 0)?;
+    let int_bits: i32 = arg.to_bits() as i32;
+    Ok(Some(Value::Int(int_bits)))
+}
+
+fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> Result<Option<Value<'a>>, VmError> {
+    let arg = expect_double_at(args, 0)?;
+    let long_bits: i64 = arg.to_bits() as i64;
+    Ok(Some(Value::Long(long_bits)))
+}
+
 fn get_class_loader(receiver: Option<ObjectRef>) -> Result<Option<Value>, VmError> {
     debug!(
         "invoked get class loader for class {:?}",
@@ -157,16 +180,4 @@ fn get_primitive_class<'a>(
     let class_name = vm.extract_str_from_java_lang_string(arg)?;
     let java_lang_class_instance = vm.create_instance_of_java_lang_class(stack, &class_name)?;
     Ok(Some(Value::Object(java_lang_class_instance)))
-}
-
-fn float_to_raw_int_bits<'a>(args: &[Value<'a>]) -> Result<Option<Value<'a>>, VmError> {
-    let arg = expect_float_at(args, 0)?;
-    let int_bits: i32 = arg.to_bits() as i32;
-    Ok(Some(Value::Int(int_bits)))
-}
-
-fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> Result<Option<Value<'a>>, VmError> {
-    let arg = expect_double_at(args, 0)?;
-    let long_bits: i64 = arg.to_bits() as i64;
-    Ok(Some(Value::Long(long_bits)))
 }
