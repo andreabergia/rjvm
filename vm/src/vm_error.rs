@@ -34,15 +34,12 @@ pub enum VmError {
     #[error("class cast exception")]
     ClassCastException,
 
-    #[error("unexpected error")]
-    UnexpectedError,
+    #[error("class reading error: {0}")]
+    ClassReaderError(ClassReaderError),
 }
 
 impl From<ClassReaderError> for VmError {
     fn from(value: ClassReaderError) -> Self {
-        match value {
-            ClassReaderError::ValidationError(_) => Self::ValidationException,
-            _ => Self::UnexpectedError,
-        }
+        Self::ClassReaderError(value)
     }
 }

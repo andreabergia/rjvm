@@ -1,9 +1,9 @@
 use thiserror::Error;
 
-use crate::{constant_pool::InvalidConstantPoolIndexError, instruction::Instruction};
+use crate::constant_pool::InvalidConstantPoolIndexError;
 use rjvm_utils::buffer::BufferError;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum ClassReaderError {
     #[error("generic I/O error: {0}")]
     IoError(String),
@@ -13,12 +13,6 @@ pub enum ClassReaderError {
 
     #[error("unsupported class file version {0}.{1}")]
     UnsupportedVersion(u16, u16),
-
-    #[error("unsupported instruction: {0:?}")]
-    UnsupportedInstruction(Instruction),
-
-    #[error("validation error: {0}")]
-    ValidationError(String),
 
     #[error("Invalid type descriptor: {0}")]
     InvalidTypeDescriptor(String),
