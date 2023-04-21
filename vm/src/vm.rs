@@ -13,7 +13,7 @@ use crate::{
     class_manager::{ClassManager, ResolvedClass},
     class_path::ClassPathParseError,
     gc::ObjectAllocator,
-    native_methods::NativeMethodsRegistry,
+    native_methods_registry::NativeMethodsRegistry,
     time::{get_current_time_millis, get_nano_time},
     value,
     value::{ObjectRef, Value},
