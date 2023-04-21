@@ -5,9 +5,6 @@ use rjvm_utils::buffer::BufferError;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ClassReaderError {
-    #[error("generic I/O error: {0}")]
-    IoError(String),
-
     #[error("invalid class file: {0}")]
     InvalidClassData(String),
 
@@ -23,12 +20,6 @@ pub type Result<T> = std::result::Result<T, ClassReaderError>;
 impl From<InvalidConstantPoolIndexError> for ClassReaderError {
     fn from(value: InvalidConstantPoolIndexError) -> Self {
         Self::InvalidClassData(value.to_string())
-    }
-}
-
-impl From<std::io::Error> for ClassReaderError {
-    fn from(err: std::io::Error) -> Self {
-        Self::IoError(format!("{err}"))
     }
 }
 

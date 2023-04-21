@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use log::warn;
 use result::prelude::*;
 
@@ -457,11 +455,6 @@ impl<'a> ClassFileReader<'a> {
             bytes: Vec::from(bytes),
         })
     }
-}
-
-pub fn read(path: &Path) -> Result<ClassFile> {
-    let buf = std::fs::read(path)?;
-    read_buffer(&buf)
 }
 
 pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
