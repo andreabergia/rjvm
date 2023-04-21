@@ -8,6 +8,7 @@ mod class_path;
 mod class_path_entry;
 mod gc;
 pub mod native_methods;
+pub mod stack_trace_element;
 mod time;
 pub mod value;
 mod value_stack;

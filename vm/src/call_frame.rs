@@ -17,6 +17,7 @@ use crate::{
     call_stack::CallStack,
     class::Class,
     class_and_method::ClassAndMethod,
+    stack_trace_element::StackTraceElement,
     value::{
         ArrayRef, ObjectRef, Value,
         Value::{Array, Double, Float, Int, Long, Null, Object},
@@ -226,19 +227,13 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    pub fn to_stack_trace_element(&self) -> String {
-        let name = format!(
-            "{}::{}",
-            self.class_and_method.class.name, self.class_and_method.method.name,
-        );
-
-        if let Some(file_name) = &self.class_and_method.class.source_file {
-            if let Some(line_number) = self.get_line_number() {
-                return format!("{} ({}:{})", name, file_name, line_number);
-            }
-            return format!("{} ({})", name, file_name);
+    pub fn to_stack_trace_element(&self) -> StackTraceElement<'a> {
+        StackTraceElement {
+            class_name: &self.class_and_method.class.name,
+            method_name: &self.class_and_method.method.name,
+            source_file: &self.class_and_method.class.source_file,
+            line_number: self.get_line_number(),
         }
-        name
     }
 
     fn get_line_number(&self) -> Option<LineNumber> {
