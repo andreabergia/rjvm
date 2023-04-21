@@ -11,7 +11,6 @@ use crate::{
 pub type NativeCallback<'a> = fn(
     &mut Vm<'a>,
     &mut CallStack<'a>,
-    class_and_method: ClassAndMethod<'a>,
     Option<ObjectRef<'a>>,
     Vec<Value<'a>>,
 ) -> Result<Option<Value<'a>>, VmError>;

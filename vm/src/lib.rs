@@ -7,6 +7,7 @@ mod class_manager;
 mod class_path;
 mod class_path_entry;
 mod gc;
+mod native_methods_impl;
 pub mod native_methods_registry;
 pub mod stack_trace_element;
 mod time;
