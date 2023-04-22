@@ -31,7 +31,7 @@ pub struct ConstantPool {
 }
 
 /// Error used to signal that an attempt was made to access a non existing constant pool entry.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 #[error("invalid constant pool index: {index}")]
 pub struct InvalidConstantPoolIndexError {
     pub index: u16,

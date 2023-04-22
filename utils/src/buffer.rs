@@ -8,8 +8,8 @@ pub struct Buffer<'a> {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum BufferError {
-    #[error("unexpected end of class file")]
-    UnexpectedEndOfClassFile,
+    #[error("unexpected end of data")]
+    UnexpectedEndOfData,
 
     #[error("invalid cesu8 string")]
     InvalidCesu8String,
@@ -27,7 +27,7 @@ impl<'a> Buffer<'a> {
 
     fn advance(&mut self, size: usize) -> Result<&'a [u8]> {
         if self.position + size > self.buffer.len() {
-            Err(BufferError::UnexpectedEndOfClassFile)
+            Err(BufferError::UnexpectedEndOfData)
         } else {
             let slice = &self.buffer[self.position..self.position + size];
             self.position += size;

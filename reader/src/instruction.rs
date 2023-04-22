@@ -363,8 +363,8 @@ impl Instruction {
             0xba => {
                 let constant_index = Self::read_u16(raw_code, &mut address)?;
                 if Self::read_u16(raw_code, &mut address)? != 0 {
-                    return Err(ClassReaderError::InvalidClassData(
-                        "expected two zero bytes after invokedynamic and the index".to_string(),
+                    return Err(ClassReaderError::invalid_class_data(
+                        format!("expected two zero bytes after invokedynamic and the index at address {address}")
                     ));
                 }
                 Instruction::Invokedynamic(constant_index)
@@ -373,8 +373,8 @@ impl Instruction {
                 let constant_index = Self::read_u16(raw_code, &mut address)?;
                 let count = Self::read_u8(raw_code, &mut address)?;
                 if Self::read_u8(raw_code, &mut address)? != 0 {
-                    return Err(ClassReaderError::InvalidClassData(
-                        "expected a zero byte after invokeinterface and the index".to_string(),
+                    return Err(ClassReaderError::invalid_class_data(
+                        format!("expected a zero byte after invokeinterface and the index at address {address}"),
                     ));
                 }
                 Instruction::Invokeinterface(constant_index, count)
@@ -457,8 +457,8 @@ impl Instruction {
                     10 => NewArrayType::Int,
                     11 => NewArrayType::Long,
                     _ => {
-                        return Err(ClassReaderError::InvalidClassData(format!(
-                            "invalid type for newarray: {array_type_byte:#04x}"
+                        return Err(ClassReaderError::invalid_class_data(format!(
+                            "invalid type for newarray: {array_type_byte:#04x} at address {address}"
                         )))
                     }
                 };
@@ -484,8 +484,8 @@ impl Instruction {
                 todo!()
             }
             _ => {
-                return Err(ClassReaderError::InvalidClassData(format!(
-                    "invalid op code: {op_byte:#04x}"
+                return Err(ClassReaderError::invalid_class_data(format!(
+                    "invalid op code: {op_byte:#04x} at address {address}"
                 )))
             }
         };
@@ -508,19 +508,20 @@ impl Instruction {
         Ok(instructions)
     }
 
-    fn byte_at(raw_code: &[u8], index: usize) -> Result<u8, ClassReaderError> {
+    fn byte_at(raw_code: &[u8], address: usize) -> Result<u8, ClassReaderError> {
         let op_byte = *raw_code
-            .get(index)
-            .ok_or(ClassReaderError::InvalidClassData(format!(
-                "cannot read instruction at offset {}",
-                index
+            .get(address)
+            .ok_or(ClassReaderError::invalid_class_data(format!(
+                "cannot read instruction at address {address}"
             )))?;
         Ok(op_byte)
     }
 
     fn read_u8(raw_code: &[u8], address: &mut usize) -> Result<u8, ClassReaderError> {
         let byte = Self::byte_at(raw_code, *address).map_err(|_| {
-            ClassReaderError::InvalidClassData("cannot find arguments for instruction".to_string())
+            ClassReaderError::invalid_class_data(format!(
+                "cannot find arguments for instruction at address {address}"
+            ))
         })?;
         *address += 1;
         Ok(byte)
@@ -546,7 +547,10 @@ impl Instruction {
         let instruction_address = *address - 1;
         let offset = Self::read_i16(raw_code, address)?;
         let jump_address = (instruction_address as i32) + (offset as i32);
-        u16::try_from(jump_address)
-            .map_err(|_| ClassReaderError::InvalidClassData("invalid jump offset".to_string()))
+        u16::try_from(jump_address).map_err(|_| {
+            ClassReaderError::invalid_class_data(format!(
+                "invalid jump offset at address {address}"
+            ))
+        })
     }
 }

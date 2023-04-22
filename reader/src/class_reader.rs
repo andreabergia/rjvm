@@ -3,6 +3,7 @@ use result::prelude::*;
 
 use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
+use crate::class_reader_error::ClassReaderError;
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
@@ -10,7 +11,7 @@ use crate::{
     class_file_field::{ClassFileField, FieldConstantValue},
     class_file_method::{ClassFileMethod, ClassFileMethodCode},
     class_file_version::ClassFileVersion,
-    class_reader_error::{ClassReaderError::InvalidClassData, Result},
+    class_reader_error::Result,
     constant_pool::{ConstantPool, ConstantPoolEntry},
     field_flags::FieldFlags,
     field_type::FieldType,
@@ -52,7 +53,9 @@ impl<'a> ClassFileReader<'a> {
     fn check_magic_number(&mut self) -> Result<()> {
         match self.buffer.read_u32() {
             Ok(0xCAFEBABE) => Ok(()),
-            Ok(_) => Err(InvalidClassData("invalid magic number".to_owned())),
+            Ok(_) => Err(ClassReaderError::invalid_class_data(
+                "invalid magic number".to_owned(),
+            )),
             Err(err) => Err(err.into()),
         }
     }
@@ -90,7 +93,7 @@ impl<'a> ClassFileReader<'a> {
                 12 => self.read_name_and_type_constant()?,
                 _ => {
                     warn!("invalid entry in constant pool at index {} tag {}", i, tag);
-                    return Err(InvalidClassData(format!(
+                    return Err(ClassReaderError::invalid_class_data(format!(
                         "Unknown constant type: 0x{tag:X}"
                     )));
                 }
@@ -192,7 +195,9 @@ impl<'a> ClassFileReader<'a> {
                 self.class_file.flags = flags;
                 Ok(())
             }
-            None => Err(InvalidClassData(format!("invalid class flags: {num}"))),
+            None => Err(ClassReaderError::invalid_class_data(format!(
+                "invalid class flags: {num}"
+            ))),
         }
     }
 
@@ -259,8 +264,8 @@ impl<'a> ClassFileReader<'a> {
         let field_flags_bits = self.buffer.read_u16()?;
         match FieldFlags::from_bits(field_flags_bits) {
             Some(flags) => Ok(flags),
-            None => Err(InvalidClassData(format!(
-                "invalid field flags: {field_flags_bits}"
+            None => Err(ClassReaderError::invalid_class_data(format!(
+                "invalid field flags: {field_flags_bits:#0x}"
             ))),
         }
     }
@@ -274,7 +279,7 @@ impl<'a> ClassFileReader<'a> {
             .filter(|attr| attr.name == "ConstantValue")
             .map(|attr| {
                 if attr.bytes.len() != std::mem::size_of::<u16>() {
-                    Err(InvalidClassData(
+                    Err(ClassReaderError::invalid_class_data(
                         "invalid attribute of type ConstantValue".to_string(),
                     ))
                 } else {
@@ -293,7 +298,7 @@ impl<'a> ClassFileReader<'a> {
                             ConstantPoolEntry::Float(v) => Ok(FieldConstantValue::Float(*v)),
                             ConstantPoolEntry::Long(v) => Ok(FieldConstantValue::Long(*v)),
                             ConstantPoolEntry::Double(v) => Ok(FieldConstantValue::Double(*v)),
-                            v => Err(InvalidClassData(format!(
+                            v => Err(ClassReaderError::invalid_class_data(format!(
                                 "invalid type for ConstantValue: {v:?}"
                             ))),
                         })
@@ -326,7 +331,7 @@ impl<'a> ClassFileReader<'a> {
         let code = if flags.contains(MethodFlags::NATIVE) || flags.contains(MethodFlags::ABSTRACT) {
             None
         } else {
-            Some(self.extract_code(&raw_attributes)?)
+            Some(self.extract_code(&raw_attributes, &name)?)
         };
         let deprecated = self.search_deprecated_attribute(&raw_attributes);
 
@@ -345,13 +350,17 @@ impl<'a> ClassFileReader<'a> {
         let method_flags_bits = self.buffer.read_u16()?;
         match MethodFlags::from_bits(method_flags_bits) {
             Some(flags) => Ok(flags),
-            None => Err(InvalidClassData(format!(
-                "invalid method flags: {method_flags_bits}"
+            None => Err(ClassReaderError::invalid_class_data(format!(
+                "invalid method flags: {method_flags_bits:#0x}"
             ))),
         }
     }
 
-    fn extract_code(&self, raw_attributes: &[Attribute]) -> Result<ClassFileMethodCode> {
+    fn extract_code(
+        &self,
+        raw_attributes: &[Attribute],
+        name: &str,
+    ) -> Result<ClassFileMethodCode> {
         raw_attributes
             .iter()
             .filter(|attr| attr.name == "Code")
@@ -378,7 +387,11 @@ impl<'a> ClassFileReader<'a> {
             })
             .next()
             .invert()?
-            .ok_or_else(|| InvalidClassData("method is missing code attribute".to_string()))
+            .ok_or_else(|| {
+                ClassReaderError::invalid_class_data(format!(
+                    "method {name} is missing code attribute"
+                ))
+            })
     }
 
     fn extract_line_number_table(
@@ -425,7 +438,9 @@ impl<'a> ClassFileReader<'a> {
                     .map_err(|err| err.into())
                     .and_then(|entry| match entry {
                         ConstantPoolEntry::Utf8(file_name) => Ok(file_name.clone()),
-                        _ => Err(InvalidClassData("invalid SourceFile attribute".to_string())),
+                        _ => Err(ClassReaderError::invalid_class_data(
+                            "invalid SourceFile attribute".to_string(),
+                        )),
                     })
             })
             .invert()
@@ -470,7 +485,7 @@ mod tests {
         let data = vec![0x00, 0x01, 0x02, 0x03];
         assert!(matches!(
             read_buffer(&data),
-            Err(ClassReaderError::InvalidClassData(s)) if s == "invalid magic number"
+            Err(ClassReaderError::InvalidClassData(s, None)) if s == "invalid magic number"
         ));
     }
 }
