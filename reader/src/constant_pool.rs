@@ -167,15 +167,10 @@ impl fmt::Display for ConstantPool {
         writeln!(f, "Constant pool: (size: {})", self.entries.len())?;
         for (raw_idx, _) in self.entries.iter().enumerate() {
             let index = (raw_idx + 1) as u16;
-            writeln!(f, "    {}, {}", index, self.fmt_entry(index)?)?;
+            let entry_text = self.fmt_entry(index).map_err(|_| fmt::Error::default())?;
+            writeln!(f, "    {}, {}", index, entry_text)?;
         }
         Ok(())
-    }
-}
-
-impl From<InvalidConstantPoolIndexError> for fmt::Error {
-    fn from(_: InvalidConstantPoolIndexError) -> fmt::Error {
-        fmt::Error {}
     }
 }
 
