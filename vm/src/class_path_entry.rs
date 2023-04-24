@@ -1,6 +1,4 @@
-use std::error::Error;
-use std::fmt;
-use std::fmt::Formatter;
+use std::{error::Error, fmt, fmt::Formatter};
 
 pub trait ClassPathEntry: fmt::Debug {
     // TODO: should `class_name` be a newtype?

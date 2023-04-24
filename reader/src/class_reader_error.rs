@@ -1,5 +1,7 @@
-use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+};
 
 use crate::constant_pool::InvalidConstantPoolIndexError;
 use rjvm_utils::buffer::BufferError;

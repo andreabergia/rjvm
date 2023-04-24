@@ -3,7 +3,6 @@ use result::prelude::*;
 
 use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
-use crate::class_reader_error::ClassReaderError;
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
@@ -11,7 +10,7 @@ use crate::{
     class_file_field::{ClassFileField, FieldConstantValue},
     class_file_method::{ClassFileMethod, ClassFileMethodCode},
     class_file_version::ClassFileVersion,
-    class_reader_error::Result,
+    class_reader_error::{ClassReaderError, Result},
     constant_pool::{ConstantPool, ConstantPoolEntry},
     field_flags::FieldFlags,
     field_type::FieldType,
