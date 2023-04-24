@@ -11,6 +11,12 @@ pub struct LineNumberTable {
 }
 
 impl LineNumberTable {
+    pub fn new(entries: Vec<LineNumberTableEntry>) -> Self {
+        Self {
+            entries: entries.into_iter().sorted().collect(),
+        }
+    }
+
     pub fn lookup_pc(&self, pc: ProgramCounter) -> LineNumber {
         let best_matching_entry_index = match self
             .entries
@@ -20,14 +26,6 @@ impl LineNumberTable {
             Err(index) => index - 1,
         };
         self.entries[best_matching_entry_index].line_number
-    }
-}
-
-impl LineNumberTable {
-    pub fn new(entries: Vec<LineNumberTableEntry>) -> Self {
-        Self {
-            entries: entries.into_iter().sorted().collect(),
-        }
     }
 }
 
