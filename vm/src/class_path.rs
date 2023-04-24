@@ -1,7 +1,9 @@
 use thiserror::Error;
 
-use crate::class_path_entry::{
-    ClassLoadingError, ClassPathEntry, FileSystemClassPathEntry, JarFileClassPathEntry,
+use crate::{
+    class_path_entry::{ClassLoadingError, ClassPathEntry},
+    file_system_class_path_entry::FileSystemClassPathEntry,
+    jar_file_class_path_entry::JarFileClassPathEntry,
 };
 
 #[allow(dead_code)]
@@ -12,7 +14,7 @@ pub struct ClassPath {
 
 #[derive(Error, Debug, PartialEq)]
 pub enum ClassPathParseError {
-    #[error("invalid entry: {0}")]
+    #[error("invalid classpath entry: {0}")]
     InvalidEntry(String),
 }
 
