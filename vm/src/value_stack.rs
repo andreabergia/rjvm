@@ -3,13 +3,21 @@ use std::{
     slice::{Iter, SliceIndex},
 };
 
-use VmError::ValidationException;
+use thiserror::Error;
 
-use crate::{value::Value, vm_error::VmError};
+use crate::value::Value;
 
 #[derive(Debug)]
 pub struct ValueStack<'a> {
     stack: Vec<Value<'a>>,
+}
+
+#[derive(Error, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ValueStackError {
+    #[error("trying to grow stack beyond maximum capacity")]
+    MaximumCapacityReached,
+    #[error("cannot pop from an empty stack")]
+    CannotPopFromEmptyStack,
 }
 
 impl<'a> ValueStack<'a> {
@@ -23,20 +31,22 @@ impl<'a> ValueStack<'a> {
         self.stack.len()
     }
 
-    pub fn push(&mut self, value: Value<'a>) -> Result<(), VmError> {
+    pub fn push(&mut self, value: Value<'a>) -> Result<(), ValueStackError> {
         if self.stack.len() < self.stack.capacity() {
             self.stack.push(value);
             Ok(())
         } else {
-            Err(ValidationException)
+            Err(ValueStackError::MaximumCapacityReached)
         }
     }
 
-    pub fn pop(&mut self) -> Result<Value<'a>, VmError> {
-        self.stack.pop().ok_or(ValidationException)
+    pub fn pop(&mut self) -> Result<Value<'a>, ValueStackError> {
+        self.stack
+            .pop()
+            .ok_or(ValueStackError::CannotPopFromEmptyStack)
     }
 
-    pub fn pop2(&mut self) -> Result<Value<'a>, VmError> {
+    pub fn pop2(&mut self) -> Result<Value<'a>, ValueStackError> {
         let value = self.pop()?;
         match value {
             Value::Long(_) | Value::Double(_) => Ok(value),
@@ -44,9 +54,9 @@ impl<'a> ValueStack<'a> {
         }
     }
 
-    pub fn truncate(&mut self, len: usize) -> Result<(), VmError> {
+    pub fn truncate(&mut self, len: usize) -> Result<(), ValueStackError> {
         if len > self.stack.capacity() {
-            Err(ValidationException)
+            Err(ValueStackError::MaximumCapacityReached)
         } else {
             self.stack.truncate(len);
             Ok(())
@@ -61,92 +71,65 @@ impl<'a> ValueStack<'a> {
         self.stack.iter()
     }
 
-    pub fn dup(&mut self) -> Result<(), VmError> {
-        if self.stack.len() < self.stack.capacity() {
-            match self.stack.last() {
-                None => Err(ValidationException),
-                Some(head) => {
-                    self.stack.push(head.clone());
-                    Ok(())
-                }
-            }
-        } else {
-            Err(ValidationException)
+    pub fn dup(&mut self) -> Result<(), ValueStackError> {
+        match self.stack.last() {
+            None => Err(ValueStackError::CannotPopFromEmptyStack),
+            Some(head) => self.push(head.clone()),
         }
     }
 
-    pub fn dup_x1(&mut self) -> Result<(), VmError> {
-        if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop()?;
-            let value2 = self.pop()?;
-            self.push(value1.clone())?;
-            self.push(value2)?;
-            self.push(value1)
-        } else {
-            Err(ValidationException)
-        }
+    pub fn dup_x1(&mut self) -> Result<(), ValueStackError> {
+        let value1 = self.pop()?;
+        let value2 = self.pop()?;
+        self.push(value1.clone())?;
+        self.push(value2)?;
+        self.push(value1)
     }
 
-    pub fn dup_x2(&mut self) -> Result<(), VmError> {
-        if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop()?;
-            let value2 = self.pop()?;
-            let value3 = self.pop()?;
-            self.push(value1.clone())?;
-            self.push(value3)?;
-            self.push(value2)?;
-            self.push(value1)
-        } else {
-            Err(ValidationException)
-        }
+    pub fn dup_x2(&mut self) -> Result<(), ValueStackError> {
+        let value1 = self.pop()?;
+        let value2 = self.pop()?;
+        let value3 = self.pop()?;
+        self.push(value1.clone())?;
+        self.push(value3)?;
+        self.push(value2)?;
+        self.push(value1)
     }
 
-    pub fn dup2(&mut self) -> Result<(), VmError> {
-        if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop()?;
-            let value2 = self.pop()?;
-            self.push(value2.clone())?;
-            self.push(value1.clone())?;
-            self.push(value2)?;
-            self.push(value1)
-        } else {
-            Err(ValidationException)
-        }
+    pub fn dup2(&mut self) -> Result<(), ValueStackError> {
+        let value1 = self.pop()?;
+        let value2 = self.pop()?;
+        self.push(value2.clone())?;
+        self.push(value1.clone())?;
+        self.push(value2)?;
+        self.push(value1)
     }
 
-    pub fn dup2_x1(&mut self) -> Result<(), VmError> {
-        if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop()?;
-            let value2 = self.pop()?;
-            let value3 = self.pop()?;
-            self.push(value2.clone())?;
-            self.push(value1.clone())?;
-            self.push(value3)?;
-            self.push(value2)?;
-            self.push(value1)
-        } else {
-            Err(ValidationException)
-        }
+    pub fn dup2_x1(&mut self) -> Result<(), ValueStackError> {
+        let value1 = self.pop()?;
+        let value2 = self.pop()?;
+        let value3 = self.pop()?;
+        self.push(value2.clone())?;
+        self.push(value1.clone())?;
+        self.push(value3)?;
+        self.push(value2)?;
+        self.push(value1)
     }
 
-    pub fn dup2_x2(&mut self) -> Result<(), VmError> {
-        if self.stack.len() < self.stack.capacity() {
-            let value1 = self.pop()?;
-            let value2 = self.pop()?;
-            let value3 = self.pop()?;
-            let value4 = self.pop()?;
-            self.push(value2.clone())?;
-            self.push(value1.clone())?;
-            self.push(value4)?;
-            self.push(value3)?;
-            self.push(value2)?;
-            self.push(value1)
-        } else {
-            Err(ValidationException)
-        }
+    pub fn dup2_x2(&mut self) -> Result<(), ValueStackError> {
+        let value1 = self.pop()?;
+        let value2 = self.pop()?;
+        let value3 = self.pop()?;
+        let value4 = self.pop()?;
+        self.push(value2.clone())?;
+        self.push(value1.clone())?;
+        self.push(value4)?;
+        self.push(value3)?;
+        self.push(value2)?;
+        self.push(value1)
     }
 
-    pub fn swap(&mut self) -> Result<(), VmError> {
+    pub fn swap(&mut self) -> Result<(), ValueStackError> {
         let value1 = self.pop()?;
         let value2 = self.pop()?;
         self.push(value1)?;

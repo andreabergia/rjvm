@@ -2,6 +2,8 @@ use thiserror::Error;
 
 use rjvm_reader::class_reader_error::ClassReaderError;
 
+use crate::value_stack::ValueStackError;
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum VmError {
     #[error("unexpected error loading class")]
@@ -41,5 +43,12 @@ pub enum VmError {
 impl From<ClassReaderError> for VmError {
     fn from(value: ClassReaderError) -> Self {
         Self::ClassReaderError(value)
+    }
+}
+
+// TODO: remove once we implement exceptions
+impl From<ValueStackError> for VmError {
+    fn from(_: ValueStackError) -> Self {
+        Self::ValidationException
     }
 }

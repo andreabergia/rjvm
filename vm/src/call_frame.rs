@@ -30,7 +30,7 @@ use crate::{
 macro_rules! generate_pop {
     ($name:ident, $variant:ident, $type:ty) => {
         fn $name(&mut self) -> Result<$type, VmError> {
-            let value = self.stack.pop()?;
+            let value = self.pop()?;
             match value {
                 $variant(value) => Ok(value),
                 _ => Err(VmError::ValidationException),
@@ -45,7 +45,7 @@ macro_rules! generate_execute_return {
             if !self.class_and_method.returns(Base(BaseType::$variant)) {
                 return Err(VmError::ValidationException);
             }
-            let result = self.stack.pop()?;
+            let result = self.pop()?;
             self.debug_done_execution(Some(&result));
             return Ok(Some(result));
         }
@@ -61,7 +61,7 @@ macro_rules! generate_execute_math {
             let val2 = self.$pop_fn()?;
             let val1 = self.$pop_fn()?;
             let result = evaluator(val1, val2)?;
-            self.stack.push($variant(result))
+            self.push($variant(result))
         }
     };
 }
@@ -70,7 +70,7 @@ macro_rules! generate_execute_neg {
     ($name:ident, $pop_fn:ident, $variant:ident) => {
         fn $name(&mut self) -> Result<(), VmError> {
             let value = self.$pop_fn()?;
-            self.stack.push($variant(-value))
+            self.push($variant(-value))
         }
     };
 }
@@ -83,7 +83,7 @@ macro_rules! generate_execute_coerce {
         {
             let value = self.$pop_fn()?;
             let coerced = evaluator(value);
-            self.stack.push(coerced)
+            self.push(coerced)
         }
     };
 }
@@ -94,11 +94,11 @@ macro_rules! generate_compare {
             let val2 = self.$pop_fn()?;
             let val1 = self.$pop_fn()?;
             if val1 > val2 {
-                self.stack.push(Int(sign_for_greater))
+                self.push(Int(sign_for_greater))
             } else if val1 < val2 {
-                self.stack.push(Int(-sign_for_greater))
+                self.push(Int(-sign_for_greater))
             } else {
-                self.stack.push(Int(0))
+                self.push(Int(0))
             }
         }
     };
@@ -110,7 +110,7 @@ macro_rules! generate_execute_load {
             let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
             match local {
                 $($variant(..) => {
-                    self.stack.push(local.clone())
+                    self.push(local.clone())
                 }),+
                 _ => Err(VmError::ValidationException),
             }
@@ -121,7 +121,7 @@ macro_rules! generate_execute_load {
 macro_rules! generate_execute_store {
     ($name:ident, $variant:ident) => {
         fn $name(&mut self, index: usize) -> Result<(), VmError> {
-            let value = self.stack.pop()?;
+            let value = self.pop()?;
             match value {
                 $variant(..) => {
                     self.locals[index] = value;
@@ -146,7 +146,7 @@ macro_rules! generate_execute_array_load {
                     .map(|value| value.clone()),)+
                 _ => return Err(VmError::ValidationException),
             }?;
-            self.stack.push(value)
+            self.push(value)
         }
     };
 }
@@ -260,7 +260,7 @@ impl<'a> CallFrame<'a> {
             self.pc = ProgramCounter(new_address as u16);
 
             match instruction {
-                Instruction::Aconst_null => self.stack.push(Null)?,
+                Instruction::Aconst_null => self.push(Null)?,
                 Instruction::Aload(index) => self.execute_aload(index.into_usize_safe())?,
                 Instruction::Aload_0 => self.execute_aload(0)?,
                 Instruction::Aload_1 => self.execute_aload(1)?,
@@ -285,23 +285,23 @@ impl<'a> CallFrame<'a> {
                 Instruction::Istore_2 => self.execute_istore(2)?,
                 Instruction::Istore_3 => self.execute_istore(3)?,
 
-                Instruction::Iconst_m1 => self.stack.push(Int(-1))?,
-                Instruction::Iconst_0 => self.stack.push(Int(0))?,
-                Instruction::Iconst_1 => self.stack.push(Int(1))?,
-                Instruction::Iconst_2 => self.stack.push(Int(2))?,
-                Instruction::Iconst_3 => self.stack.push(Int(3))?,
-                Instruction::Iconst_4 => self.stack.push(Int(4))?,
-                Instruction::Iconst_5 => self.stack.push(Int(5))?,
+                Instruction::Iconst_m1 => self.push(Int(-1))?,
+                Instruction::Iconst_0 => self.push(Int(0))?,
+                Instruction::Iconst_1 => self.push(Int(1))?,
+                Instruction::Iconst_2 => self.push(Int(2))?,
+                Instruction::Iconst_3 => self.push(Int(3))?,
+                Instruction::Iconst_4 => self.push(Int(4))?,
+                Instruction::Iconst_5 => self.push(Int(5))?,
 
-                Instruction::Lconst_0 => self.stack.push(Long(0))?,
-                Instruction::Lconst_1 => self.stack.push(Long(1))?,
+                Instruction::Lconst_0 => self.push(Long(0))?,
+                Instruction::Lconst_1 => self.push(Long(1))?,
 
-                Instruction::Fconst_0 => self.stack.push(Float(0f32))?,
-                Instruction::Fconst_1 => self.stack.push(Float(1f32))?,
-                Instruction::Fconst_2 => self.stack.push(Float(2f32))?,
+                Instruction::Fconst_0 => self.push(Float(0f32))?,
+                Instruction::Fconst_1 => self.push(Float(1f32))?,
+                Instruction::Fconst_2 => self.push(Float(2f32))?,
 
-                Instruction::Dconst_0 => self.stack.push(Double(0f64))?,
-                Instruction::Dconst_1 => self.stack.push(Double(1f64))?,
+                Instruction::Dconst_0 => self.push(Double(0f64))?,
+                Instruction::Dconst_1 => self.push(Double(1f64))?,
 
                 Instruction::Lload(index) => self.execute_lload(index.into_usize_safe())?,
                 Instruction::Lload_0 => self.execute_lload(0)?,
@@ -366,7 +366,7 @@ impl<'a> CallFrame<'a> {
                     let new_object_class_name =
                         self.get_constant_class_reference(constant_index)?;
                     let new_object = vm.new_object(call_stack, new_object_class_name)?;
-                    self.stack.push(Object(new_object))?;
+                    self.push(Object(new_object))?;
                 }
 
                 Instruction::Dup => self.stack.dup()?,
@@ -379,8 +379,8 @@ impl<'a> CallFrame<'a> {
                 Instruction::Pop2 => self.stack.pop2().map(|_| ())?,
                 Instruction::Swap => self.stack.swap()?,
 
-                Instruction::Bipush(byte_value) => self.stack.push(Int(byte_value as i32))?,
-                Instruction::Sipush(short_value) => self.stack.push(Int(short_value as i32))?,
+                Instruction::Bipush(byte_value) => self.push(Int(byte_value as i32))?,
+                Instruction::Sipush(short_value) => self.push(Int(short_value as i32))?,
 
                 Instruction::Invokespecial(constant_index) => {
                     self.invoke_method(vm, call_stack, constant_index, InvokeKind::Special)?
@@ -621,6 +621,14 @@ impl<'a> CallFrame<'a> {
         }
     }
 
+    fn push(&mut self, value: Value<'a>) -> Result<(), VmError> {
+        self.stack.push(value).map_err(|err| err.into())
+    }
+
+    fn pop(&mut self) -> Result<Value<'a>, VmError> {
+        self.stack.pop().map_err(|err| err.into())
+    }
+
     fn i2b(value: i32) -> Value<'a> {
         Int((value as i8) as i32)
     }
@@ -706,7 +714,7 @@ impl<'a> CallFrame<'a> {
 
         Self::validate_type_opt(vm, method_return_type, &result)?;
         if let Some(value) = result {
-            self.stack.push(value)?;
+            self.push(value)?;
         }
         Ok(())
     }
@@ -730,7 +738,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_object, Object, ObjectRef<'a>);
 
     fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), VmError> {
-        let receiver = self.stack.pop()?;
+        let receiver = self.pop()?;
         match receiver {
             Array(field_type, vector) => Ok((field_type, vector)),
             _ => Err(VmError::ValidationException),
@@ -1007,7 +1015,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_areturn(&mut self) -> Result<Option<Value<'a>>, VmError> {
-        let result = self.stack.pop()?;
+        let result = self.pop()?;
         self.debug_done_execution(Some(&result));
         Ok(Some(result))
     }
@@ -1043,7 +1051,7 @@ impl<'a> CallFrame<'a> {
         let val2 = self.pop_int()?;
         let val1 = self.pop_long()?;
         let result = evaluator(val1, val2)?;
-        self.stack.push(Long(result))
+        self.push(Long(result))
     }
 
     fn is_double_division_returning_nan(a: f64, b: f64) -> bool {
@@ -1091,7 +1099,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_if_null(&mut self, jump_address: u16, jump_on_null: bool) -> Result<(), VmError> {
-        let value = self.stack.pop()?;
+        let value = self.pop()?;
         match value {
             Object(_) | Array(..) => {
                 if !jump_on_null {
@@ -1109,8 +1117,8 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_if_acmp(&mut self, jump_address: u16, jump_on_equal: bool) -> Result<(), VmError> {
-        let value2 = self.stack.pop()?;
-        let value1 = self.stack.pop()?;
+        let value2 = self.pop()?;
+        let value1 = self.pop()?;
         let equal = match value1 {
             Object(object1) => match value2 {
                 Object(object2) => std::ptr::eq(object1, object2),
@@ -1146,7 +1154,7 @@ impl<'a> CallFrame<'a> {
     fn execute_aload(&mut self, index: usize) -> Result<(), VmError> {
         let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
         match local {
-            Object(..) | Array(..) | Null => self.stack.push(local.clone()),
+            Object(..) | Array(..) | Null => self.push(local.clone()),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -1157,7 +1165,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_load!(execute_dload, Double);
 
     fn execute_astore(&mut self, index: usize) -> Result<(), VmError> {
-        let value = self.stack.pop()?;
+        let value = self.pop()?;
         match value {
             Object(..) | Array(..) => {
                 self.locals[index] = value;
@@ -1184,15 +1192,15 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), VmError> {
         let constant_value = self.get_constant(index)?;
         match constant_value {
-            ConstantPoolEntry::Integer(value) => self.stack.push(Int(*value)),
-            ConstantPoolEntry::Float(value) => self.stack.push(Float(*value)),
+            ConstantPoolEntry::Integer(value) => self.push(Int(*value)),
+            ConstantPoolEntry::Float(value) => self.push(Float(*value)),
             ConstantPoolEntry::StringReference(string_index) => {
                 let constant = self.get_constant(*string_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(string) => {
                         let string_object =
                             vm.create_java_lang_string_instance(call_stack, string)?;
-                        self.stack.push(Object(string_object))
+                        self.push(Object(string_object))
                     }
                     _ => Err(VmError::ValidationException),
                 }
@@ -1203,7 +1211,7 @@ impl<'a> CallFrame<'a> {
                     ConstantPoolEntry::Utf8(class_name) => {
                         let class_object =
                             vm.create_instance_of_java_lang_class(call_stack, class_name)?;
-                        self.stack.push(Object(class_object))
+                        self.push(Object(class_object))
                     }
                     _ => Err(VmError::ValidationException),
                 }
@@ -1216,8 +1224,8 @@ impl<'a> CallFrame<'a> {
     fn execute_ldc_long_double(&mut self, index: u16) -> Result<(), VmError> {
         let constant_value = self.get_constant(index)?;
         match constant_value {
-            ConstantPoolEntry::Long(value) => self.stack.push(Long(*value)),
-            ConstantPoolEntry::Double(value) => self.stack.push(Double(*value)),
+            ConstantPoolEntry::Long(value) => self.push(Long(*value)),
+            ConstantPoolEntry::Double(value) => self.push(Double(*value)),
             _ => Err(VmError::ValidationException),
         }
     }
@@ -1239,7 +1247,7 @@ impl<'a> CallFrame<'a> {
         let vec = vec![default_value; length];
         let vec = Rc::new(RefCell::new(vec));
         let array_value = Array(elements_type, vec);
-        self.stack.push(array_value)
+        self.push(array_value)
     }
 
     fn execute_anewarray(&mut self, constant_index: u16) -> Result<(), VmError> {
@@ -1249,12 +1257,12 @@ impl<'a> CallFrame<'a> {
         let vec = vec![Null; length];
         let vec = Rc::new(RefCell::new(vec));
         let array_value = Array(FieldType::Object(class_name.to_string()), vec);
-        self.stack.push(array_value)
+        self.push(array_value)
     }
 
     fn execute_array_length(&mut self) -> Result<(), VmError> {
         let (_, array) = self.pop_array()?;
-        self.stack.push(Int(array.borrow().len() as i32))?;
+        self.push(Int(array.borrow().len() as i32))?;
         Ok(())
     }
 
@@ -1309,7 +1317,7 @@ impl<'a> CallFrame<'a> {
         constant_index: u16,
     ) -> Result<(), VmError> {
         let (is_instance_of, _) = self.is_instanceof(vm, call_stack, constant_index)?;
-        self.stack.push(Int(is_instance_of as i32))
+        self.push(Int(is_instance_of as i32))
     }
 
     fn execute_checkcast(
@@ -1320,7 +1328,7 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), VmError> {
         let (is_instance_of, value) = self.is_instanceof(vm, call_stack, constant_index)?;
         if is_instance_of {
-            self.stack.push(value)
+            self.push(value)
         } else {
             Err(VmError::ClassCastException)
         }
@@ -1346,7 +1354,7 @@ impl<'a> CallFrame<'a> {
             }
         };
 
-        let value = self.stack.pop()?;
+        let value = self.pop()?;
         let is_instance_of = match &value {
             Null => false,
 
@@ -1375,14 +1383,14 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_getfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {
-        let object = self.stack.pop()?;
+        let object = self.pop()?;
         if let Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
             let object_class = vm.get_class_by_id(object_ref.class_id)?;
             let (index, field) = Self::get_field(object_class, field_reference)?;
             let field_value = object_ref.get_field(index);
             Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-            self.stack.push(field_value)?;
+            self.push(field_value)?;
             Ok(())
         } else {
             Err(VmError::ValidationException)
@@ -1390,8 +1398,8 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_putfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {
-        let value = self.stack.pop()?;
-        let object = self.stack.pop()?;
+        let value = self.pop()?;
+        let object = self.pop()?;
         if let Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
             let object_class = vm.get_class_by_id(object_ref.class_id)?;
@@ -1417,7 +1425,7 @@ impl<'a> CallFrame<'a> {
         if let Some(object_ref) = object {
             let field_value = object_ref.get_field(index);
             Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-            self.stack.push(field_value)?;
+            self.push(field_value)?;
             Ok(())
         } else {
             Err(VmError::ValidationException)
@@ -1433,7 +1441,7 @@ impl<'a> CallFrame<'a> {
         let field_reference = self.get_constant_field_reference(field_index)?;
         let object_class = vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
         let (index, field) = Self::get_field(object_class, field_reference)?;
-        let value = self.stack.pop()?;
+        let value = self.pop()?;
         Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
         let object = vm.get_static_instance(self.class_and_method.class.id);
         if let Some(object_ref) = object {
@@ -1445,7 +1453,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_monitorenter(&mut self) -> Result<(), VmError> {
-        let obj = self.stack.pop()?;
+        let obj = self.pop()?;
         match obj {
             Object(_) => {
                 // We don't really have monitors or lock, since we are single-threaded,
@@ -1457,7 +1465,7 @@ impl<'a> CallFrame<'a> {
     }
 
     fn execute_monitorexit(&mut self) -> Result<(), VmError> {
-        let obj = self.stack.pop()?;
+        let obj = self.pop()?;
         match obj {
             Object(_) => {
                 // We don't really have monitors or lock, since we are single-threaded,
