@@ -19,17 +19,19 @@ pub struct ClassFileMethod {
     pub attributes: Vec<Attribute>,
     pub code: Option<ClassFileMethodCode>,
     pub deprecated: bool,
+    pub thrown_exceptions: Vec<String>,
 }
 
 impl fmt::Display for ClassFileMethod {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "{:?} {}: {}{}",
+            "{:?} {}: {}{} throws {:?}",
             self.flags,
             self.name,
             self.parsed_type_descriptor,
-            if self.deprecated { " (deprecated)" } else { "" }
+            if self.deprecated { " (deprecated)" } else { "" },
+            self.thrown_exceptions,
         )?;
         if let Some(code) = &self.code {
             writeln!(f, "  code: {code}")?;
@@ -71,16 +73,16 @@ pub struct ClassFileMethodCode {
     pub max_locals: u16,
     pub code: Vec<u8>,
     pub exception_table: ExceptionTable,
-    pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
     pub line_number_table: Option<LineNumberTable>,
+    pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
 }
 
 impl fmt::Display for ClassFileMethodCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "max_stack = {}, max_locals = {}, exception_table = {:?}, attributes = {:?}, instructions:",
-            self.max_stack, self.max_locals, self.exception_table, self.attributes,
+            "max_stack = {}, max_locals = {}, exception_table = {:?}, line_number_table: {:?}, attributes = {:?}, instructions:",
+            self.max_stack, self.max_locals, self.exception_table, self.line_number_table, self.attributes,
         )?;
 
         let instructions = Instruction::parse_instructions(&self.code);

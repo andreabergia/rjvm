@@ -4,7 +4,7 @@ class ExceptionsHandlers {
     void foo() {
     }
 
-    void bar() throws Exception {
+    void bar() throws IllegalArgumentException, IllegalStateException {
     }
 
     void test() throws Exception {

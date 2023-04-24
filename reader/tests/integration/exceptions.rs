@@ -11,7 +11,7 @@ use rjvm_reader::{
 use crate::assertions::check_method;
 
 #[test_log::test]
-fn can_read_class_with_exception_handler() {
+fn can_read_class_with_exception_handler_and_throws() {
     let class =
         utils::read_class_from_bytes(include_bytes!("../resources/rjvm/ExceptionsHandlers.class"));
     assert_eq!("rjvm/ExceptionsHandlers", class.name);
@@ -24,7 +24,15 @@ fn check_methods(class: &ClassFile) {
 
     check_method(&class.methods[0], MethodFlags::empty(), "<init>", "()V");
     check_method(&class.methods[1], MethodFlags::empty(), "foo", "()V");
+
     check_method(&class.methods[2], MethodFlags::empty(), "bar", "()V");
+    assert_eq!(
+        vec![
+            "java/lang/IllegalArgumentException".to_string(),
+            "java/lang/IllegalStateException".to_string()
+        ],
+        class.methods[2].thrown_exceptions
+    );
 
     check_method(&class.methods[3], MethodFlags::empty(), "test", "()V");
     assert_eq!(

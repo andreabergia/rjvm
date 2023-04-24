@@ -334,6 +334,7 @@ impl<'a> ClassFileReader<'a> {
             Some(self.extract_code(&raw_attributes, &name)?)
         };
         let deprecated = self.search_deprecated_attribute(&raw_attributes);
+        let thrown_exceptions = self.extract_thrown_exceptions(&raw_attributes)?;
 
         Ok(ClassFileMethod {
             flags,
@@ -343,6 +344,7 @@ impl<'a> ClassFileReader<'a> {
             attributes: raw_attributes,
             code,
             deprecated,
+            thrown_exceptions,
         })
     }
 
@@ -370,7 +372,7 @@ impl<'a> ClassFileReader<'a> {
                 let max_locals = buf.read_u16()?;
                 let code_length = buf.read_u32()?.into_usize_safe();
                 let code = Vec::from(buf.read_bytes(code_length)?);
-                let exception_table = self.extract_exception_table(&mut buf)?;
+                let exception_table = self.read_exception_table(&mut buf)?;
                 let attributes =
                     Self::read_raw_attributes_from(&self.class_file.constants, &mut buf)?;
                 let line_number_table = self.extract_line_number_table(&attributes)?;
@@ -380,8 +382,8 @@ impl<'a> ClassFileReader<'a> {
                     max_locals,
                     code,
                     exception_table,
-                    attributes,
                     line_number_table,
+                    attributes,
                 })
             })
             .next()
@@ -393,7 +395,7 @@ impl<'a> ClassFileReader<'a> {
             })
     }
 
-    fn extract_exception_table(&self, buf: &mut Buffer) -> Result<ExceptionTable> {
+    fn read_exception_table(&self, buf: &mut Buffer) -> Result<ExceptionTable> {
         let exception_table_length = buf.read_u16()?.into_usize_safe();
         let mut entries: Vec<ExceptionTableEntry> = Vec::with_capacity(exception_table_length / 8);
         for _ in 0..exception_table_length {
@@ -437,6 +439,24 @@ impl<'a> ClassFileReader<'a> {
                 Ok(LineNumberTable::new(entries))
             })
             .invert()
+    }
+
+    fn extract_thrown_exceptions(&self, raw_attributes: &[Attribute]) -> Result<Vec<String>> {
+        raw_attributes
+            .iter()
+            .find(|attr| attr.name == "Exceptions")
+            .map(|attr| {
+                let mut buf = Buffer::new(&attr.bytes);
+                let num_entries = buf.read_u16()?.into_usize_safe();
+                let mut exceptions = Vec::with_capacity(num_entries);
+                for _ in 0..num_entries {
+                    let class_name = buf.read_u16()?;
+                    let exception_class_name = self.read_string_reference(class_name)?;
+                    exceptions.push(exception_class_name);
+                }
+                Ok(exceptions)
+            })
+            .unwrap_or(Ok(Vec::new()))
     }
 
     fn read_class_attributes(&mut self) -> Result<()> {
