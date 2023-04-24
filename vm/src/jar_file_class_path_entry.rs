@@ -1,11 +1,12 @@
-use std::cell::RefCell;
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::path::Path;
+use std::{
+    cell::RefCell,
+    fs::File,
+    io::{BufReader, Read},
+    path::Path,
+};
 
 use thiserror::Error;
-use zip::result::ZipError;
-use zip::ZipArchive;
+use zip::{result::ZipError, ZipArchive};
 
 use crate::class_path_entry::{ClassLoadingError, ClassPathEntry};
 
@@ -40,12 +41,12 @@ impl ClassPathEntry for JarFileClassPathEntry {
                 let mut buffer: Vec<u8> = Vec::with_capacity(zip_file.size() as usize);
                 zip_file
                     .read_to_end(&mut buffer)
-                    .map_err(|_| ClassLoadingError {})?;
+                    .map_err(ClassLoadingError::new)?;
                 Ok(Some(buffer))
             }
             Err(err) => match err {
                 ZipError::FileNotFound => Ok(None),
-                _ => Err(ClassLoadingError {}),
+                _ => Err(ClassLoadingError::new(err)),
             },
         }
     }
@@ -65,8 +66,10 @@ pub enum JarFileError {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::class_path_entry::tests::{assert_can_find_class, assert_cannot_find_class};
-    use crate::jar_file_class_path_entry::{JarFileClassPathEntry, JarFileError};
+    use crate::{
+        class_path_entry::tests::{assert_can_find_class, assert_cannot_find_class},
+        jar_file_class_path_entry::{JarFileClassPathEntry, JarFileError},
+    };
 
     #[test]
     fn jar_file_not_found() {

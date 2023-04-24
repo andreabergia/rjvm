@@ -1,6 +1,8 @@
-use std::fmt;
-use std::fmt::Formatter;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    fmt::Formatter,
+    path::{Path, PathBuf},
+};
 
 use crate::class_path_entry::{ClassLoadingError, ClassPathEntry};
 
@@ -32,7 +34,9 @@ impl ClassPathEntry for FileSystemClassPathEntry {
         candidate.push(class_name);
         candidate.set_extension("class");
         if candidate.exists() {
-            std::fs::read(candidate).map(Some).map_err(|err| err.into())
+            std::fs::read(candidate)
+                .map(Some)
+                .map_err(ClassLoadingError::new)
         } else {
             Ok(None)
         }
@@ -57,8 +61,10 @@ impl std::error::Error for InvalidDirectoryError {}
 mod tests {
     use std::path::PathBuf;
 
-    use crate::class_path_entry::tests::{assert_can_find_class, assert_cannot_find_class};
-    use crate::file_system_class_path_entry::{FileSystemClassPathEntry, InvalidDirectoryError};
+    use crate::{
+        class_path_entry::tests::{assert_can_find_class, assert_cannot_find_class},
+        file_system_class_path_entry::{FileSystemClassPathEntry, InvalidDirectoryError},
+    };
 
     #[test]
     fn directory_not_found() {

@@ -1,19 +1,37 @@
+use std::error::Error;
 use std::fmt;
-use std::io::Error;
-
-#[derive(Debug, PartialEq)]
-pub struct ClassLoadingError {}
-
-// TODO
-impl From<Error> for ClassLoadingError {
-    fn from(_: Error) -> Self {
-        Self {}
-    }
-}
+use std::fmt::Formatter;
 
 pub trait ClassPathEntry: fmt::Debug {
     // TODO: should `class_name` be a newtype?
     fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError>;
+}
+
+#[derive(Debug)]
+pub struct ClassLoadingError {
+    message: String,
+    source: Box<dyn Error>,
+}
+
+impl ClassLoadingError {
+    pub fn new(error: impl Error + 'static) -> Self {
+        Self {
+            message: format!("{error}"),
+            source: Box::new(error),
+        }
+    }
+}
+
+impl fmt::Display for ClassLoadingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl Error for ClassLoadingError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(self.source.as_ref())
+    }
 }
 
 #[cfg(test)]
