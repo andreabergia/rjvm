@@ -4,7 +4,6 @@ use rjvm_reader::{
     class_access_flags::ClassAccessFlags,
     class_file::ClassFile,
     class_file_field::ClassFileField,
-    class_file_method::ClassFileMethod,
     class_file_version::ClassFileVersion,
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
@@ -14,6 +13,8 @@ use rjvm_reader::{
     program_counter::ProgramCounter,
     utils,
 };
+
+use crate::assertions::check_method;
 
 #[test_log::test]
 fn can_read_pojo_class_file() {
@@ -85,10 +86,4 @@ fn check_methods(class: &ClassFile) {
         )])),
         class.methods[4].code.as_ref().unwrap().line_number_table
     );
-}
-
-fn check_method(method: &ClassFileMethod, flags: MethodFlags, name: &str, type_descriptor: &str) {
-    assert_eq!(method.flags, flags);
-    assert_eq!(method.name, name);
-    assert_eq!(method.type_descriptor, type_descriptor);
 }

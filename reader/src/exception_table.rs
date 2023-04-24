@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use crate::program_counter::ProgramCounter;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct ExceptionTable {
     entries: Vec<ExceptionTableEntry>,
 }

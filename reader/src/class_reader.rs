@@ -12,6 +12,7 @@ use crate::{
     class_file_version::ClassFileVersion,
     class_reader_error::{ClassReaderError, Result},
     constant_pool::{ConstantPool, ConstantPoolEntry},
+    exception_table::{ExceptionTable, ExceptionTableEntry},
     field_flags::FieldFlags,
     field_type::FieldType,
     line_number::LineNumber,
@@ -369,8 +370,7 @@ impl<'a> ClassFileReader<'a> {
                 let max_locals = buf.read_u16()?;
                 let code_length = buf.read_u32()?.into_usize_safe();
                 let code = Vec::from(buf.read_bytes(code_length)?);
-                let exception_table_length = buf.read_u16()?.into_usize_safe();
-                let exception_table = Vec::from(buf.read_bytes(exception_table_length * 8)?);
+                let exception_table = self.extract_exception_table(&mut buf)?;
                 let attributes =
                     Self::read_raw_attributes_from(&self.class_file.constants, &mut buf)?;
                 let line_number_table = self.extract_line_number_table(&attributes)?;
@@ -391,6 +391,28 @@ impl<'a> ClassFileReader<'a> {
                     "method {name} is missing code attribute"
                 ))
             })
+    }
+
+    fn extract_exception_table(&self, buf: &mut Buffer) -> Result<ExceptionTable> {
+        let exception_table_length = buf.read_u16()?.into_usize_safe();
+        let mut entries: Vec<ExceptionTableEntry> = Vec::with_capacity(exception_table_length / 8);
+        for _ in 0..exception_table_length {
+            let start_pc = buf.read_u16()?;
+            let end_pc = buf.read_u16()?;
+            let handler_pc = buf.read_u16()?;
+            let catch_class_constant = buf.read_u16()?;
+            let catch_class = if catch_class_constant == 0 {
+                None
+            } else {
+                Some(self.read_string_reference(catch_class_constant)?)
+            };
+            entries.push(ExceptionTableEntry {
+                range: ProgramCounter(start_pc)..ProgramCounter(end_pc),
+                handler_pc: ProgramCounter(handler_pc),
+                catch_class,
+            })
+        }
+        Ok(ExceptionTable::new(entries))
     }
 
     fn extract_line_number_table(

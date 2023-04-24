@@ -2,6 +2,7 @@ use std::{fmt, fmt::Formatter};
 
 use crate::{
     attribute::Attribute,
+    exception_table::ExceptionTable,
     field_type::{BaseType, FieldType},
     instruction::Instruction,
     line_number_table::LineNumberTable,
@@ -69,7 +70,7 @@ pub struct ClassFileMethodCode {
     pub max_stack: u16,
     pub max_locals: u16,
     pub code: Vec<u8>,
-    pub exception_table: Vec<u8>, // TODO: replace with some proper struct
+    pub exception_table: ExceptionTable,
     pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
     pub line_number_table: Option<LineNumberTable>,
 }
