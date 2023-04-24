@@ -341,3 +341,12 @@ fn exceptions_throwing_and_catching() {
         vm.printed
     );
 }
+
+#[test_log::test]
+fn reflection() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(&mut vm, "rjvm/Reflection", "main", "([Ljava/lang/String;)V");
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(vec![Value::Int(2)], vm.printed);
+}

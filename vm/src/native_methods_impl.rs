@@ -48,6 +48,9 @@ fn register_noops(registry: &mut NativeMethodsRegistry) {
         "()V",
         |_, _, _, _| Ok(None),
     );
+    registry.register("sun/misc/Unsafe", "registerNatives", "()V", |_, _, _, _| {
+        Ok(None)
+    });
 }
 
 fn register_time_methods(registry: &mut NativeMethodsRegistry) {
