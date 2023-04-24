@@ -10,6 +10,7 @@ pub mod class_file_version;
 pub mod class_reader;
 pub mod class_reader_error;
 pub mod constant_pool;
+pub mod exception_table;
 pub mod field_flags;
 pub mod field_type;
 pub mod instruction;
