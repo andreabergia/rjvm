@@ -27,6 +27,8 @@ use crate::{
     vm_error::VmError,
 };
 
+pub type MethodCallResult<'a> = Result<Option<Value<'a>>, VmError>;
+
 macro_rules! generate_pop {
     ($name:ident, $variant:ident, $type:ty) => {
         fn $name(&mut self) -> Result<$type, VmError> {
@@ -41,7 +43,7 @@ macro_rules! generate_pop {
 
 macro_rules! generate_execute_return {
     ($name:ident, $variant:ident) => {
-        fn $name(&mut self) -> Result<Option<Value<'a>>, VmError> {
+        fn $name(&mut self) -> MethodCallResult<'a> {
             if !self.class_and_method.returns(Base(BaseType::$variant)) {
                 return Err(VmError::ValidationException);
             }
@@ -249,7 +251,7 @@ impl<'a> CallFrame<'a> {
         &mut self,
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
-    ) -> Result<Option<Value<'a>>, VmError> {
+    ) -> MethodCallResult<'a> {
         self.debug_start_execution();
 
         loop {
@@ -1014,7 +1016,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn execute_areturn(&mut self) -> Result<Option<Value<'a>>, VmError> {
+    fn execute_areturn(&mut self) -> MethodCallResult<'a> {
         let result = self.pop()?;
         self.debug_done_execution(Some(&result));
         Ok(Some(result))

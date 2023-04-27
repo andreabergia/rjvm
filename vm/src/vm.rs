@@ -1,9 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use log::{debug, warn};
+use log::{debug, error};
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
+use crate::call_frame::MethodCallResult;
 use crate::{
     call_stack::CallStack,
     class::{ClassId, ClassRef},
@@ -138,43 +139,55 @@ impl<'a> Vm<'a> {
             })
     }
 
-    // TODO: do we need it?
-    pub fn allocate_call_stack(&self) -> CallStack<'a> {
-        CallStack::new()
-    }
-
     pub fn invoke(
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
         object: Option<ObjectRef<'a>>,
         args: Vec<Value<'a>>,
-    ) -> Result<Option<Value<'a>>, VmError> {
+    ) -> MethodCallResult<'a> {
         if class_and_method.method.is_native() {
-            let native_callback = self.native_methods_registry.get_method(&class_and_method);
-            return if let Some(native_callback) = native_callback {
-                debug!(
-                    "executing native method {}::{} {}",
-                    class_and_method.class.name,
-                    class_and_method.method.name,
-                    class_and_method.method.type_descriptor
-                );
-                native_callback(self, call_stack, object, args)
-            } else {
-                warn!(
-                    "cannot resolve native method {}::{} {}",
-                    class_and_method.class.name,
-                    class_and_method.method.name,
-                    class_and_method.method.type_descriptor
-                );
-                Err(VmError::NotImplemented)
-            };
+            return self.invoke_native(call_stack, class_and_method, object, args);
         }
 
         let frame = call_stack.add_frame(class_and_method, object, args)?;
         let result = frame.borrow_mut().execute(self, call_stack);
-        call_stack.pop_frame()?;
+        call_stack
+            .pop_frame()
+            .expect("should be able to pop the frame we just pushed");
         result
+    }
+
+    fn invoke_native(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        class_and_method: ClassAndMethod<'a>,
+        object: Option<ObjectRef<'a>>,
+        args: Vec<Value<'a>>,
+    ) -> MethodCallResult<'a> {
+        let native_callback = self.native_methods_registry.get_method(&class_and_method);
+        if let Some(native_callback) = native_callback {
+            debug!(
+                "executing native method {}::{} {}",
+                class_and_method.class.name,
+                class_and_method.method.name,
+                class_and_method.method.type_descriptor
+            );
+            native_callback(self, call_stack, object, args)
+        } else {
+            error!(
+                "cannot resolve native method {}::{} {}",
+                class_and_method.class.name,
+                class_and_method.method.name,
+                class_and_method.method.type_descriptor
+            );
+            Err(VmError::NotImplemented)
+        }
+    }
+
+    // TODO: do we need it?
+    pub fn allocate_call_stack(&self) -> CallStack<'a> {
+        CallStack::new()
     }
 
     pub fn new_object(
