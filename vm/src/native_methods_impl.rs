@@ -3,6 +3,7 @@ use log::{debug, info};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{
+    call_frame::MethodCallResult,
     call_stack::CallStack,
     native_methods_registry::NativeMethodsRegistry,
     time::{get_current_time_millis, get_nano_time},
@@ -110,7 +111,7 @@ fn register_reflection_methods(registry: &mut NativeMethodsRegistry) {
     );
 }
 
-fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> Result<Option<Value<'a>>, VmError> {
+fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     let arg = args.get(0).ok_or(VmError::ValidationException)?;
     info!(
         "TEMP implementation of native method: printing value {:?}",
@@ -120,7 +121,7 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> Result<Option<Value<
     Ok(None)
 }
 
-fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> Result<Option<Value<'a>>, VmError> {
+fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     let object = expect_object_at(&args, 0)?;
     // TODO: we need some sort of object id when we implement the GC
     //  For the moment we'll use the raw address
@@ -129,7 +130,7 @@ fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> Result<Option<Value<'a>>, VmE
     Ok(Some(Value::Int(address)))
 }
 
-fn array_copy(args: Vec<Value>) -> Result<Option<Value>, VmError> {
+fn array_copy(args: Vec<Value>) -> MethodCallResult {
     let (_src_type, src) = expect_array_at(&args, 0)?;
     let src_pos = expect_int_at(&args, 1)?;
     let (_dest_type, dest) = expect_array_at(&args, 2)?;
@@ -149,19 +150,19 @@ fn array_copy(args: Vec<Value>) -> Result<Option<Value>, VmError> {
     Ok(None)
 }
 
-fn float_to_raw_int_bits<'a>(args: &[Value<'a>]) -> Result<Option<Value<'a>>, VmError> {
+fn float_to_raw_int_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
     let arg = expect_float_at(args, 0)?;
     let int_bits: i32 = arg.to_bits() as i32;
     Ok(Some(Value::Int(int_bits)))
 }
 
-fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> Result<Option<Value<'a>>, VmError> {
+fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
     let arg = expect_double_at(args, 0)?;
     let long_bits: i64 = arg.to_bits() as i64;
     Ok(Some(Value::Long(long_bits)))
 }
 
-fn get_class_loader(receiver: Option<ObjectRef>) -> Result<Option<Value>, VmError> {
+fn get_class_loader(receiver: Option<ObjectRef>) -> MethodCallResult {
     debug!(
         "invoked get class loader for class {:?}",
         receiver.map(|r| r.class_id)
@@ -175,7 +176,7 @@ fn get_primitive_class<'a>(
     vm: &mut Vm<'a>,
     stack: &mut CallStack<'a>,
     args: &[Value<'a>],
-) -> Result<Option<Value<'a>>, VmError> {
+) -> MethodCallResult<'a> {
     let arg = expect_object_at(args, 0)?;
     let class_name = vm.extract_str_from_java_lang_string(arg)?;
     let java_lang_class_instance = vm.create_instance_of_java_lang_class(stack, &class_name)?;

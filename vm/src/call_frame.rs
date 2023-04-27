@@ -17,6 +17,7 @@ use crate::{
     call_stack::CallStack,
     class::Class,
     class_and_method::ClassAndMethod,
+    exceptions::MethodCallFailed,
     stack_trace_element::StackTraceElement,
     value::{
         ArrayRef, ObjectRef, Value,
@@ -27,15 +28,17 @@ use crate::{
     vm_error::VmError,
 };
 
-pub type MethodCallResult<'a> = Result<Option<Value<'a>>, VmError>;
+pub type MethodCallResult<'a> = Result<Option<Value<'a>>, MethodCallFailed<'a>>;
 
 macro_rules! generate_pop {
     ($name:ident, $variant:ident, $type:ty) => {
-        fn $name(&mut self) -> Result<$type, VmError> {
+        fn $name(&mut self) -> Result<$type, MethodCallFailed<'a>> {
             let value = self.pop()?;
             match value {
                 $variant(value) => Ok(value),
-                _ => Err(VmError::ValidationException),
+                _ => Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                )),
             }
         }
     };
@@ -45,7 +48,9 @@ macro_rules! generate_execute_return {
     ($name:ident, $variant:ident) => {
         fn $name(&mut self) -> MethodCallResult<'a> {
             if !self.class_and_method.returns(Base(BaseType::$variant)) {
-                return Err(VmError::ValidationException);
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ));
             }
             let result = self.pop()?;
             self.debug_done_execution(Some(&result));
@@ -56,7 +61,7 @@ macro_rules! generate_execute_return {
 
 macro_rules! generate_execute_math {
     ($name:ident, $pop_fn:ident, $variant:ident, $type:ty) => {
-        fn $name<T>(&mut self, evaluator: T) -> Result<(), VmError>
+        fn $name<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
         where
             T: FnOnce($type, $type) -> Result<$type, VmError>,
         {
@@ -70,7 +75,7 @@ macro_rules! generate_execute_math {
 
 macro_rules! generate_execute_neg {
     ($name:ident, $pop_fn:ident, $variant:ident) => {
-        fn $name(&mut self) -> Result<(), VmError> {
+        fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
             let value = self.$pop_fn()?;
             self.push($variant(-value))
         }
@@ -79,7 +84,7 @@ macro_rules! generate_execute_neg {
 
 macro_rules! generate_execute_coerce {
     ($name:ident, $pop_fn:ident, $type:ty) => {
-        fn $name<T>(&mut self, evaluator: T) -> Result<(), VmError>
+        fn $name<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
         where
             T: FnOnce($type) -> Value<'a>,
         {
@@ -92,7 +97,7 @@ macro_rules! generate_execute_coerce {
 
 macro_rules! generate_compare {
     ($name:ident, $pop_fn:ident) => {
-        fn $name(&mut self, sign_for_greater: i32) -> Result<(), VmError> {
+        fn $name(&mut self, sign_for_greater: i32) -> Result<(), MethodCallFailed<'a>> {
             let val2 = self.$pop_fn()?;
             let val1 = self.$pop_fn()?;
             if val1 > val2 {
@@ -108,13 +113,13 @@ macro_rules! generate_compare {
 
 macro_rules! generate_execute_load {
     ($name:ident, $($variant:ident),+) => {
-        fn $name(&mut self, index: usize) -> Result<(), VmError> {
+        fn $name(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
             let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
             match local {
                 $($variant(..) => {
                     self.push(local.clone())
                 }),+
-                _ => Err(VmError::ValidationException),
+                _ => Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }
         }
     };
@@ -122,14 +127,16 @@ macro_rules! generate_execute_load {
 
 macro_rules! generate_execute_store {
     ($name:ident, $variant:ident) => {
-        fn $name(&mut self, index: usize) -> Result<(), VmError> {
+        fn $name(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
             let value = self.pop()?;
             match value {
                 $variant(..) => {
                     self.locals[index] = value;
                     Ok(())
                 }
-                _ => Err(VmError::ValidationException),
+                _ => Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                )),
             }
         }
     };
@@ -137,7 +144,7 @@ macro_rules! generate_execute_store {
 
 macro_rules! generate_execute_array_load {
     ($name:ident, $($variant:pat),+) => {
-        fn $name(&mut self) -> Result<(), VmError> {
+        fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
             let index = self.pop_int()?.into_usize_safe();
             let (field_type, array) = self.pop_array()?;
             let value = match field_type {
@@ -146,7 +153,7 @@ macro_rules! generate_execute_array_load {
                     .get(index)
                     .ok_or(VmError::ArrayIndexOutOfBoundsException)
                     .map(|value| value.clone()),)+
-                _ => return Err(VmError::ValidationException),
+                _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }?;
             self.push(value)
         }
@@ -155,18 +162,18 @@ macro_rules! generate_execute_array_load {
 
 macro_rules! generate_execute_array_store {
     ($name:ident, $pop_fn:ident, $map_fn:ident, $($variant:pat),+) => {
-        fn $name(&mut self) -> Result<(), VmError> {
+        fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
             let value = Self::$map_fn(self.$pop_fn()?);
             let index = self.pop_int()?.into_usize_safe();
             let (field_type, array) = self.pop_array()?;
             match field_type {
                 $($variant => {
                     match array.borrow_mut().get_mut(index) {
-                        None => return Err(VmError::ArrayIndexOutOfBoundsException),
+                        None => return Err(MethodCallFailed::InternalError(VmError::ArrayIndexOutOfBoundsException)),
                         Some(reference) => *reference = value,
                     }
                 })+
-                _ => return Err(VmError::ValidationException),
+                _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }
             Ok(())
         }
@@ -257,7 +264,7 @@ impl<'a> CallFrame<'a> {
         loop {
             let (instruction, new_address) =
                 Instruction::parse(self.code, self.pc.0.into_usize_safe())
-                    .map_err(|_| VmError::ValidationException)?;
+                    .map_err(|_| MethodCallFailed::InternalError(VmError::ValidationException))?;
             self.debug_print_status(&instruction);
             self.pc = ProgramCounter(new_address as u16);
 
@@ -399,7 +406,9 @@ impl<'a> CallFrame<'a> {
 
                 Instruction::Return => {
                     if !self.class_and_method.is_void() {
-                        return Err(VmError::ValidationException);
+                        return Err(MethodCallFailed::InternalError(
+                            VmError::ValidationException,
+                        ));
                     }
                     self.debug_done_execution(None);
                     return Ok(None);
@@ -617,17 +626,17 @@ impl<'a> CallFrame<'a> {
 
                 _ => {
                     warn!("Unsupported instruction: {:?}", instruction);
-                    return Err(VmError::NotImplemented);
+                    return Err(MethodCallFailed::InternalError(VmError::NotImplemented));
                 }
             }
         }
     }
 
-    fn push(&mut self, value: Value<'a>) -> Result<(), VmError> {
+    fn push(&mut self, value: Value<'a>) -> Result<(), MethodCallFailed<'a>> {
         self.stack.push(value).map_err(|err| err.into())
     }
 
-    fn pop(&mut self) -> Result<Value<'a>, VmError> {
+    fn pop(&mut self) -> Result<Value<'a>, MethodCallFailed<'a>> {
         self.stack.pop().map_err(|err| err.into())
     }
 
@@ -698,7 +707,7 @@ impl<'a> CallFrame<'a> {
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
         kind: InvokeKind,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let static_method_reference =
             self.get_method_to_invoke_statically(vm, call_stack, constant_index, kind)?;
         let (receiver, params, new_stack_len) =
@@ -739,11 +748,13 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_double, Double, f64);
     generate_pop!(pop_object, Object, ObjectRef<'a>);
 
-    fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), VmError> {
+    fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), MethodCallFailed<'a>> {
         let receiver = self.pop()?;
         match receiver {
             Array(field_type, vector) => Ok((field_type, vector)),
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
@@ -832,7 +843,7 @@ impl<'a> CallFrame<'a> {
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
         kind: InvokeKind,
-    ) -> Result<ClassAndMethod<'a>, VmError> {
+    ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         let method_reference = self.get_constant_method_reference(constant_index)?;
 
         let class = vm.get_or_resolve_class(call_stack, method_reference.class_name)?;
@@ -850,23 +861,25 @@ impl<'a> CallFrame<'a> {
     fn get_method_of_class<'b>(
         class: &'b Class<'a>,
         method_reference: MethodReference,
-    ) -> Result<&'b ClassFileMethod, VmError> {
+    ) -> Result<&'b ClassFileMethod, MethodCallFailed<'a>> {
         class
             .find_method(
                 method_reference.method_name,
                 method_reference.type_descriptor,
             )
-            .ok_or(VmError::MethodNotFoundException(
-                class.name.to_string(),
-                method_reference.method_name.to_string(),
-                method_reference.type_descriptor.to_string(),
+            .ok_or(MethodCallFailed::InternalError(
+                VmError::MethodNotFoundException(
+                    class.name.to_string(),
+                    method_reference.method_name.to_string(),
+                    method_reference.type_descriptor.to_string(),
+                ),
             ))
     }
 
     fn get_method_checking_superclasses<'b>(
         class: &'b Class<'a>,
         method_reference: MethodReference,
-    ) -> Result<ClassAndMethod<'b>, VmError> {
+    ) -> Result<ClassAndMethod<'b>, MethodCallFailed<'a>> {
         let mut curr_class = class;
         loop {
             if let Some(method) = curr_class.find_method(
@@ -882,10 +895,12 @@ impl<'a> CallFrame<'a> {
             if let Some(superclass) = class.superclass {
                 curr_class = superclass;
             } else {
-                return Err(VmError::MethodNotFoundException(
-                    class.name.to_string(),
-                    method_reference.method_name.to_string(),
-                    method_reference.type_descriptor.to_string(),
+                return Err(MethodCallFailed::InternalError(
+                    VmError::MethodNotFoundException(
+                        class.name.to_string(),
+                        method_reference.method_name.to_string(),
+                        method_reference.type_descriptor.to_string(),
+                    ),
                 ));
             }
         }
@@ -895,9 +910,11 @@ impl<'a> CallFrame<'a> {
         vm: &Vm<'a>,
         receiver: Option<ObjectRef>,
         class_and_method: ClassAndMethod,
-    ) -> Result<ClassAndMethod<'a>, VmError> {
+    ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         match receiver {
-            None => Err(VmError::ValidationException),
+            None => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
             Some(receiver) => {
                 let receiver_class = vm.find_class_by_id(receiver.class_id).ok_or(
                     VmError::ClassNotFoundException(receiver.class_id.to_string()),
@@ -1046,7 +1063,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_math!(execute_float_math, pop_float, Float, f32);
     generate_execute_math!(execute_double_math, pop_double, Double, f64);
 
-    fn execute_long_shift<T>(&mut self, evaluator: T) -> Result<(), VmError>
+    fn execute_long_shift<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
     where
         T: FnOnce(i64, i32) -> Result<i64, VmError>,
     {
@@ -1077,7 +1094,11 @@ impl<'a> CallFrame<'a> {
         self.pc = ProgramCounter(jump_address);
     }
 
-    fn execute_if<T>(&mut self, jump_address: u16, comparator: T) -> Result<(), VmError>
+    fn execute_if<T>(
+        &mut self,
+        jump_address: u16,
+        comparator: T,
+    ) -> Result<(), MethodCallFailed<'a>>
     where
         T: FnOnce(i32) -> bool,
     {
@@ -1088,7 +1109,11 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    fn execute_if_icmp<T>(&mut self, jump_address: u16, comparator: T) -> Result<(), VmError>
+    fn execute_if_icmp<T>(
+        &mut self,
+        jump_address: u16,
+        comparator: T,
+    ) -> Result<(), MethodCallFailed<'a>>
     where
         T: FnOnce(i32, i32) -> bool,
     {
@@ -1100,7 +1125,11 @@ impl<'a> CallFrame<'a> {
         Ok(())
     }
 
-    fn execute_if_null(&mut self, jump_address: u16, jump_on_null: bool) -> Result<(), VmError> {
+    fn execute_if_null(
+        &mut self,
+        jump_address: u16,
+        jump_on_null: bool,
+    ) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
             Object(_) | Array(..) => {
@@ -1113,24 +1142,40 @@ impl<'a> CallFrame<'a> {
                     self.goto(jump_address);
                 }
             }
-            _ => return Err(VmError::ValidationException),
+            _ => {
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ))
+            }
         }
         Ok(())
     }
 
-    fn execute_if_acmp(&mut self, jump_address: u16, jump_on_equal: bool) -> Result<(), VmError> {
+    fn execute_if_acmp(
+        &mut self,
+        jump_address: u16,
+        jump_on_equal: bool,
+    ) -> Result<(), MethodCallFailed<'a>> {
         let value2 = self.pop()?;
         let value1 = self.pop()?;
         let equal = match value1 {
             Object(object1) => match value2 {
                 Object(object2) => std::ptr::eq(object1, object2),
                 Null | Array(..) => false,
-                _ => return Err(VmError::ValidationException),
+                _ => {
+                    return Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    ))
+                }
             },
             Null => match value2 {
                 Null => true,
                 Object(..) | Array(..) => false,
-                _ => return Err(VmError::ValidationException),
+                _ => {
+                    return Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    ))
+                }
             },
             Array(_, array1) => match value2 {
                 Array(_, array2) => {
@@ -1139,9 +1184,17 @@ impl<'a> CallFrame<'a> {
                     x.as_ptr() == y.as_ptr()
                 }
                 Null | Object(..) => false,
-                _ => return Err(VmError::ValidationException),
+                _ => {
+                    return Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    ))
+                }
             },
-            _ => return Err(VmError::ValidationException),
+            _ => {
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ))
+            }
         };
         if (jump_on_equal && equal) || (!jump_on_equal && !equal) {
             self.goto(jump_address);
@@ -1153,11 +1206,13 @@ impl<'a> CallFrame<'a> {
     generate_compare!(execute_float_compare, pop_float);
     generate_compare!(execute_double_compare, pop_double);
 
-    fn execute_aload(&mut self, index: usize) -> Result<(), VmError> {
+    fn execute_aload(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
         match local {
             Object(..) | Array(..) | Null => self.push(local.clone()),
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
@@ -1166,7 +1221,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_load!(execute_fload, Float);
     generate_execute_load!(execute_dload, Double);
 
-    fn execute_astore(&mut self, index: usize) -> Result<(), VmError> {
+    fn execute_astore(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
             Object(..) | Array(..) => {
@@ -1177,7 +1232,9 @@ impl<'a> CallFrame<'a> {
                 self.locals[index] = value;
                 Ok(())
             }
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
@@ -1191,7 +1248,7 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         index: u16,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let constant_value = self.get_constant(index)?;
         match constant_value {
             ConstantPoolEntry::Integer(value) => self.push(Int(*value)),
@@ -1204,7 +1261,9 @@ impl<'a> CallFrame<'a> {
                             vm.create_java_lang_string_instance(call_stack, string)?;
                         self.push(Object(string_object))
                     }
-                    _ => Err(VmError::ValidationException),
+                    _ => Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    )),
                 }
             }
             ConstantPoolEntry::ClassReference(class_index) => {
@@ -1215,24 +1274,30 @@ impl<'a> CallFrame<'a> {
                             vm.create_instance_of_java_lang_class(call_stack, class_name)?;
                         self.push(Object(class_object))
                     }
-                    _ => Err(VmError::ValidationException),
+                    _ => Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    )),
                 }
             }
             // TODO: method type or method handle
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
-    fn execute_ldc_long_double(&mut self, index: u16) -> Result<(), VmError> {
+    fn execute_ldc_long_double(&mut self, index: u16) -> Result<(), MethodCallFailed<'a>> {
         let constant_value = self.get_constant(index)?;
         match constant_value {
             ConstantPoolEntry::Long(value) => self.push(Long(*value)),
             ConstantPoolEntry::Double(value) => self.push(Double(*value)),
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
-    fn execute_newarray(&mut self, array_type: NewArrayType) -> Result<(), VmError> {
+    fn execute_newarray(&mut self, array_type: NewArrayType) -> Result<(), MethodCallFailed<'a>> {
         let length = self.pop_int()?.into_usize_safe();
 
         let (elements_type, default_value) = match array_type {
@@ -1252,7 +1317,7 @@ impl<'a> CallFrame<'a> {
         self.push(array_value)
     }
 
-    fn execute_anewarray(&mut self, constant_index: u16) -> Result<(), VmError> {
+    fn execute_anewarray(&mut self, constant_index: u16) -> Result<(), MethodCallFailed<'a>> {
         let length = self.pop_int()?.into_usize_safe();
         let class_name = self.get_constant_class_reference(constant_index)?;
 
@@ -1262,7 +1327,7 @@ impl<'a> CallFrame<'a> {
         self.push(array_value)
     }
 
-    fn execute_array_length(&mut self) -> Result<(), VmError> {
+    fn execute_array_length(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let (_, array) = self.pop_array()?;
         self.push(Int(array.borrow().len() as i32))?;
         Ok(())
@@ -1295,7 +1360,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_array_store!(execute_fastore, pop_float, f2f, Base(BaseType::Float));
     generate_execute_array_store!(execute_dastore, pop_double, d2d, Base(BaseType::Double));
 
-    fn execute_aastore(&mut self, vm: &Vm) -> Result<(), VmError> {
+    fn execute_aastore(&mut self, vm: &Vm) -> Result<(), MethodCallFailed<'a>> {
         let value = Object(self.pop_object()?);
         let index = self.pop_int()?.into_usize_safe();
         let (field_type, array) = self.pop_array()?;
@@ -1303,11 +1368,19 @@ impl<'a> CallFrame<'a> {
             FieldType::Object(array_type) => {
                 Self::validate_type(vm, FieldType::Object(array_type), &value)?;
                 match array.borrow_mut().get_mut(index) {
-                    None => return Err(VmError::ArrayIndexOutOfBoundsException),
+                    None => {
+                        return Err(MethodCallFailed::InternalError(
+                            VmError::ArrayIndexOutOfBoundsException,
+                        ))
+                    }
                     Some(reference) => *reference = value,
                 }
             }
-            _ => return Err(VmError::ValidationException),
+            _ => {
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ))
+            }
         }
         Ok(())
     }
@@ -1317,7 +1390,7 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let (is_instance_of, _) = self.is_instanceof(vm, call_stack, constant_index)?;
         self.push(Int(is_instance_of as i32))
     }
@@ -1327,12 +1400,12 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let (is_instance_of, value) = self.is_instanceof(vm, call_stack, constant_index)?;
         if is_instance_of {
             self.push(value)
         } else {
-            Err(VmError::ClassCastException)
+            Err(MethodCallFailed::InternalError(VmError::ClassCastException))
         }
     }
 
@@ -1341,7 +1414,7 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
-    ) -> Result<(bool, Value<'a>), VmError> {
+    ) -> Result<(bool, Value<'a>), MethodCallFailed<'a>> {
         let class_name = self.get_constant_class_reference(constant_index)?;
 
         // TODO: multidimensional arrays
@@ -1379,12 +1452,20 @@ impl<'a> CallFrame<'a> {
                 FieldType::Array(_) => false,
             },
 
-            _ => return Err(VmError::ValidationException),
+            _ => {
+                return Err(MethodCallFailed::InternalError(
+                    VmError::ValidationException,
+                ))
+            }
         };
         Ok((is_instance_of, value))
     }
 
-    fn execute_getfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {
+    fn execute_getfield(
+        &mut self,
+        vm: &mut Vm<'a>,
+        field_index: u16,
+    ) -> Result<(), MethodCallFailed<'a>> {
         let object = self.pop()?;
         if let Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
@@ -1395,11 +1476,17 @@ impl<'a> CallFrame<'a> {
             self.push(field_value)?;
             Ok(())
         } else {
-            Err(VmError::ValidationException)
+            Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            ))
         }
     }
 
-    fn execute_putfield(&mut self, vm: &mut Vm<'a>, field_index: u16) -> Result<(), VmError> {
+    fn execute_putfield(
+        &mut self,
+        vm: &mut Vm<'a>,
+        field_index: u16,
+    ) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         let object = self.pop()?;
         if let Object(object_ref) = object {
@@ -1410,7 +1497,9 @@ impl<'a> CallFrame<'a> {
             object_ref.set_field(index, value);
             Ok(())
         } else {
-            Err(VmError::ValidationException)
+            Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            ))
         }
     }
 
@@ -1419,7 +1508,7 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         field_index: u16,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let field_reference = self.get_constant_field_reference(field_index)?;
         let object_class = vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
         let (index, field) = Self::get_field(object_class, field_reference)?;
@@ -1430,7 +1519,9 @@ impl<'a> CallFrame<'a> {
             self.push(field_value)?;
             Ok(())
         } else {
-            Err(VmError::ValidationException)
+            Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            ))
         }
     }
 
@@ -1439,7 +1530,7 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         field_index: u16,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let field_reference = self.get_constant_field_reference(field_index)?;
         let object_class = vm.get_or_resolve_class(call_stack, field_reference.class_name)?;
         let (index, field) = Self::get_field(object_class, field_reference)?;
@@ -1450,11 +1541,13 @@ impl<'a> CallFrame<'a> {
             object_ref.set_field(index, value);
             Ok(())
         } else {
-            Err(VmError::ValidationException)
+            Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            ))
         }
     }
 
-    fn execute_monitorenter(&mut self) -> Result<(), VmError> {
+    fn execute_monitorenter(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let obj = self.pop()?;
         match obj {
             Object(_) => {
@@ -1462,11 +1555,13 @@ impl<'a> CallFrame<'a> {
                 // so any monitor access will succeed
                 Ok(())
             }
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
-    fn execute_monitorexit(&mut self) -> Result<(), VmError> {
+    fn execute_monitorexit(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let obj = self.pop()?;
         match obj {
             Object(_) => {
@@ -1475,7 +1570,9 @@ impl<'a> CallFrame<'a> {
                 // TODO: check we actually have acquired monitor
                 Ok(())
             }
-            _ => Err(VmError::ValidationException),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 

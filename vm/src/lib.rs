@@ -6,6 +6,7 @@ mod class_loader;
 mod class_manager;
 mod class_path;
 mod class_path_entry;
+pub mod exceptions;
 mod file_system_class_path_entry;
 mod gc;
 mod jar_file_class_path_entry;

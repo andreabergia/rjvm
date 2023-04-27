@@ -1,7 +1,7 @@
 use rjvm_vm::{
+    exceptions::MethodCallFailed,
     value::{expect_object_at, Value},
     vm::Vm,
-    vm_error::VmError,
 };
 
 fn create_base_vm() -> Vm<'static> {
@@ -18,7 +18,7 @@ fn invoke<'a>(
     class_name: &str,
     method_name: &str,
     descriptor: &str,
-) -> Result<Option<Value<'a>>, VmError> {
+) -> Result<Option<Value<'a>>, MethodCallFailed<'a>> {
     let mut call_stack = vm.allocate_call_stack();
     let main_method = vm
         .resolve_class_method(&mut call_stack, class_name, method_name, descriptor)

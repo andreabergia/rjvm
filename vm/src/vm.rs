@@ -4,13 +4,14 @@ use log::{debug, error};
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::call_frame::MethodCallResult;
 use crate::{
+    call_frame::MethodCallResult,
     call_stack::CallStack,
     class::{ClassId, ClassRef},
     class_and_method::ClassAndMethod,
     class_manager::{ClassManager, ResolvedClass},
     class_path::ClassPathParseError,
+    exceptions::MethodCallFailed,
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
     value::{ObjectRef, Value},
@@ -78,7 +79,7 @@ impl<'a> Vm<'a> {
         &mut self,
         stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ClassRef<'a>, VmError> {
+    ) -> Result<ClassRef<'a>, MethodCallFailed<'a>> {
         let class = self.class_manager.get_or_resolve_class(class_name)?;
         if let ResolvedClass::NewClass(classes_to_init) = &class {
             for class_to_init in classes_to_init.to_initialize.iter() {
@@ -92,7 +93,7 @@ impl<'a> Vm<'a> {
         &mut self,
         stack: &mut CallStack<'a>,
         class_to_init: &ClassRef<'a>,
-    ) -> Result<(), VmError> {
+    ) -> Result<(), MethodCallFailed<'a>> {
         let static_instance = self.new_object_of_class(class_to_init);
         self.statics.insert(class_to_init.id, static_instance);
         if let Some(clinit_method) = class_to_init.find_method("<clinit>", "()V") {
@@ -129,13 +130,15 @@ impl<'a> Vm<'a> {
         class_name: &str,
         method_name: &str,
         method_type_descriptor: &str,
-    ) -> Result<ClassAndMethod<'a>, VmError> {
+    ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         self.get_or_resolve_class(call_stack, class_name)
             .and_then(|class| {
                 class
                     .find_method(method_name, method_type_descriptor)
                     .map(|method| ClassAndMethod { class, method })
-                    .ok_or(VmError::ClassNotFoundException(class_name.to_string()))
+                    .ok_or(MethodCallFailed::InternalError(
+                        VmError::ClassNotFoundException(class_name.to_string()),
+                    ))
             })
     }
 
@@ -181,7 +184,7 @@ impl<'a> Vm<'a> {
                 class_and_method.method.name,
                 class_and_method.method.type_descriptor
             );
-            Err(VmError::NotImplemented)
+            Err(MethodCallFailed::InternalError(VmError::NotImplemented))
         }
     }
 
@@ -194,7 +197,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ObjectRef<'a>, VmError> {
+    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
         let class = self.get_or_resolve_class(call_stack, class_name)?;
         Ok(self.new_object_of_class(class))
     }
@@ -208,7 +211,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         string: &str,
-    ) -> Result<ObjectRef<'a>, VmError> {
+    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
         let char_array: Vec<Value<'a>> = string
             .encode_utf16()
             .map(|c| Value::Int(c as i32))
@@ -235,7 +238,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ObjectRef<'a>, VmError> {
+    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
         let class_object = self.new_object(call_stack, "java/lang/Class")?;
         // TODO: build a proper instance of Class object
         let string_object = Self::create_java_lang_string_instance(self, call_stack, class_name)?;
