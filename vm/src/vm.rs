@@ -14,6 +14,7 @@ use crate::{
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
+    stack_trace_element::StackTraceElement,
     value::{ObjectRef, Value},
     vm_error::VmError,
 };
@@ -153,8 +154,8 @@ impl<'a> Vm<'a> {
             return self.invoke_native(call_stack, class_and_method, object, args);
         }
 
-        let frame = call_stack.add_frame(class_and_method, object, args)?;
-        let result = frame.borrow_mut().execute(self, call_stack);
+        let mut frame = call_stack.add_frame(class_and_method, object, args)?;
+        let result = frame.as_mut().execute(self, call_stack);
         call_stack
             .pop_frame()
             .expect("should be able to pop the frame we just pushed");

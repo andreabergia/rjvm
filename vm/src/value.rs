@@ -193,3 +193,10 @@ pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
         Err(VmError::ValidationException)
     }
 }
+
+pub fn expect_receiver(receiver: Option<ObjectRef>) -> Result<ObjectRef, VmError> {
+    match receiver {
+        Some(v) => Ok(v),
+        None => Err(VmError::ValidationException),
+    }
+}
