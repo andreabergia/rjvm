@@ -1,8 +1,16 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{hash_map::DefaultHasher, HashMap},
+    hash::Hasher,
+    rc::Rc,
+};
 
 use log::{debug, error};
 
-use rjvm_reader::field_type::{BaseType, FieldType};
+use rjvm_reader::{
+    field_type::{BaseType, FieldType},
+    line_number::LineNumber,
+};
 
 use crate::{
     call_frame::MethodCallResult,
@@ -33,6 +41,15 @@ pub struct Vm<'a> {
 
     /// Stores native methods
     pub native_methods_registry: NativeMethodsRegistry<'a>,
+
+    /// Stores call stacks collected, and associate them with their throwable.
+    /// In the classes that we are using, the Throwable implementation does not
+    /// store the stack trace in the java fields, but rather relies on a native
+    /// array. Since we have no place to store it inside the actual object, we will
+    /// keep it in this weird map.
+    /// See the implementation of Throwable::getStackTrace() in our rt.jar for
+    /// clarity.
+    throwable_call_stacks: HashMap<u64, Vec<StackTraceElement<'a>>>,
 
     pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 }
@@ -208,7 +225,7 @@ impl<'a> Vm<'a> {
         self.object_allocator.allocate(class)
     }
 
-    pub fn create_java_lang_string_instance(
+    pub fn new_java_lang_string_object(
         &mut self,
         call_stack: &mut CallStack<'a>,
         string: &str,
@@ -235,16 +252,71 @@ impl<'a> Vm<'a> {
         Ok(string_object)
     }
 
-    pub fn create_instance_of_java_lang_class(
+    pub fn new_java_lang_class_object(
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
     ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
         let class_object = self.new_object(call_stack, "java/lang/Class")?;
         // TODO: build a proper instance of Class object
-        let string_object = Self::create_java_lang_string_instance(self, call_stack, class_name)?;
+        let string_object = Self::new_java_lang_string_object(self, call_stack, class_name)?;
         class_object.set_field(5, Value::Object(string_object));
         Ok(class_object)
+    }
+
+    pub fn new_java_lang_stack_trace_element_object(
+        &mut self,
+        call_stack: &mut CallStack<'a>,
+        stack_trace_element: &StackTraceElement<'a>,
+    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
+        let class_name = Value::Object(
+            self.new_java_lang_string_object(call_stack, stack_trace_element.class_name)?,
+        );
+        let method_name = Value::Object(
+            self.new_java_lang_string_object(call_stack, stack_trace_element.method_name)?,
+        );
+        let file_name = match stack_trace_element.source_file {
+            Some(file_name) => {
+                Value::Object(self.new_java_lang_string_object(call_stack, file_name)?)
+            }
+            _ => Value::Null,
+        };
+        let line_number =
+            Value::Int(stack_trace_element.line_number.unwrap_or(LineNumber(0)).0 as i32);
+
+        // The class StackTraceElement has this layout:
+        //     private String declaringClass;
+        //     private String methodName;
+        //     private String fileName;
+        //     private int    lineNumber;
+        let stack_trace_element_java_object =
+            self.new_object(call_stack, "java/lang/StackTraceElement")?;
+        stack_trace_element_java_object.set_field(0, class_name);
+        stack_trace_element_java_object.set_field(1, method_name);
+        stack_trace_element_java_object.set_field(2, file_name);
+        stack_trace_element_java_object.set_field(3, line_number);
+
+        Ok(stack_trace_element_java_object)
+    }
+
+    pub(crate) fn associate_stack_trace_with_throwable(
+        &mut self,
+        throwable: ObjectRef<'a>,
+        call_stack: Vec<StackTraceElement<'a>>,
+    ) {
+        let mut hasher = DefaultHasher::new();
+        std::ptr::hash(throwable, &mut hasher);
+        self.throwable_call_stacks
+            .insert(hasher.finish(), call_stack);
+    }
+
+    pub(crate) fn get_stack_trace_associated_with_throwable(
+        &self,
+        throwable: ObjectRef<'a>,
+    ) -> Option<&Vec<StackTraceElement<'a>>> {
+        let mut hasher = DefaultHasher::new();
+        std::ptr::hash(throwable, &mut hasher);
+        self.throwable_call_stacks.get(&hasher.finish())
     }
 
     pub fn debug_stats(&self) {

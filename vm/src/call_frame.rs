@@ -20,7 +20,7 @@ use crate::{
     exceptions::MethodCallFailed,
     stack_trace_element::StackTraceElement,
     value::{
-        ArrayRef, ObjectRef, Value,
+        clone_array, ArrayRef, ObjectRef, Value,
         Value::{Array, Double, Float, Int, Long, Null, Object},
     },
     value_stack::ValueStack,
@@ -708,8 +708,17 @@ impl<'a> CallFrame<'a> {
         constant_index: u16,
         kind: InvokeKind,
     ) -> Result<(), MethodCallFailed<'a>> {
+        let method_reference = self.get_constant_method_reference(constant_index)?;
+        if method_reference.class_name.starts_with('[') && method_reference.method_name == "clone" {
+            // Since we have NOT modelled arrays properly (i.e. they are not an object, as they
+            // should be), we need a special case for invoking "clone" on an array.
+            let array = self.pop()?;
+            let clone = clone_array(array)?;
+            return self.push(clone);
+        }
+
         let static_method_reference =
-            self.get_method_to_invoke_statically(vm, call_stack, constant_index, kind)?;
+            self.get_method_to_invoke_statically(vm, call_stack, method_reference, kind)?;
         let (receiver, params, new_stack_len) =
             self.get_method_receiver_and_params(&static_method_reference)?;
         let class_and_method = match kind {
@@ -841,11 +850,9 @@ impl<'a> CallFrame<'a> {
         &self,
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
-        constant_index: u16,
+        method_reference: MethodReference,
         kind: InvokeKind,
     ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
-        let method_reference = self.get_constant_method_reference(constant_index)?;
-
         let class = vm.get_or_resolve_class(call_stack, method_reference.class_name)?;
         match kind {
             InvokeKind::Special | InvokeKind::Static => {
@@ -1257,8 +1264,7 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*string_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(string) => {
-                        let string_object =
-                            vm.create_java_lang_string_instance(call_stack, string)?;
+                        let string_object = vm.new_java_lang_string_object(call_stack, string)?;
                         self.push(Object(string_object))
                     }
                     _ => Err(MethodCallFailed::InternalError(
@@ -1270,8 +1276,7 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*class_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(class_name) => {
-                        let class_object =
-                            vm.create_instance_of_java_lang_class(call_stack, class_name)?;
+                        let class_object = vm.new_java_lang_class_object(call_stack, class_name)?;
                         self.push(Object(class_object))
                     }
                     _ => Err(MethodCallFailed::InternalError(

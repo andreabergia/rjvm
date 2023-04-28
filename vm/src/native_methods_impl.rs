@@ -5,11 +5,12 @@ use rjvm_utils::type_conversion::ToUsizeSafe;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
+    exceptions::MethodCallFailed,
     native_methods_registry::NativeMethodsRegistry,
     time::{get_current_time_millis, get_nano_time},
     value::{
         expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_object_at,
-        ObjectRef, Value,
+        expect_receiver, ObjectRef, Value,
     },
     vm::Vm,
     vm_error::VmError,
@@ -22,6 +23,7 @@ pub(crate) fn register_natives(registry: &mut NativeMethodsRegistry) {
     register_gc_methods(registry);
     register_native_repr_methods(registry);
     register_reflection_methods(registry);
+    register_throwable_methods(registry);
 }
 
 fn register_noops(registry: &mut NativeMethodsRegistry) {
@@ -111,6 +113,27 @@ fn register_reflection_methods(registry: &mut NativeMethodsRegistry) {
     );
 }
 
+fn register_throwable_methods(registry: &mut NativeMethodsRegistry) {
+    registry.register(
+        "java/lang/Throwable",
+        "fillInStackTrace",
+        "(I)Ljava/lang/Throwable;",
+        |vm, call_stack, receiver, _| fill_in_stack_trace(vm, call_stack, receiver),
+    );
+    registry.register(
+        "java/lang/Throwable",
+        "getStackTraceDepth",
+        "()I",
+        |vm, _, receiver, _| get_stack_trace_depth(vm, receiver),
+    );
+    registry.register(
+        "java/lang/Throwable",
+        "getStackTraceElement",
+        "(I)Ljava/lang/StackTraceElement;",
+        get_stack_trace_element,
+    );
+}
+
 fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     let arg = args.get(0).ok_or(VmError::ValidationException)?;
     info!(
@@ -179,6 +202,51 @@ fn get_primitive_class<'a>(
 ) -> MethodCallResult<'a> {
     let arg = expect_object_at(args, 0)?;
     let class_name = vm.extract_str_from_java_lang_string(arg)?;
-    let java_lang_class_instance = vm.create_instance_of_java_lang_class(stack, &class_name)?;
+    let java_lang_class_instance = vm.new_java_lang_class_object(stack, &class_name)?;
     Ok(Some(Value::Object(java_lang_class_instance)))
+}
+
+fn fill_in_stack_trace<'a>(
+    vm: &mut Vm<'a>,
+    call_stack: &mut CallStack<'a>,
+    receiver: Option<ObjectRef<'a>>,
+) -> MethodCallResult<'a> {
+    let receiver = expect_receiver(receiver)?;
+    let stack_trace_elements = call_stack.get_stack_trace_elements();
+    vm.associate_stack_trace_with_throwable(receiver, stack_trace_elements);
+    Ok(Some(Value::Object(receiver)))
+}
+
+fn get_stack_trace_depth<'a>(
+    vm: &mut Vm<'a>,
+    receiver: Option<ObjectRef<'a>>,
+) -> MethodCallResult<'a> {
+    let receiver = expect_receiver(receiver)?;
+    match vm.get_stack_trace_associated_with_throwable(receiver) {
+        Some(stack_trace_elements) => Ok(Some(Value::Int(stack_trace_elements.len() as i32))),
+        None => Err(MethodCallFailed::InternalError(
+            VmError::ValidationException,
+        )),
+    }
+}
+
+fn get_stack_trace_element<'a>(
+    vm: &mut Vm<'a>,
+    call_stack: &mut CallStack<'a>,
+    receiver: Option<ObjectRef<'a>>,
+    args: Vec<Value<'a>>,
+) -> MethodCallResult<'a> {
+    let receiver = expect_receiver(receiver)?;
+    let index = expect_int_at(&args, 0)?;
+    match vm.get_stack_trace_associated_with_throwable(receiver) {
+        Some(stack_trace_elements) => {
+            let stack_trace_element = &stack_trace_elements[index.into_usize_safe()].clone();
+            let stack_trace_element_java_object =
+                vm.new_java_lang_stack_trace_element_object(call_stack, stack_trace_element)?;
+            Ok(Some(Value::Object(stack_trace_element_java_object)))
+        }
+        None => Err(MethodCallFailed::InternalError(
+            VmError::ValidationException,
+        )),
+    }
 }

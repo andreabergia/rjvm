@@ -31,6 +31,13 @@ fn invoke<'a>(
     main_result
 }
 
+fn extract_printed_string(vm: &Vm, index: usize) -> String {
+    let string = expect_object_at(&vm.printed, index)
+        .unwrap_or_else(|_| panic!("should have printed an object at position {index}"));
+    vm.extract_str_from_java_lang_string(string)
+        .expect("should have a valid string")
+}
+
 #[test_log::test]
 fn simple_main() {
     let mut vm = create_base_vm();
@@ -250,11 +257,10 @@ fn strings() {
     assert_eq!(Ok(None), main_result);
 
     assert_eq!(1, vm.printed.len());
-    let string = expect_object_at(&vm.printed, 0).expect("should have printed an object");
-    let string = vm
-        .extract_str_from_java_lang_string(string)
-        .expect("should have a valid string");
-    assert_eq!("Hello, Andrea, you were born in 1985", string);
+    assert_eq!(
+        "Hello, Andrea, you were born in 1985",
+        extract_printed_string(&vm, 0)
+    );
 }
 
 #[test_log::test]
@@ -281,4 +287,34 @@ fn check_cast() {
     assert_eq!(Ok(None), main_result);
 
     assert_eq!(vec![Value::Int(1)], vm.printed);
+}
+
+#[test_log::test]
+fn stack_trace_printing() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/StackTracePrinting",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(4, vm.printed.len());
+    assert_eq!(
+        "java/lang/Throwable::fillInStackTrace - Throwable.java:783",
+        extract_printed_string(&vm, 0)
+    );
+    assert_eq!(
+        "java/lang/Throwable::<init> - Throwable.java:250",
+        extract_printed_string(&vm, 1)
+    );
+    assert_eq!(
+        "java/lang/Exception::<init> - Exception.java:55",
+        extract_printed_string(&vm, 2)
+    );
+    assert_eq!(
+        "rjvm/StackTracePrinting::main - StackTracePrinting.java:5",
+        extract_printed_string(&vm, 3)
+    );
 }

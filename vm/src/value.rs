@@ -214,3 +214,21 @@ pub fn expect_receiver(receiver: Option<ObjectRef>) -> Result<ObjectRef, VmError
         None => Err(VmError::ValidationException),
     }
 }
+
+pub fn clone_array(array: Value) -> Result<Value, VmError> {
+    match array {
+        Value::Array(elements_type, array_ref) => {
+            let existing_vec = array_ref.borrow();
+
+            let mut new_vec = Vec::with_capacity(existing_vec.len());
+            for value in existing_vec.iter() {
+                new_vec.push(value.clone());
+            }
+
+            let new_vec = Rc::new(RefCell::new(new_vec));
+            let new_array = Value::Array(elements_type, new_vec);
+            Ok(new_array)
+        }
+        _ => Err(VmError::ValidationException),
+    }
+}
