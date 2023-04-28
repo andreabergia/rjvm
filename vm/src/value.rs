@@ -142,7 +142,21 @@ impl<'a> Value<'a> {
 
 impl<'a> Debug for ObjectValue<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "class: {} fields {:?}", self.class_id, self.fields)
+        write!(f, "class: {} fields [", self.class_id)?;
+        for field in self.fields.borrow().iter() {
+            match field {
+                Value::Object(object) => write!(f, "object cid = {}", object.class_id)?,
+                Value::Array(arr_type, arr_ref) => write!(
+                    f,
+                    "array of type {} len {}",
+                    arr_type,
+                    arr_ref.borrow().len()
+                )?,
+                _ => field.fmt(f)?,
+            }
+            write!(f, ", ")?;
+        }
+        write!(f, "]")
     }
 }
 
