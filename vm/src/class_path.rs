@@ -1,3 +1,4 @@
+use log::debug;
 use thiserror::Error;
 
 use crate::{
@@ -22,6 +23,7 @@ impl ClassPath {
     pub fn push(&mut self, string: &str) -> Result<(), ClassPathParseError> {
         let mut entries_to_add: Vec<Box<dyn ClassPathEntry>> = Vec::new();
         for entry in string.split(':') {
+            debug!("trying to parse class path entry {}", entry);
             let parsed_entry = Self::try_parse_entry(entry)?;
             entries_to_add.push(parsed_entry);
         }
@@ -49,6 +51,7 @@ impl ClassPath {
 
     pub fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError> {
         for entry in self.entries.iter() {
+            debug!("looking up class {} in {:?}", class_name, entry);
             let entry_result = entry.resolve(class_name)?;
             if let Some(class_bytes) = entry_result {
                 return Ok(Some(class_bytes));

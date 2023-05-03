@@ -1,5 +1,5 @@
 mod call_frame;
-mod call_stack;
+pub mod call_stack;
 pub mod class;
 pub mod class_and_method;
 mod class_loader;

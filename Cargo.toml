@@ -2,5 +2,6 @@
 members = [
     "utils",
     "reader",
-    "vm"
+    "vm",
+    "vm_cli"
 ]

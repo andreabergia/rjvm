@@ -155,7 +155,11 @@ impl<'a> Vm<'a> {
                     .find_method(method_name, method_type_descriptor)
                     .map(|method| ClassAndMethod { class, method })
                     .ok_or(MethodCallFailed::InternalError(
-                        VmError::ClassNotFoundException(class_name.to_string()),
+                        VmError::MethodNotFoundException(
+                            class_name.to_string(),
+                            method_name.to_string(),
+                            method_type_descriptor.to_string(),
+                        ),
                     ))
             })
     }

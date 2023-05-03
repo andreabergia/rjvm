@@ -1,0 +1,9 @@
+[package]
+name = "rjvm_vm_cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rjvm_vm = { path = "../vm" }
+env_logger = "*"
+clap = { version = "4.2.5", features = ["derive"] }
