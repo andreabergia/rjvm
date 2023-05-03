@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use std::{
     cell::RefCell,
     fs::File,
@@ -11,9 +12,19 @@ use zip::{result::ZipError, ZipArchive};
 use crate::class_path_entry::{ClassLoadingError, ClassPathEntry};
 
 /// Implementation of [ClassPathEntry] that searches for `.class` file inside a `.jar` file
-#[derive(Debug)]
 pub struct JarFileClassPathEntry {
+    file_name: String,
     zip: RefCell<ZipArchive<BufReader<File>>>,
+}
+
+impl Debug for JarFileClassPathEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "JarFileClassPathEntry {{ file_name: {} }}",
+            self.file_name
+        )
+    }
 }
 
 impl JarFileClassPathEntry {
@@ -22,12 +33,14 @@ impl JarFileClassPathEntry {
         if !path.exists() {
             return Err(JarFileError::NotFound(path.to_string_lossy().to_string()));
         }
+
         let file = File::open(path)
             .map_err(|_| JarFileError::ReadingError(path.to_string_lossy().to_string()))?;
         let buf_reader = BufReader::new(file);
         let zip = ZipArchive::new(buf_reader)
             .map_err(|_| JarFileError::InvalidJar(path.to_string_lossy().to_string()))?;
         Ok(Self {
+            file_name: path.to_string_lossy().to_string(),
             zip: RefCell::new(zip),
         })
     }
