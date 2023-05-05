@@ -2,7 +2,7 @@
 
 This project is an attempt to write a minimal JVM 7 using Rust.
 
-Important note: *this is a hobby project, built for fun and for learning purposes*. In particular, it is my first real
+Important note: **this is a hobby project, built for fun and for learning purposes**. In particular, it is my first real
 program in Rust and I've used to learn the language - thus, I'm sure some parts of the code are not very "idiomatic"
 Rust since I'm just learning the language.
 
@@ -13,7 +13,7 @@ The code is licensed under the [Apache v2 license](./LICENSE).
 
 ## What has been implemented
 
-The current code can execute a [various simple programs](./vm/tests/resources/rjvm), but it has a lot of limitations.
+The current code can execute [various simple programs](./vm/tests/resources/rjvm), but it has a lot of limitations.
 
 Things not implemented (and not planned to):
 
@@ -23,14 +23,14 @@ Things not implemented (and not planned to):
 - reflection
 - annotations
 - [class file verification](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10)
+- I/O
 
 However, there's quite a few things implemented:
 
 - parsing .class files
 - class loading from a jar file or from a folder
 - execution of code:
-    - primitive types
-    - strings
+    - primitive types, arrays, strings
     - control flow statements
     - classes, subclasses, interfaces
     - methods (virtual, static)
@@ -51,8 +51,8 @@ Before declaring the project "complete", these are the things I still plan to im
 - garbage collection
 
 There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
-but it is "good enough" to execute some simple code; for example arrays or the concept of "identity hash code". However,
-it is unlikely I will fix those issues.
+but it is "good enough" to execute some simple code; for example arrays aren't real objects, or we don't really have the
+concept of "identity hash code". However, it is unlikely I will fix those issues.
 
 ## Code structure
 
