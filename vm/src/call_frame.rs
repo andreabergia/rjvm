@@ -752,11 +752,6 @@ impl<'a> CallFrame<'a> {
         constant_index: u16,
         kind: InvokeKind,
     ) -> Result<(), MethodCallFailed<'a>> {
-        if self.class_and_method.class.name == "java/lang/Throwable"
-            && self.to_stack_trace_element().line_number == Some(LineNumber(250))
-        {
-            println!("here {}", self.to_stack_trace_element())
-        }
         let method_reference = self.get_constant_method_reference(constant_index)?;
         if method_reference.class_name.starts_with('[') && method_reference.method_name == "clone" {
             // Since we have NOT modelled arrays properly (i.e. they are not an object, as they
