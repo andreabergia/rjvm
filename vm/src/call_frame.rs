@@ -14,10 +14,11 @@ use rjvm_reader::{
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{
+    call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
     class::Class,
     class_and_method::ClassAndMethod,
-    exceptions::MethodCallFailed,
+    exceptions::{JavaException, MethodCallFailed},
     stack_trace_element::StackTraceElement,
     value::{
         clone_array, ArrayRef, ObjectRef, Value,
@@ -212,6 +213,11 @@ enum InvokeKind {
     Interface,
 }
 
+enum InstructionCompleted<'a> {
+    ReturnFromMethod(Option<Value<'a>>),
+    ContinueMethodExecution,
+}
+
 impl<'a> CallFrame<'a> {
     pub fn new(class_and_method: ClassAndMethod<'a>, locals: Vec<Value<'a>>) -> Self {
         let max_stack_size = class_and_method
@@ -262,374 +268,412 @@ impl<'a> CallFrame<'a> {
         self.debug_start_execution();
 
         loop {
+            let executed_instruction_pc = self.pc;
             let (instruction, new_address) =
-                Instruction::parse(self.code, self.pc.0.into_usize_safe())
+                Instruction::parse(self.code, executed_instruction_pc.0.into_usize_safe())
                     .map_err(|_| MethodCallFailed::InternalError(VmError::ValidationException))?;
             self.debug_print_status(&instruction);
+
+            // Move pc to the next instruction, _before_ executing it, since we want a "goto" to override this
             self.pc = ProgramCounter(new_address as u16);
 
-            match instruction {
-                Instruction::Aconst_null => self.push(Null)?,
-                Instruction::Aload(index) => self.execute_aload(index.into_usize_safe())?,
-                Instruction::Aload_0 => self.execute_aload(0)?,
-                Instruction::Aload_1 => self.execute_aload(1)?,
-                Instruction::Aload_2 => self.execute_aload(2)?,
-                Instruction::Aload_3 => self.execute_aload(3)?,
+            let instruction_result = self.execute_instruction(vm, call_stack, instruction);
+            match instruction_result {
+                Ok(ReturnFromMethod(return_value)) => return Ok(return_value),
+                Ok(ContinueMethodExecution) => {}
 
-                Instruction::Astore(index) => self.execute_astore(index.into_usize_safe())?,
-                Instruction::Astore_0 => self.execute_astore(0)?,
-                Instruction::Astore_1 => self.execute_astore(1)?,
-                Instruction::Astore_2 => self.execute_astore(2)?,
-                Instruction::Astore_3 => self.execute_astore(3)?,
-
-                Instruction::Iload(index) => self.execute_iload(index.into_usize_safe())?,
-                Instruction::Iload_0 => self.execute_iload(0)?,
-                Instruction::Iload_1 => self.execute_iload(1)?,
-                Instruction::Iload_2 => self.execute_iload(2)?,
-                Instruction::Iload_3 => self.execute_iload(3)?,
-
-                Instruction::Istore(index) => self.execute_istore(index.into_usize_safe())?,
-                Instruction::Istore_0 => self.execute_istore(0)?,
-                Instruction::Istore_1 => self.execute_istore(1)?,
-                Instruction::Istore_2 => self.execute_istore(2)?,
-                Instruction::Istore_3 => self.execute_istore(3)?,
-
-                Instruction::Iconst_m1 => self.push(Int(-1))?,
-                Instruction::Iconst_0 => self.push(Int(0))?,
-                Instruction::Iconst_1 => self.push(Int(1))?,
-                Instruction::Iconst_2 => self.push(Int(2))?,
-                Instruction::Iconst_3 => self.push(Int(3))?,
-                Instruction::Iconst_4 => self.push(Int(4))?,
-                Instruction::Iconst_5 => self.push(Int(5))?,
-
-                Instruction::Lconst_0 => self.push(Long(0))?,
-                Instruction::Lconst_1 => self.push(Long(1))?,
-
-                Instruction::Fconst_0 => self.push(Float(0f32))?,
-                Instruction::Fconst_1 => self.push(Float(1f32))?,
-                Instruction::Fconst_2 => self.push(Float(2f32))?,
-
-                Instruction::Dconst_0 => self.push(Double(0f64))?,
-                Instruction::Dconst_1 => self.push(Double(1f64))?,
-
-                Instruction::Lload(index) => self.execute_lload(index.into_usize_safe())?,
-                Instruction::Lload_0 => self.execute_lload(0)?,
-                Instruction::Lload_1 => self.execute_lload(1)?,
-                Instruction::Lload_2 => self.execute_lload(2)?,
-                Instruction::Lload_3 => self.execute_lload(3)?,
-
-                Instruction::Lstore(index) => self.execute_lstore(index.into_usize_safe())?,
-                Instruction::Lstore_0 => self.execute_lstore(0)?,
-                Instruction::Lstore_1 => self.execute_lstore(1)?,
-                Instruction::Lstore_2 => self.execute_lstore(2)?,
-                Instruction::Lstore_3 => self.execute_lstore(3)?,
-
-                Instruction::Ldc(index) => self.execute_ldc(vm, call_stack, index as u16)?,
-                Instruction::Ldc_w(index) => self.execute_ldc(vm, call_stack, index)?,
-                Instruction::Ldc2_w(index) => self.execute_ldc_long_double(index)?,
-
-                Instruction::Fload(index) => self.execute_fload(index.into_usize_safe())?,
-                Instruction::Fload_0 => self.execute_fload(0)?,
-                Instruction::Fload_1 => self.execute_fload(1)?,
-                Instruction::Fload_2 => self.execute_fload(2)?,
-                Instruction::Fload_3 => self.execute_fload(3)?,
-
-                Instruction::Fstore(index) => self.execute_fstore(index.into_usize_safe())?,
-                Instruction::Fstore_0 => self.execute_fstore(0)?,
-                Instruction::Fstore_1 => self.execute_fstore(1)?,
-                Instruction::Fstore_2 => self.execute_fstore(2)?,
-                Instruction::Fstore_3 => self.execute_fstore(3)?,
-
-                Instruction::Dload(index) => self.execute_dload(index.into_usize_safe())?,
-                Instruction::Dload_0 => self.execute_dload(0)?,
-                Instruction::Dload_1 => self.execute_dload(1)?,
-                Instruction::Dload_2 => self.execute_dload(2)?,
-                Instruction::Dload_3 => self.execute_dload(3)?,
-
-                Instruction::Dstore(index) => self.execute_dstore(index.into_usize_safe())?,
-                Instruction::Dstore_0 => self.execute_dstore(0)?,
-                Instruction::Dstore_1 => self.execute_dstore(1)?,
-                Instruction::Dstore_2 => self.execute_dstore(2)?,
-                Instruction::Dstore_3 => self.execute_dstore(3)?,
-
-                Instruction::I2b => self.coerce_int(Self::i2b)?,
-                Instruction::I2c => self.coerce_int(Self::i2c)?,
-                Instruction::I2s => self.coerce_int(Self::i2s)?,
-                Instruction::I2f => self.coerce_int(Self::i2f)?,
-                Instruction::I2l => self.coerce_int(Self::i2l)?,
-                Instruction::I2d => self.coerce_int(Self::i2d)?,
-
-                Instruction::L2i => self.coerce_long(Self::l2i)?,
-                Instruction::L2f => self.coerce_long(Self::l2f)?,
-                Instruction::L2d => self.coerce_long(Self::l2d)?,
-
-                Instruction::F2i => self.coerce_float(Self::f2i)?,
-                Instruction::F2l => self.coerce_float(Self::f2l)?,
-                Instruction::F2d => self.coerce_float(Self::f2d)?,
-
-                Instruction::D2i => self.coerce_double(Self::d2i)?,
-                Instruction::D2l => self.coerce_double(Self::d2l)?,
-                Instruction::D2f => self.coerce_double(Self::d2f)?,
-
-                Instruction::New(constant_index) => {
-                    let new_object_class_name =
-                        self.get_constant_class_reference(constant_index)?;
-                    let new_object = vm.new_object(call_stack, new_object_class_name)?;
-                    self.push(Object(new_object))?;
+                Err(MethodCallFailed::InternalError(err)) => {
+                    return Err(MethodCallFailed::InternalError(err))
                 }
 
-                Instruction::Dup => self.stack.dup()?,
-                Instruction::Dup_x1 => self.stack.dup_x1()?,
-                Instruction::Dup_x2 => self.stack.dup_x2()?,
-                Instruction::Dup2 => self.stack.dup2()?,
-                Instruction::Dup2_x1 => self.stack.dup2_x1()?,
-                Instruction::Dup2_x2 => self.stack.dup2_x2()?,
-                Instruction::Pop => self.stack.pop().map(|_| ())?,
-                Instruction::Pop2 => self.stack.pop2().map(|_| ())?,
-                Instruction::Swap => self.stack.swap()?,
-
-                Instruction::Bipush(byte_value) => self.push(Int(byte_value as i32))?,
-                Instruction::Sipush(short_value) => self.push(Int(short_value as i32))?,
-
-                Instruction::Invokespecial(constant_index) => {
-                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Special)?
-                }
-                Instruction::Invokestatic(constant_index) => {
-                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Static)?
-                }
-                Instruction::Invokevirtual(constant_index) => {
-                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Virtual)?
-                }
-                Instruction::Invokeinterface(constant_index, _) => {
-                    self.invoke_method(vm, call_stack, constant_index, InvokeKind::Interface)?
-                }
-
-                Instruction::Return => {
-                    if !self.class_and_method.is_void() {
-                        return Err(MethodCallFailed::InternalError(
-                            VmError::ValidationException,
-                        ));
+                Err(MethodCallFailed::ExceptionThrown(exception)) => {
+                    let exception_handler = self.find_exception_handler(
+                        vm,
+                        call_stack,
+                        executed_instruction_pc,
+                        &exception,
+                    );
+                    match exception_handler {
+                        Err(err) => return Err(err),
+                        Ok(None) => {
+                            // Bubble exception up to the caller
+                            return Err(MethodCallFailed::ExceptionThrown(exception));
+                        }
+                        Ok(Some(catch_handler_pc)) => {
+                            // Re-push exception on the stack and continue execution of this method from the catch handler
+                            self.stack.push(Object(exception.java_exception_object))?;
+                            self.pc = catch_handler_pc
+                        }
                     }
-                    self.debug_done_execution(None);
-                    return Ok(None);
-                }
-                Instruction::Areturn => return self.execute_areturn(),
-                Instruction::Ireturn => return self.execute_ireturn(),
-                Instruction::Lreturn => return self.execute_lreturn(),
-                Instruction::Freturn => return self.execute_freturn(),
-                Instruction::Dreturn => return self.execute_dreturn(),
-
-                Instruction::Instanceof(constant_index) => {
-                    self.execute_instanceof(vm, call_stack, constant_index)?
-                }
-                Instruction::Checkcast(constant_index) => {
-                    self.execute_checkcast(vm, call_stack, constant_index)?
-                }
-
-                Instruction::Putfield(field_index) => self.execute_putfield(vm, field_index)?,
-                Instruction::Putstatic(field_index) => {
-                    self.execute_putstatic(vm, call_stack, field_index)?
-                }
-                Instruction::Getfield(field_index) => self.execute_getfield(vm, field_index)?,
-                Instruction::Getstatic(field_index) => {
-                    self.execute_getstatic(vm, call_stack, field_index)?
-                }
-
-                Instruction::Iadd => self.execute_int_math(|a, b| Ok(a.wrapping_add(b)))?,
-                Instruction::Isub => self.execute_int_math(|a, b| Ok(a.wrapping_sub(b)))?,
-                Instruction::Imul => self.execute_int_math(|a, b| Ok(a.wrapping_mul(b)))?,
-                Instruction::Idiv => self.execute_int_math(|a, b| match b {
-                    0 => Err(VmError::ArithmeticException),
-                    _ => Ok(a.wrapping_div(b)),
-                })?,
-                Instruction::Irem => self.execute_int_math(|a, b| match b {
-                    0 => Err(VmError::ArithmeticException),
-                    _ => Ok(a.wrapping_rem(b)),
-                })?,
-                Instruction::Iand => self.execute_int_math(|a, b| Ok(a & b))?,
-                Instruction::Ior => self.execute_int_math(|a, b| Ok(a | b))?,
-                Instruction::Ixor => self.execute_int_math(|a, b| Ok(a ^ b))?,
-                Instruction::Ishr => self.execute_int_math(|a, b| Ok(a >> (b & 0x1f)))?,
-                Instruction::Ishl => self.execute_int_math(|a, b| Ok(a << (b & 0x1f)))?,
-                Instruction::Iushr => self.execute_int_math(|a, b| {
-                    Ok({
-                        if a > 0 {
-                            a >> (b & 0x1f)
-                        } else {
-                            ((a as u32) >> (b & 0x1f)) as i32
-                        }
-                    })
-                })?,
-
-                Instruction::Iinc(index, constant) => {
-                    let index = index.into_usize_safe();
-                    let local = self.get_local_int_as_int(vm, index)?;
-                    self.locals[index] = Int(local + constant as i32);
-                }
-
-                Instruction::Ladd => self.execute_long_math(|a, b| Ok(a + b))?,
-                Instruction::Lsub => self.execute_long_math(|a, b| Ok(a - b))?,
-                Instruction::Lmul => self.execute_long_math(|a, b| Ok(a * b))?,
-                Instruction::Ldiv => self.execute_long_math(|a, b| match b {
-                    0 => Err(VmError::ArithmeticException),
-                    _ => Ok(a / b),
-                })?,
-                Instruction::Lrem => self.execute_long_math(|a, b| match b {
-                    0 => Err(VmError::ArithmeticException),
-                    _ => Ok(a % b),
-                })?,
-                Instruction::Land => self.execute_long_math(|a, b| Ok(a & b))?,
-                Instruction::Lor => self.execute_long_math(|a, b| Ok(a | b))?,
-                Instruction::Lxor => self.execute_long_math(|a, b| Ok(a ^ b))?,
-                Instruction::Lshr => self.execute_long_shift(|a, b| Ok(a >> (b & 0x1f)))?,
-                Instruction::Lshl => self.execute_long_shift(|a, b| Ok(a << (b & 0x1f)))?,
-                Instruction::Lushr => self.execute_long_shift(|a, b| {
-                    Ok({
-                        if a > 0 {
-                            a >> (b & 0x1f)
-                        } else {
-                            ((a as u64) >> (b & 0x1f)) as i64
-                        }
-                    })
-                })?,
-
-                Instruction::Fadd => self.execute_float_math(|a, b| Ok(a + b))?,
-                Instruction::Fsub => self.execute_float_math(|a, b| Ok(a - b))?,
-                Instruction::Fmul => self.execute_float_math(|a, b| Ok(a * b))?,
-                Instruction::Fdiv => self.execute_float_math(|a, b| {
-                    Ok(
-                        if Self::is_double_division_returning_nan(a as f64, b as f64) {
-                            f32::NAN
-                        } else {
-                            a / b
-                        },
-                    )
-                })?,
-                Instruction::Frem => self.execute_float_math(|a, b| {
-                    Ok(
-                        if Self::is_double_division_returning_nan(a as f64, b as f64) {
-                            f32::NAN
-                        } else {
-                            a % b
-                        },
-                    )
-                })?,
-
-                Instruction::Dadd => self.execute_double_math(|a, b| Ok(a + b))?,
-                Instruction::Dsub => self.execute_double_math(|a, b| Ok(a - b))?,
-                Instruction::Dmul => self.execute_double_math(|a, b| Ok(a * b))?,
-                Instruction::Ddiv => self.execute_double_math(|a, b| {
-                    Ok(if Self::is_double_division_returning_nan(a, b) {
-                        f64::NAN
-                    } else {
-                        a / b
-                    })
-                })?,
-                Instruction::Drem => self.execute_double_math(|a, b| {
-                    Ok(if Self::is_double_division_returning_nan(a, b) {
-                        f64::NAN
-                    } else {
-                        a % b
-                    })
-                })?,
-
-                Instruction::Ineg => self.execute_ineg()?,
-                Instruction::Lneg => self.execute_lneg()?,
-                Instruction::Fneg => self.execute_fneg()?,
-                Instruction::Dneg => self.execute_dneg()?,
-
-                Instruction::Goto(jump_address) => self.goto(jump_address),
-
-                Instruction::Ifeq(jump_address) => self.execute_if(jump_address, |v| v == 0)?,
-                Instruction::Ifne(jump_address) => self.execute_if(jump_address, |v| v != 0)?,
-                Instruction::Iflt(jump_address) => self.execute_if(jump_address, |v| v < 0)?,
-                Instruction::Ifle(jump_address) => self.execute_if(jump_address, |v| v <= 0)?,
-                Instruction::Ifgt(jump_address) => self.execute_if(jump_address, |v| v > 0)?,
-                Instruction::Ifge(jump_address) => self.execute_if(jump_address, |v| v >= 0)?,
-                Instruction::Ifnull(jump_address) => self.execute_if_null(jump_address, true)?,
-                Instruction::Ifnonnull(jump_address) => {
-                    self.execute_if_null(jump_address, false)?
-                }
-                Instruction::If_acmpeq(jump_address) => self.execute_if_acmp(jump_address, true)?,
-                Instruction::If_acmpne(jump_address) => {
-                    self.execute_if_acmp(jump_address, false)?
-                }
-
-                Instruction::If_icmpeq(jump_address) => {
-                    self.execute_if_icmp(jump_address, |a, b| a == b)?
-                }
-                Instruction::If_icmpne(jump_address) => {
-                    self.execute_if_icmp(jump_address, |a, b| a != b)?
-                }
-                Instruction::If_icmplt(jump_address) => {
-                    self.execute_if_icmp(jump_address, |a, b| a < b)?
-                }
-                Instruction::If_icmple(jump_address) => {
-                    self.execute_if_icmp(jump_address, |a, b| a <= b)?
-                }
-                Instruction::If_icmpgt(jump_address) => {
-                    self.execute_if_icmp(jump_address, |a, b| a > b)?
-                }
-                Instruction::If_icmpge(jump_address) => {
-                    self.execute_if_icmp(jump_address, |a, b| a >= b)?
-                }
-
-                Instruction::Lcmp => self.execute_long_compare(1)?,
-                Instruction::Fcmpg => self.execute_float_compare(-1)?,
-                Instruction::Fcmpl => self.execute_float_compare(1)?,
-                Instruction::Dcmpg => self.execute_double_compare(-1)?,
-                Instruction::Dcmpl => self.execute_double_compare(1)?,
-
-                Instruction::Newarray(array_type) => {
-                    self.execute_newarray(array_type)?;
-                }
-                Instruction::Anewarray(constant_index) => {
-                    self.execute_anewarray(constant_index)?;
-                }
-
-                Instruction::Arraylength => self.execute_array_length()?,
-
-                Instruction::Baload => self.execute_baload()?,
-                Instruction::Caload => self.execute_caload()?,
-                Instruction::Saload => self.execute_saload()?,
-                Instruction::Iaload => self.execute_iaload()?,
-                Instruction::Laload => self.execute_laload()?,
-                Instruction::Faload => self.execute_faload()?,
-                Instruction::Daload => self.execute_daload()?,
-                Instruction::Aaload => self.execute_aaload()?,
-
-                Instruction::Bastore => self.execute_bastore()?,
-                Instruction::Castore => self.execute_castore()?,
-                Instruction::Sastore => self.execute_sastore()?,
-                Instruction::Iastore => self.execute_iastore()?,
-                Instruction::Lastore => self.execute_lastore()?,
-                Instruction::Fastore => self.execute_fastore()?,
-                Instruction::Dastore => self.execute_dastore()?,
-                Instruction::Aastore => self.execute_aastore(vm)?,
-
-                Instruction::Monitorenter => self.execute_monitorenter()?,
-                Instruction::Monitorexit => self.execute_monitorexit()?,
-
-                /* Unsupported instructions:
-                Instruction::Athrow => {}
-                Instruction::Goto_w => {}
-                Instruction::Invokedynamic(_) => {}
-                Instruction::Jsr(_) => {}
-                Instruction::Jsr_w => {}
-                Instruction::Lookupswitch => {}
-                Instruction::Multianewarray(_, _) => {}
-                Instruction::Ret(_) => {}
-                Instruction::Tableswitch => {}
-                Instruction::Wide => {}
-                */
-                Instruction::Nop => {}
-
-                _ => {
-                    warn!("Unsupported instruction: {:?}", instruction);
-                    return Err(MethodCallFailed::InternalError(VmError::NotImplemented));
                 }
             }
         }
+    }
+
+    fn execute_instruction(
+        &mut self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        instruction: Instruction,
+    ) -> Result<InstructionCompleted<'a>, MethodCallFailed<'a>> {
+        match instruction {
+            Instruction::Aconst_null => self.push(Null)?,
+            Instruction::Aload(index) => self.execute_aload(index.into_usize_safe())?,
+            Instruction::Aload_0 => self.execute_aload(0)?,
+            Instruction::Aload_1 => self.execute_aload(1)?,
+            Instruction::Aload_2 => self.execute_aload(2)?,
+            Instruction::Aload_3 => self.execute_aload(3)?,
+
+            Instruction::Astore(index) => self.execute_astore(index.into_usize_safe())?,
+            Instruction::Astore_0 => self.execute_astore(0)?,
+            Instruction::Astore_1 => self.execute_astore(1)?,
+            Instruction::Astore_2 => self.execute_astore(2)?,
+            Instruction::Astore_3 => self.execute_astore(3)?,
+
+            Instruction::Iload(index) => self.execute_iload(index.into_usize_safe())?,
+            Instruction::Iload_0 => self.execute_iload(0)?,
+            Instruction::Iload_1 => self.execute_iload(1)?,
+            Instruction::Iload_2 => self.execute_iload(2)?,
+            Instruction::Iload_3 => self.execute_iload(3)?,
+
+            Instruction::Istore(index) => self.execute_istore(index.into_usize_safe())?,
+            Instruction::Istore_0 => self.execute_istore(0)?,
+            Instruction::Istore_1 => self.execute_istore(1)?,
+            Instruction::Istore_2 => self.execute_istore(2)?,
+            Instruction::Istore_3 => self.execute_istore(3)?,
+
+            Instruction::Iconst_m1 => self.push(Int(-1))?,
+            Instruction::Iconst_0 => self.push(Int(0))?,
+            Instruction::Iconst_1 => self.push(Int(1))?,
+            Instruction::Iconst_2 => self.push(Int(2))?,
+            Instruction::Iconst_3 => self.push(Int(3))?,
+            Instruction::Iconst_4 => self.push(Int(4))?,
+            Instruction::Iconst_5 => self.push(Int(5))?,
+
+            Instruction::Lconst_0 => self.push(Long(0))?,
+            Instruction::Lconst_1 => self.push(Long(1))?,
+
+            Instruction::Fconst_0 => self.push(Float(0f32))?,
+            Instruction::Fconst_1 => self.push(Float(1f32))?,
+            Instruction::Fconst_2 => self.push(Float(2f32))?,
+
+            Instruction::Dconst_0 => self.push(Double(0f64))?,
+            Instruction::Dconst_1 => self.push(Double(1f64))?,
+
+            Instruction::Lload(index) => self.execute_lload(index.into_usize_safe())?,
+            Instruction::Lload_0 => self.execute_lload(0)?,
+            Instruction::Lload_1 => self.execute_lload(1)?,
+            Instruction::Lload_2 => self.execute_lload(2)?,
+            Instruction::Lload_3 => self.execute_lload(3)?,
+
+            Instruction::Lstore(index) => self.execute_lstore(index.into_usize_safe())?,
+            Instruction::Lstore_0 => self.execute_lstore(0)?,
+            Instruction::Lstore_1 => self.execute_lstore(1)?,
+            Instruction::Lstore_2 => self.execute_lstore(2)?,
+            Instruction::Lstore_3 => self.execute_lstore(3)?,
+
+            Instruction::Ldc(index) => self.execute_ldc(vm, call_stack, index as u16)?,
+            Instruction::Ldc_w(index) => self.execute_ldc(vm, call_stack, index)?,
+            Instruction::Ldc2_w(index) => self.execute_ldc_long_double(index)?,
+
+            Instruction::Fload(index) => self.execute_fload(index.into_usize_safe())?,
+            Instruction::Fload_0 => self.execute_fload(0)?,
+            Instruction::Fload_1 => self.execute_fload(1)?,
+            Instruction::Fload_2 => self.execute_fload(2)?,
+            Instruction::Fload_3 => self.execute_fload(3)?,
+
+            Instruction::Fstore(index) => self.execute_fstore(index.into_usize_safe())?,
+            Instruction::Fstore_0 => self.execute_fstore(0)?,
+            Instruction::Fstore_1 => self.execute_fstore(1)?,
+            Instruction::Fstore_2 => self.execute_fstore(2)?,
+            Instruction::Fstore_3 => self.execute_fstore(3)?,
+
+            Instruction::Dload(index) => self.execute_dload(index.into_usize_safe())?,
+            Instruction::Dload_0 => self.execute_dload(0)?,
+            Instruction::Dload_1 => self.execute_dload(1)?,
+            Instruction::Dload_2 => self.execute_dload(2)?,
+            Instruction::Dload_3 => self.execute_dload(3)?,
+
+            Instruction::Dstore(index) => self.execute_dstore(index.into_usize_safe())?,
+            Instruction::Dstore_0 => self.execute_dstore(0)?,
+            Instruction::Dstore_1 => self.execute_dstore(1)?,
+            Instruction::Dstore_2 => self.execute_dstore(2)?,
+            Instruction::Dstore_3 => self.execute_dstore(3)?,
+
+            Instruction::I2b => self.coerce_int(Self::i2b)?,
+            Instruction::I2c => self.coerce_int(Self::i2c)?,
+            Instruction::I2s => self.coerce_int(Self::i2s)?,
+            Instruction::I2f => self.coerce_int(Self::i2f)?,
+            Instruction::I2l => self.coerce_int(Self::i2l)?,
+            Instruction::I2d => self.coerce_int(Self::i2d)?,
+
+            Instruction::L2i => self.coerce_long(Self::l2i)?,
+            Instruction::L2f => self.coerce_long(Self::l2f)?,
+            Instruction::L2d => self.coerce_long(Self::l2d)?,
+
+            Instruction::F2i => self.coerce_float(Self::f2i)?,
+            Instruction::F2l => self.coerce_float(Self::f2l)?,
+            Instruction::F2d => self.coerce_float(Self::f2d)?,
+
+            Instruction::D2i => self.coerce_double(Self::d2i)?,
+            Instruction::D2l => self.coerce_double(Self::d2l)?,
+            Instruction::D2f => self.coerce_double(Self::d2f)?,
+
+            Instruction::New(constant_index) => {
+                let new_object_class_name = self.get_constant_class_reference(constant_index)?;
+                let new_object = vm.new_object(call_stack, new_object_class_name)?;
+                self.push(Object(new_object))?;
+            }
+
+            Instruction::Dup => self.stack.dup()?,
+            Instruction::Dup_x1 => self.stack.dup_x1()?,
+            Instruction::Dup_x2 => self.stack.dup_x2()?,
+            Instruction::Dup2 => self.stack.dup2()?,
+            Instruction::Dup2_x1 => self.stack.dup2_x1()?,
+            Instruction::Dup2_x2 => self.stack.dup2_x2()?,
+            Instruction::Pop => self.stack.pop().map(|_| ())?,
+            Instruction::Pop2 => self.stack.pop2().map(|_| ())?,
+            Instruction::Swap => self.stack.swap()?,
+
+            Instruction::Bipush(byte_value) => self.push(Int(byte_value as i32))?,
+            Instruction::Sipush(short_value) => self.push(Int(short_value as i32))?,
+
+            Instruction::Invokespecial(constant_index) => {
+                self.invoke_method(vm, call_stack, constant_index, InvokeKind::Special)?
+            }
+            Instruction::Invokestatic(constant_index) => {
+                self.invoke_method(vm, call_stack, constant_index, InvokeKind::Static)?
+            }
+            Instruction::Invokevirtual(constant_index) => {
+                self.invoke_method(vm, call_stack, constant_index, InvokeKind::Virtual)?
+            }
+            Instruction::Invokeinterface(constant_index, _) => {
+                self.invoke_method(vm, call_stack, constant_index, InvokeKind::Interface)?
+            }
+
+            Instruction::Return => {
+                if !self.class_and_method.is_void() {
+                    return Err(MethodCallFailed::InternalError(
+                        VmError::ValidationException,
+                    ));
+                }
+                self.debug_done_execution(None);
+                return Ok(ReturnFromMethod(None));
+            }
+            Instruction::Areturn => return Ok(ReturnFromMethod(self.execute_areturn()?)),
+            Instruction::Ireturn => return Ok(ReturnFromMethod(self.execute_ireturn()?)),
+            Instruction::Lreturn => return Ok(ReturnFromMethod(self.execute_lreturn()?)),
+            Instruction::Freturn => return Ok(ReturnFromMethod(self.execute_freturn()?)),
+            Instruction::Dreturn => return Ok(ReturnFromMethod(self.execute_dreturn()?)),
+
+            Instruction::Instanceof(constant_index) => {
+                self.execute_instanceof(vm, call_stack, constant_index)?
+            }
+            Instruction::Checkcast(constant_index) => {
+                self.execute_checkcast(vm, call_stack, constant_index)?
+            }
+
+            Instruction::Putfield(field_index) => self.execute_putfield(vm, field_index)?,
+            Instruction::Putstatic(field_index) => {
+                self.execute_putstatic(vm, call_stack, field_index)?
+            }
+            Instruction::Getfield(field_index) => self.execute_getfield(vm, field_index)?,
+            Instruction::Getstatic(field_index) => {
+                self.execute_getstatic(vm, call_stack, field_index)?
+            }
+
+            Instruction::Iadd => self.execute_int_math(|a, b| Ok(a.wrapping_add(b)))?,
+            Instruction::Isub => self.execute_int_math(|a, b| Ok(a.wrapping_sub(b)))?,
+            Instruction::Imul => self.execute_int_math(|a, b| Ok(a.wrapping_mul(b)))?,
+            Instruction::Idiv => self.execute_int_math(|a, b| match b {
+                0 => Err(VmError::ArithmeticException),
+                _ => Ok(a.wrapping_div(b)),
+            })?,
+            Instruction::Irem => self.execute_int_math(|a, b| match b {
+                0 => Err(VmError::ArithmeticException),
+                _ => Ok(a.wrapping_rem(b)),
+            })?,
+            Instruction::Iand => self.execute_int_math(|a, b| Ok(a & b))?,
+            Instruction::Ior => self.execute_int_math(|a, b| Ok(a | b))?,
+            Instruction::Ixor => self.execute_int_math(|a, b| Ok(a ^ b))?,
+            Instruction::Ishr => self.execute_int_math(|a, b| Ok(a >> (b & 0x1f)))?,
+            Instruction::Ishl => self.execute_int_math(|a, b| Ok(a << (b & 0x1f)))?,
+            Instruction::Iushr => self.execute_int_math(|a, b| {
+                Ok({
+                    if a > 0 {
+                        a >> (b & 0x1f)
+                    } else {
+                        ((a as u32) >> (b & 0x1f)) as i32
+                    }
+                })
+            })?,
+
+            Instruction::Iinc(index, constant) => {
+                let index = index.into_usize_safe();
+                let local = self.get_local_int_as_int(vm, index)?;
+                self.locals[index] = Int(local + constant as i32);
+            }
+
+            Instruction::Ladd => self.execute_long_math(|a, b| Ok(a + b))?,
+            Instruction::Lsub => self.execute_long_math(|a, b| Ok(a - b))?,
+            Instruction::Lmul => self.execute_long_math(|a, b| Ok(a * b))?,
+            Instruction::Ldiv => self.execute_long_math(|a, b| match b {
+                0 => Err(VmError::ArithmeticException),
+                _ => Ok(a / b),
+            })?,
+            Instruction::Lrem => self.execute_long_math(|a, b| match b {
+                0 => Err(VmError::ArithmeticException),
+                _ => Ok(a % b),
+            })?,
+            Instruction::Land => self.execute_long_math(|a, b| Ok(a & b))?,
+            Instruction::Lor => self.execute_long_math(|a, b| Ok(a | b))?,
+            Instruction::Lxor => self.execute_long_math(|a, b| Ok(a ^ b))?,
+            Instruction::Lshr => self.execute_long_shift(|a, b| Ok(a >> (b & 0x1f)))?,
+            Instruction::Lshl => self.execute_long_shift(|a, b| Ok(a << (b & 0x1f)))?,
+            Instruction::Lushr => self.execute_long_shift(|a, b| {
+                Ok({
+                    if a > 0 {
+                        a >> (b & 0x1f)
+                    } else {
+                        ((a as u64) >> (b & 0x1f)) as i64
+                    }
+                })
+            })?,
+
+            Instruction::Fadd => self.execute_float_math(|a, b| Ok(a + b))?,
+            Instruction::Fsub => self.execute_float_math(|a, b| Ok(a - b))?,
+            Instruction::Fmul => self.execute_float_math(|a, b| Ok(a * b))?,
+            Instruction::Fdiv => self.execute_float_math(|a, b| {
+                Ok(
+                    if Self::is_double_division_returning_nan(a as f64, b as f64) {
+                        f32::NAN
+                    } else {
+                        a / b
+                    },
+                )
+            })?,
+            Instruction::Frem => self.execute_float_math(|a, b| {
+                Ok(
+                    if Self::is_double_division_returning_nan(a as f64, b as f64) {
+                        f32::NAN
+                    } else {
+                        a % b
+                    },
+                )
+            })?,
+
+            Instruction::Dadd => self.execute_double_math(|a, b| Ok(a + b))?,
+            Instruction::Dsub => self.execute_double_math(|a, b| Ok(a - b))?,
+            Instruction::Dmul => self.execute_double_math(|a, b| Ok(a * b))?,
+            Instruction::Ddiv => self.execute_double_math(|a, b| {
+                Ok(if Self::is_double_division_returning_nan(a, b) {
+                    f64::NAN
+                } else {
+                    a / b
+                })
+            })?,
+            Instruction::Drem => self.execute_double_math(|a, b| {
+                Ok(if Self::is_double_division_returning_nan(a, b) {
+                    f64::NAN
+                } else {
+                    a % b
+                })
+            })?,
+
+            Instruction::Ineg => self.execute_ineg()?,
+            Instruction::Lneg => self.execute_lneg()?,
+            Instruction::Fneg => self.execute_fneg()?,
+            Instruction::Dneg => self.execute_dneg()?,
+
+            Instruction::Goto(jump_address) => self.goto(jump_address),
+
+            Instruction::Ifeq(jump_address) => self.execute_if(jump_address, |v| v == 0)?,
+            Instruction::Ifne(jump_address) => self.execute_if(jump_address, |v| v != 0)?,
+            Instruction::Iflt(jump_address) => self.execute_if(jump_address, |v| v < 0)?,
+            Instruction::Ifle(jump_address) => self.execute_if(jump_address, |v| v <= 0)?,
+            Instruction::Ifgt(jump_address) => self.execute_if(jump_address, |v| v > 0)?,
+            Instruction::Ifge(jump_address) => self.execute_if(jump_address, |v| v >= 0)?,
+            Instruction::Ifnull(jump_address) => self.execute_if_null(jump_address, true)?,
+            Instruction::Ifnonnull(jump_address) => self.execute_if_null(jump_address, false)?,
+            Instruction::If_acmpeq(jump_address) => self.execute_if_acmp(jump_address, true)?,
+            Instruction::If_acmpne(jump_address) => self.execute_if_acmp(jump_address, false)?,
+
+            Instruction::If_icmpeq(jump_address) => {
+                self.execute_if_icmp(jump_address, |a, b| a == b)?
+            }
+            Instruction::If_icmpne(jump_address) => {
+                self.execute_if_icmp(jump_address, |a, b| a != b)?
+            }
+            Instruction::If_icmplt(jump_address) => {
+                self.execute_if_icmp(jump_address, |a, b| a < b)?
+            }
+            Instruction::If_icmple(jump_address) => {
+                self.execute_if_icmp(jump_address, |a, b| a <= b)?
+            }
+            Instruction::If_icmpgt(jump_address) => {
+                self.execute_if_icmp(jump_address, |a, b| a > b)?
+            }
+            Instruction::If_icmpge(jump_address) => {
+                self.execute_if_icmp(jump_address, |a, b| a >= b)?
+            }
+
+            Instruction::Lcmp => self.execute_long_compare(1)?,
+            Instruction::Fcmpg => self.execute_float_compare(-1)?,
+            Instruction::Fcmpl => self.execute_float_compare(1)?,
+            Instruction::Dcmpg => self.execute_double_compare(-1)?,
+            Instruction::Dcmpl => self.execute_double_compare(1)?,
+
+            Instruction::Newarray(array_type) => {
+                self.execute_newarray(array_type)?;
+            }
+            Instruction::Anewarray(constant_index) => {
+                self.execute_anewarray(constant_index)?;
+            }
+
+            Instruction::Arraylength => self.execute_array_length()?,
+
+            Instruction::Baload => self.execute_baload()?,
+            Instruction::Caload => self.execute_caload()?,
+            Instruction::Saload => self.execute_saload()?,
+            Instruction::Iaload => self.execute_iaload()?,
+            Instruction::Laload => self.execute_laload()?,
+            Instruction::Faload => self.execute_faload()?,
+            Instruction::Daload => self.execute_daload()?,
+            Instruction::Aaload => self.execute_aaload()?,
+
+            Instruction::Bastore => self.execute_bastore()?,
+            Instruction::Castore => self.execute_castore()?,
+            Instruction::Sastore => self.execute_sastore()?,
+            Instruction::Iastore => self.execute_iastore()?,
+            Instruction::Lastore => self.execute_lastore()?,
+            Instruction::Fastore => self.execute_fastore()?,
+            Instruction::Dastore => self.execute_dastore()?,
+            Instruction::Aastore => self.execute_aastore(vm)?,
+
+            Instruction::Monitorenter => self.execute_monitorenter()?,
+            Instruction::Monitorexit => self.execute_monitorexit()?,
+
+            Instruction::Athrow => self.execute_athrow()?,
+
+            /* Unsupported instructions:
+            Instruction::Goto_w => {}
+            Instruction::Invokedynamic(_) => {}
+            Instruction::Jsr(_) => {}
+            Instruction::Jsr_w => {}
+            Instruction::Lookupswitch => {}
+            Instruction::Multianewarray(_, _) => {}
+            Instruction::Ret(_) => {}
+            Instruction::Tableswitch => {}
+            Instruction::Wide => {}
+            */
+            Instruction::Nop => {}
+
+            _ => {
+                warn!("Unsupported instruction: {:?}", instruction);
+                return Err(MethodCallFailed::InternalError(VmError::NotImplemented));
+            }
+        };
+        Ok(ContinueMethodExecution)
     }
 
     fn push(&mut self, value: Value<'a>) -> Result<(), MethodCallFailed<'a>> {
@@ -1448,7 +1492,7 @@ impl<'a> CallFrame<'a> {
                     false
                 } else {
                     let object_class = vm.get_class_by_id(object.class_id)?;
-                    object_class.is_instance_of(expected_class)
+                    object_class.is_subclass_of(expected_class)
                 }
             }
 
@@ -1457,7 +1501,7 @@ impl<'a> CallFrame<'a> {
                 FieldType::Object(components_class_name) => {
                     let components_class =
                         vm.get_or_resolve_class(call_stack, components_class_name)?;
-                    components_class.is_instance_of(expected_class)
+                    components_class.is_subclass_of(expected_class)
                 }
                 FieldType::Array(_) => false,
             },
@@ -1584,6 +1628,52 @@ impl<'a> CallFrame<'a> {
                 VmError::ValidationException,
             )),
         }
+    }
+
+    fn execute_athrow(&mut self) -> Result<(), MethodCallFailed<'a>> {
+        let obj = self.pop()?;
+        match obj {
+            Object(exception) => Err(MethodCallFailed::ExceptionThrown(JavaException::new(
+                exception,
+            ))),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
+        }
+    }
+
+    fn find_exception_handler(
+        &self,
+        vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
+        executed_instruction_pc: ProgramCounter,
+        exception: &JavaException<'a>,
+    ) -> Result<Option<ProgramCounter>, MethodCallFailed<'a>> {
+        let exception_table = &self
+            .class_and_method
+            .method
+            .code
+            .as_ref()
+            .unwrap()
+            .exception_table;
+
+        // We shouldn't use self.pc, since we have already incremented it!
+        let catch_handlers = exception_table.lookup(executed_instruction_pc);
+
+        for catch_handler in catch_handlers {
+            match &catch_handler.catch_class {
+                None => return Ok(Some(catch_handler.handler_pc)),
+                Some(class_name) => {
+                    let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
+                    let exception_class =
+                        vm.get_class_by_id(exception.java_exception_object.class_id)?;
+                    if exception_class.is_subclass_of(catch_class) {
+                        return Ok(Some(catch_handler.handler_pc));
+                    }
+                }
+            }
+        }
+        Ok(None)
     }
 
     fn debug_start_execution(&self) {

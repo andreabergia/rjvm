@@ -117,7 +117,7 @@ impl<'a> Value<'a> {
                     if let Some(object_class) = value_class {
                         let expected_class = class_resolver_by_name(&expected_class_name);
                         expected_class.map_or(false, |expected_class| {
-                            object_class.is_instance_of(expected_class)
+                            object_class.is_subclass_of(expected_class)
                         })
                     } else {
                         false

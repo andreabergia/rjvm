@@ -318,3 +318,26 @@ fn stack_trace_printing() {
         extract_printed_string(&vm, 3)
     );
 }
+
+#[test_log::test]
+fn exceptions_throwing_and_catching() {
+    let mut vm = create_base_vm();
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/ExceptionsThrowingAndCatching",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+
+    assert_eq!(
+        vec![
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Int(5),
+            Value::Int(6)
+        ],
+        vm.printed
+    );
+}

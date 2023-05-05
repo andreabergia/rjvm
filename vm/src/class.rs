@@ -36,12 +36,12 @@ pub struct Class<'a> {
 }
 
 impl<'a> Class<'a> {
-    pub fn is_instance_of(&self, base: ClassRef) -> bool {
+    pub fn is_subclass_of(&self, base: ClassRef) -> bool {
         self.name == base.name
             || self
                 .superclass
-                .map_or(false, |superclass| superclass.is_instance_of(base))
-            || self.interfaces.iter().any(|intf| intf.is_instance_of(base))
+                .map_or(false, |superclass| superclass.is_subclass_of(base))
+            || self.interfaces.iter().any(|intf| intf.is_subclass_of(base))
     }
 }
 

@@ -1,6 +1,6 @@
-use std::fmt::{Debug, Formatter};
 use std::{
     cell::RefCell,
+    fmt::{Debug, Formatter},
     fs::File,
     io::{BufReader, Read},
     path::Path,

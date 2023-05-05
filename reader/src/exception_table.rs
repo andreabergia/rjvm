@@ -12,9 +12,11 @@ impl ExceptionTable {
         Self { entries }
     }
 
-    pub fn lookup(&self, pc: ProgramCounter) -> Option<&ExceptionTableEntry> {
-        // We expect exception tables to be relatively small, so we'll just do a linear search
-        self.entries.iter().find(|entry| entry.range.contains(&pc))
+    pub fn lookup(&self, pc: ProgramCounter) -> Vec<&ExceptionTableEntry> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.range.contains(&pc))
+            .collect()
     }
 }
 
@@ -44,13 +46,18 @@ mod tests {
             handler_pc: ProgramCounter(88),
             catch_class: Some("java/lang/RuntimeException".to_string()),
         };
-        let table = ExceptionTable::new(vec![entry_1.clone(), entry_2.clone()]);
+        let entry_3 = ExceptionTableEntry {
+            range: ProgramCounter(13)..ProgramCounter(14),
+            handler_pc: ProgramCounter(77),
+            catch_class: Some("java/lang/ClassCastException".to_string()),
+        };
+        let table = ExceptionTable::new(vec![entry_1.clone(), entry_2.clone(), entry_3.clone()]);
 
-        assert_eq!(Some(&entry_1), table.lookup(ProgramCounter(0)));
-        assert_eq!(Some(&entry_1), table.lookup(ProgramCounter(1)));
-        assert_eq!(None, table.lookup(ProgramCounter(4)));
-        assert_eq!(Some(&entry_2), table.lookup(ProgramCounter(8)));
-        assert_eq!(Some(&entry_2), table.lookup(ProgramCounter(13)));
-        assert_eq!(None, table.lookup(ProgramCounter(14)));
+        assert_eq!(vec![&entry_1], table.lookup(ProgramCounter(0)));
+        assert_eq!(vec![&entry_1], table.lookup(ProgramCounter(1)));
+        assert!(table.lookup(ProgramCounter(4)).is_empty());
+        assert_eq!(vec![&entry_2], table.lookup(ProgramCounter(8)));
+        assert_eq!(vec![&entry_2, &entry_3], table.lookup(ProgramCounter(13)));
+        assert!(table.lookup(ProgramCounter(14)).is_empty());
     }
 }

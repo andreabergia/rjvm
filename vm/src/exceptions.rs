@@ -24,3 +24,11 @@ impl<'a> From<ValueStackError> for MethodCallFailed<'a> {
 pub struct JavaException<'a> {
     pub java_exception_object: ObjectRef<'a>,
 }
+
+impl<'a> JavaException<'a> {
+    pub fn new(java_exception_object: ObjectRef<'a>) -> Self {
+        Self {
+            java_exception_object,
+        }
+    }
+}
