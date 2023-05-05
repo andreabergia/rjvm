@@ -301,7 +301,7 @@ impl<'a> CallFrame<'a> {
                         }
                         Ok(Some(catch_handler_pc)) => {
                             // Re-push exception on the stack and continue execution of this method from the catch handler
-                            self.stack.push(Object(exception.java_exception_object))?;
+                            self.stack.push(Object(exception.0))?;
                             self.pc = catch_handler_pc
                         }
                     }
@@ -1628,9 +1628,7 @@ impl<'a> CallFrame<'a> {
     fn execute_athrow(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let obj = self.pop()?;
         match obj {
-            Object(exception) => Err(MethodCallFailed::ExceptionThrown(JavaException::new(
-                exception,
-            ))),
+            Object(exception) => Err(MethodCallFailed::ExceptionThrown(JavaException(exception))),
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -1660,8 +1658,7 @@ impl<'a> CallFrame<'a> {
                 None => return Ok(Some(catch_handler.handler_pc)),
                 Some(class_name) => {
                     let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
-                    let exception_class =
-                        vm.get_class_by_id(exception.java_exception_object.class_id)?;
+                    let exception_class = vm.get_class_by_id(exception.0.class_id)?;
                     if exception_class.is_subclass_of(catch_class) {
                         return Ok(Some(catch_handler.handler_pc));
                     }

@@ -19,16 +19,5 @@ impl<'a> From<ValueStackError> for MethodCallFailed<'a> {
     }
 }
 
-// TODO: not sure if we need this wrapper or not
 #[derive(Debug, PartialEq)]
-pub struct JavaException<'a> {
-    pub java_exception_object: ObjectRef<'a>,
-}
-
-impl<'a> JavaException<'a> {
-    pub fn new(java_exception_object: ObjectRef<'a>) -> Self {
-        Self {
-            java_exception_object,
-        }
-    }
-}
+pub struct JavaException<'a>(pub ObjectRef<'a>);
