@@ -1,0 +1,40 @@
+Things still to implement in the reader:
+
+- [ ] class attributes
+    - [ ] [InnerClasses](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.6)
+    - [ ] [EnclosingMethod](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.7)
+    - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
+    - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
+    - [x] [SourceFile](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.10)
+    - [ ] [SourceDebugExtension](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.11)
+    - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
+    - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
+    - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
+    - [ ] [BootstrapMethods](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.21)
+- [ ] methods
+    - [ ] code
+        - [ ] exception tables
+        - [ ] attributes
+            - [x] [LineNumberTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.12)
+            - [ ] [LocalVariableTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.13)
+            - [ ] [LocalVariableTypeTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.14)
+            - [ ] [StackMapTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.4)
+    - [ ] source code mappings
+    - [ ] attributes
+        - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
+        - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
+        - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
+        - [ ] [exceptions](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.5)
+        - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
+        - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
+        - [ ] [runtime visible parameter annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.18)
+        - [ ] [runtime invisible parameter annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.19)
+        - [ ] [annotation default](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.20)
+- [ ] field
+    - [ ] attributes
+        - [x] constant value
+        - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
+        - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
+        - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
+        - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
+        - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)

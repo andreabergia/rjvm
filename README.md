@@ -1,91 +1,72 @@
 # RJVM
 
-This project is an attempt to write a minimal JVM using Rust.
+This project is an attempt to write a minimal JVM 7 using Rust.
 
-It is a hobby project, built for fun and for learning purposes. The code quality is definitely not production ready -
-there are not enough tests, there isn't enough documentation, and some parts might not be idiomatic Rust since I'm
-just learning it. 😊
+Important note: *this is a hobby project, built for fun and for learning purposes*. In particular, it is my first real
+program in Rust and I've used to learn the language - thus, I'm sure some parts of the code are not very "idiomatic"
+Rust since I'm just learning the language.
+
+The code quality is definitely not production ready - there are not enough tests, there isn't enough documentation and
+some of the initial decision should be revisited.
 
 The code is licensed under the [Apache v2 license](./LICENSE).
 
-## Status
+## What has been implemented
 
-The current code can execute a [very simple program](./vm/tests/resources/rjvm/SimpleMain.java).
+The current code can execute a [various simple programs](./vm/tests/resources/rjvm), but it has a lot of limitations.
 
-- [ ] reading class files
-  - [ ] class attributes
-    - [ ] [InnerClasses](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.6)
-    - [ ] [EnclosingMethod](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.7)
-    - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
-    - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
-    - [x] [SourceFile](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.10)
-    - [ ] [SourceDebugExtension](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.11)
-    - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
-    - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
-    - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
-    - [ ] [BootstrapMethods](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.21)
-  - [ ] methods
-    - [ ] code
-        - [ ] exception tables
-        - [ ] attributes
-          - [x] [LineNumberTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.12)
-          - [ ] [LocalVariableTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.13)
-          - [ ] [LocalVariableTypeTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.14)
-          - [ ] [StackMapTable](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.4)
-    - [ ] source code mappings
-    - [ ] attributes
-      - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
-      - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
-      - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
-      - [ ] [exceptions](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.5)
-      - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
-      - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
-      - [ ] [runtime visible parameter annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.18)
-      - [ ] [runtime invisible parameter annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.19)
-      - [ ] [annotation default](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.20)
-  - [ ] field
-    - [ ] attributes
-      - [x] constant value
-      - [ ] [synthetic](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.8)
-      - [ ] [signature](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.9)
-      - [x] [deprecated](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.15)
-      - [ ] [runtime visible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.16)
-      - [ ] [runtime invisible annotations](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.7.17)
-- [ ] execution
-  - [ ] data types
-      - [ ] primitives
-        - [x] int
-        - [x] short
-        - [x] char
-        - [x] byte
-        - [x] long
-        - [x] float
-        - [x] double
-        - [x] boolean
-        - [x] object
-        - [x] primitive arrays
-        - [x] object arrays
-        - [ ] multidimensional arrays
-  - [x] new object instances creation
-  - [x] static methods invocation
-  - [x] virtual methods invocation
-  - [x] modelling of super classes
-  - [x] abstract methods
-  - [x] control flow
-  - [ ] exceptions
-  - [ ] object allocations and garbage collection
-  - [ ] threading
-  - [ ] generics
-  - [ ] tons of other features :-)
+Things not implemented (and not planned to):
 
-## Structure
+- generics
+- threading
+- multi dimensional arrays
+- reflection
+- annotations
+- [class file verification](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10)
+
+However, there's quite a few things implemented:
+
+- parsing .class files
+- class loading from a jar file or from a folder
+- execution of code:
+    - primitive types
+    - strings
+    - control flow statements
+    - classes, subclasses, interfaces
+    - methods (virtual, static)
+    - exception throwing and catching
+    - stack traces
+
+The JVM uses the real classes from [OpenJDK 7](https://jdk.java.net/java-se-ri/7) - meaning the classes such as
+`java.lang.Object`, `java.lang.String` or `java.lang.Exception` are _real_ classes, without any modifications. The JVM
+is "good enough" to parse and execute their code.
+
+## What has still to be implemented
+
+Before declaring the project "complete", these are the things I still plan to implement:
+
+- throwing real java exceptions (rather than internal errors that will abort executions) for things like stack overflow,
+  accessing an array out of bounds, divisions by zero, etc
+- review of the memory layout of objects
+- garbage collection
+
+There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
+but it is "good enough" to execute some simple code; for example arrays or the concept of "identity hash code". However,
+it is unlikely I will fix those issues.
+
+## Code structure
 
 The code is currently structured in three crates:
 
 - `utils`, which contains some common code, unrelated to the JVM;
-- `reader`, with the `.class` file reader and the data structure for modelling them;
-- `vm`, which contains the virtual machine that can execute the code.
+    - this code is the oldest part of the project and is probably not particularly rust-idiomatic, or replaceable with
+      some crates
+- `reader`, which is able to read a `.class` file and contains various data structures for modelling their content;
+- `vm`, which contains the virtual machine that can execute the code as a library
+- `vm_cli`, which contains a very simple command-line launcher to run the vm, in the spirit of the `java` executable.
 
-There are some unit test and some integration tests - probably not enough, 
-but since this is not production code but just a learning exercise,
-I'm not that worried about it.
+There are some unit test and some integration tests - probably not enough, but since this is not production code but
+just a learning exercise, I'm not that worried about it.
+
+I plan to extract `reader` class in a separate repository and publish it on [crates.io](https://crates.io/), since it
+could actually be useful to someone else.
