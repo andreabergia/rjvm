@@ -7,12 +7,8 @@ use rjvm_reader::method_flags::MethodFlags;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{
-    call_frame::CallFrame,
-    class_and_method::ClassAndMethod,
-    object::ObjectValue,
-    stack_trace_element::StackTraceElement,
-    value::{Value, Value::Object},
-    vm_error::VmError,
+    call_frame::CallFrame, class_and_method::ClassAndMethod, object::Object,
+    stack_trace_element::StackTraceElement, value::Value, vm_error::VmError,
 };
 
 // The allocator will allocate and ensure that our call frames are alive while the call stack is.
@@ -49,7 +45,7 @@ impl<'a> CallStack<'a> {
     pub fn add_frame(
         &mut self,
         class_and_method: ClassAndMethod<'a>,
-        receiver: Option<ObjectValue<'a>>,
+        receiver: Option<Object<'a>>,
         args: Vec<Value<'a>>,
     ) -> Result<CallFrameReference<'a>, VmError> {
         let code = Self::get_code(&class_and_method, receiver.clone())?;
@@ -65,7 +61,7 @@ impl<'a> CallStack<'a> {
 
     fn get_code<'b>(
         class_and_method: &'b ClassAndMethod,
-        receiver: Option<ObjectValue>,
+        receiver: Option<Object>,
     ) -> Result<&'b ClassFileMethodCode, VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
@@ -85,11 +81,11 @@ impl<'a> CallStack<'a> {
 
     fn prepare_locals(
         code: &ClassFileMethodCode,
-        receiver: Option<ObjectValue<'a>>,
+        receiver: Option<Object<'a>>,
         args: Vec<Value<'a>>,
     ) -> Vec<Value<'a>> {
         let mut locals: Vec<Value<'a>> = receiver
-            .map(Object)
+            .map(Value::Object)
             .into_iter()
             .chain(args.into_iter())
             .collect();

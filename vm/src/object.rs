@@ -13,14 +13,14 @@ use crate::{
 };
 
 #[derive(PartialEq, Clone)]
-pub struct ObjectValue<'a> {
+pub struct Object<'a> {
     data: *mut u8,
     marker: PhantomData<&'a [u8]>,
 }
 
 const HEADER_SIZE: usize = 8;
 
-impl<'a> ObjectValue<'a> {
+impl<'a> Object<'a> {
     pub(crate) fn size(class: &Class<'a>) -> usize {
         /*
         let fields_sizes: usize = (0..class.num_total_fields)
@@ -96,7 +96,7 @@ impl<'a> ObjectValue<'a> {
                 Value::Float(float) => std::ptr::write(ptr as *mut f32, float),
                 Value::Double(double) => std::ptr::write(ptr as *mut f64, double),
                 Value::Uninitialized | Value::Null => std::ptr::write(ptr, 0),
-                Value::Object(obj) => std::ptr::write(ptr as *mut ObjectValue, obj),
+                Value::Object(obj) => std::ptr::write(ptr as *mut Object, obj),
                 Value::Array(_, arr) => std::ptr::write(ptr as *mut ArrayRef, arr),
             }
         }
@@ -120,7 +120,7 @@ impl<'a> ObjectValue<'a> {
                 FieldType::Base(BaseType::Double) => {
                     Value::Double(std::ptr::read(ptr as *const f64))
                 }
-                FieldType::Object(_) => Value::Object(std::ptr::read(ptr as *const ObjectValue)),
+                FieldType::Object(_) => Value::Object(std::ptr::read(ptr as *const Object)),
                 FieldType::Array(entry_type) => Value::Array(
                     entry_type.as_ref().clone(),
                     std::ptr::read(ptr as *const ArrayRef),
@@ -129,7 +129,7 @@ impl<'a> ObjectValue<'a> {
         }
     }
 
-    pub fn is_same_as(&self, other: &ObjectValue) -> bool {
+    pub fn is_same_as(&self, other: &Object) -> bool {
         self.data == other.data
     }
 }
@@ -140,7 +140,7 @@ fn identity_hash_code(ptr: *mut u8) -> u32 {
     hash as u32
 }
 
-impl<'a> Debug for ObjectValue<'a> {
+impl<'a> Debug for Object<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "class: {} fields [", self.get_class_id())?;
         // for field in self.fields.borrow().iter() {

@@ -7,7 +7,7 @@ use crate::{
     call_stack::CallStack,
     exceptions::MethodCallFailed,
     native_methods_registry::NativeMethodsRegistry,
-    object::ObjectValue,
+    object::Object,
     time::{get_current_time_millis, get_nano_time},
     value::{
         expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_object_at,
@@ -182,7 +182,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
     Ok(Some(Value::Long(long_bits)))
 }
 
-fn get_class_loader(receiver: Option<ObjectValue>) -> MethodCallResult {
+fn get_class_loader(receiver: Option<Object>) -> MethodCallResult {
     debug!(
         "invoked get class loader for class {:?}",
         receiver.map(|r| r.get_class_id())
@@ -206,7 +206,7 @@ fn get_primitive_class<'a>(
 fn fill_in_stack_trace<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    receiver: Option<ObjectValue<'a>>,
+    receiver: Option<Object<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
     let stack_trace_elements = call_stack.get_stack_trace_elements();
@@ -216,7 +216,7 @@ fn fill_in_stack_trace<'a>(
 
 fn get_stack_trace_depth<'a>(
     vm: &mut Vm<'a>,
-    receiver: Option<ObjectValue<'a>>,
+    receiver: Option<Object<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
     match vm.get_stack_trace_associated_with_throwable(receiver) {
@@ -230,7 +230,7 @@ fn get_stack_trace_depth<'a>(
 fn get_stack_trace_element<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    receiver: Option<ObjectValue<'a>>,
+    receiver: Option<Object<'a>>,
     args: Vec<Value<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;

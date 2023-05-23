@@ -1,12 +1,12 @@
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
-use crate::{class::Class, object::ObjectValue};
+use crate::{class::Class, object::Object};
 
 pub struct ObjectAllocator<'a> {
     memory: *mut u8,
     used: usize,
     capacity: usize,
-    marker: PhantomData<&'a ObjectValue<'a>>,
+    marker: PhantomData<&'a Object<'a>>,
 }
 
 impl<'a> ObjectAllocator<'a> {
@@ -21,10 +21,10 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    pub fn allocate(&mut self, class: &Class<'a>) -> ObjectValue<'a> {
-        let size = ObjectValue::size(class);
+    pub fn allocate(&mut self, class: &Class<'a>) -> Object<'a> {
+        let size = Object::size(class);
         let ptr = self.alloc(size);
-        ObjectValue::new(class, ptr)
+        Object::new(class, ptr)
     }
 
     fn alloc(&mut self, size: usize) -> *mut u8 {

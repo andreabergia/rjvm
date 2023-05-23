@@ -4,7 +4,7 @@ use rjvm_reader::field_type::{BaseType, FieldType};
 
 use crate::{
     class::{ClassId, ClassRef},
-    object::ObjectValue,
+    object::Object,
     vm_error::VmError,
 };
 
@@ -16,7 +16,7 @@ pub enum Value<'a> {
     Long(i64),
     Float(f32),
     Double(f64),
-    Object(ObjectValue<'a>),
+    Object(Object<'a>),
     Null, // TODO: should this be merged with Object and use an Option?
 
     // TODO: avoid RC and use garbage collector to allocate
@@ -94,7 +94,7 @@ impl<'a> Value<'a> {
     }
 }
 
-pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<ObjectValue<'a>, VmError> {
+pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<Object<'a>, VmError> {
     let value = vec.get(index);
     if let Some(Value::Object(object)) = value {
         Ok(object.clone())
@@ -142,7 +142,7 @@ pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
     }
 }
 
-pub fn expect_receiver(receiver: Option<ObjectValue>) -> Result<ObjectValue, VmError> {
+pub fn expect_receiver(receiver: Option<Object>) -> Result<Object, VmError> {
     match receiver {
         Some(v) => Ok(v),
         None => Err(VmError::ValidationException),

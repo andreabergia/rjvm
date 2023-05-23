@@ -19,11 +19,11 @@ use crate::{
     class::Class,
     class_and_method::ClassAndMethod,
     exceptions::{JavaException, MethodCallFailed},
-    object::ObjectValue,
+    object::Object,
     stack_trace_element::StackTraceElement,
     value::{
         clone_array, ArrayRef, Value,
-        Value::{Array, Double, Float, Int, Long, Null, Object},
+        Value::{Array, Double, Float, Int, Long, Null},
     },
     value_stack::ValueStack,
     vm::Vm,
@@ -37,7 +37,7 @@ macro_rules! generate_pop {
         fn $name(&mut self) -> Result<$type, MethodCallFailed<'a>> {
             let value = self.pop()?;
             match value {
-                $variant(value) => Ok(value),
+                Value::$variant(value) => Ok(value),
                 _ => Err(MethodCallFailed::InternalError(
                     VmError::ValidationException,
                 )),
@@ -302,7 +302,7 @@ impl<'a> CallFrame<'a> {
                         }
                         Ok(Some(catch_handler_pc)) => {
                             // Re-push exception on the stack and continue execution of this method from the catch handler
-                            self.stack.push(Object(exception.0))?;
+                            self.stack.push(Value::Object(exception.0))?;
                             self.pc = catch_handler_pc
                         }
                     }
@@ -423,7 +423,7 @@ impl<'a> CallFrame<'a> {
             Instruction::New(constant_index) => {
                 let new_object_class_name = self.get_constant_class_reference(constant_index)?;
                 let new_object = vm.new_object(call_stack, new_object_class_name)?;
-                self.push(Object(new_object))?;
+                self.push(Value::Object(new_object))?;
             }
 
             Instruction::Dup => self.stack.dup()?,
@@ -800,7 +800,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_long, Long, i64);
     generate_pop!(pop_float, Float, f32);
     generate_pop!(pop_double, Double, f64);
-    generate_pop!(pop_object, Object, ObjectValue<'a>);
+    generate_pop!(pop_object, Object, Object<'a>);
 
     fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), MethodCallFailed<'a>> {
         let receiver = self.pop()?;
@@ -960,7 +960,7 @@ impl<'a> CallFrame<'a> {
 
     fn resolve_virtual_method(
         vm: &Vm<'a>,
-        receiver: Option<ObjectValue>,
+        receiver: Option<Object>,
         class_and_method: ClassAndMethod,
     ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         match receiver {
@@ -995,7 +995,7 @@ impl<'a> CallFrame<'a> {
     fn get_method_receiver_and_params(
         &self,
         class_and_method: &ClassAndMethod<'a>,
-    ) -> Result<(Option<ObjectValue<'a>>, Vec<Value<'a>>, usize), VmError> {
+    ) -> Result<(Option<Object<'a>>, Vec<Value<'a>>, usize), VmError> {
         let cur_stack_len = self.stack.len();
         let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
         let num_params = class_and_method.num_arguments();
@@ -1045,10 +1045,10 @@ impl<'a> CallFrame<'a> {
         &self,
         index: usize,
         _expected_class: &Class,
-    ) -> Result<ObjectValue<'a>, VmError> {
+    ) -> Result<Object<'a>, VmError> {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
-            Object(object) => {
+            Value::Object(object) => {
                 // TODO: here we should check "instanceof" the expected class of a subclass
                 Ok(object.clone())
             }
@@ -1184,7 +1184,7 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
-            Object(_) | Array(..) => {
+            Value::Object(_) | Array(..) => {
                 if !jump_on_null {
                     self.goto(jump_address);
                 }
@@ -1211,8 +1211,8 @@ impl<'a> CallFrame<'a> {
         let value2 = self.pop()?;
         let value1 = self.pop()?;
         let equal = match value1 {
-            Object(object1) => match value2 {
-                Object(object2) => object1.is_same_as(&object2),
+            Value::Object(object1) => match value2 {
+                Value::Object(object2) => object1.is_same_as(&object2),
                 Null | Array(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
@@ -1222,7 +1222,7 @@ impl<'a> CallFrame<'a> {
             },
             Null => match value2 {
                 Null => true,
-                Object(..) | Array(..) => false,
+                Value::Object(..) | Array(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1235,7 +1235,7 @@ impl<'a> CallFrame<'a> {
                     let y = array2.borrow();
                     x.as_ptr() == y.as_ptr()
                 }
-                Null | Object(..) => false,
+                Null | Value::Object(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1261,7 +1261,7 @@ impl<'a> CallFrame<'a> {
     fn execute_aload(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
         match local {
-            Object(..) | Array(..) | Null => self.push(local.clone()),
+            Value::Object(..) | Array(..) | Null => self.push(local.clone()),
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -1276,7 +1276,7 @@ impl<'a> CallFrame<'a> {
     fn execute_astore(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
-            Object(..) | Array(..) => {
+            Value::Object(..) | Array(..) => {
                 self.locals[index] = value;
                 Ok(())
             }
@@ -1310,7 +1310,7 @@ impl<'a> CallFrame<'a> {
                 match constant {
                     ConstantPoolEntry::Utf8(string) => {
                         let string_object = vm.new_java_lang_string_object(call_stack, string)?;
-                        self.push(Object(string_object))
+                        self.push(Value::Object(string_object))
                     }
                     _ => Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1322,7 +1322,7 @@ impl<'a> CallFrame<'a> {
                 match constant {
                     ConstantPoolEntry::Utf8(class_name) => {
                         let class_object = vm.new_java_lang_class_object(call_stack, class_name)?;
-                        self.push(Object(class_object))
+                        self.push(Value::Object(class_object))
                     }
                     _ => Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1411,7 +1411,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_array_store!(execute_dastore, pop_double, d2d, Base(BaseType::Double));
 
     fn execute_aastore(&mut self, vm: &Vm) -> Result<(), MethodCallFailed<'a>> {
-        let value = Object(self.pop_object()?);
+        let value = Value::Object(self.pop_object()?);
         let index = self.pop_int()?.into_usize_safe();
         let (field_type, array) = self.pop_array()?;
         match field_type {
@@ -1483,7 +1483,7 @@ impl<'a> CallFrame<'a> {
         let is_instance_of = match &value {
             Null => false,
 
-            Object(object) => {
+            Value::Object(object) => {
                 if is_array {
                     false
                 } else {
@@ -1517,7 +1517,7 @@ impl<'a> CallFrame<'a> {
         field_index: u16,
     ) -> Result<(), MethodCallFailed<'a>> {
         let object = self.pop()?;
-        if let Object(object_ref) = object {
+        if let Value::Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
             let object_class = vm.get_class_by_id(object_ref.get_class_id())?;
             let (index, field) = Self::get_field(object_class, field_reference)?;
@@ -1539,7 +1539,7 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         let object = self.pop()?;
-        if let Object(object_ref) = object {
+        if let Value::Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
             let object_class = vm.get_class_by_id(object_ref.get_class_id())?;
             let (index, field) = Self::get_field(object_class, field_reference)?;
@@ -1600,7 +1600,7 @@ impl<'a> CallFrame<'a> {
     fn execute_monitorenter(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let obj = self.pop()?;
         match obj {
-            Object(_) => {
+            Value::Object(_) => {
                 // We don't really have monitors or lock, since we are single-threaded,
                 // so any monitor access will succeed
                 Ok(())
@@ -1614,7 +1614,7 @@ impl<'a> CallFrame<'a> {
     fn execute_monitorexit(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let obj = self.pop()?;
         match obj {
-            Object(_) => {
+            Value::Object(_) => {
                 // We don't really have monitors or lock, since we are single-threaded,
                 // so any monitor access will succeed
                 // TODO: check we actually have acquired monitor
@@ -1629,7 +1629,9 @@ impl<'a> CallFrame<'a> {
     fn execute_athrow(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let obj = self.pop()?;
         match obj {
-            Object(exception) => Err(MethodCallFailed::ExceptionThrown(JavaException(exception))),
+            Value::Object(exception) => {
+                Err(MethodCallFailed::ExceptionThrown(JavaException(exception)))
+            }
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),

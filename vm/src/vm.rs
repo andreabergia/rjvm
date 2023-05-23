@@ -17,7 +17,7 @@ use crate::{
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
-    object::ObjectValue,
+    object::Object,
     stack_trace_element::StackTraceElement,
     value::Value,
     vm_error::VmError,
@@ -33,7 +33,7 @@ pub struct Vm<'a> {
 
     /// To model static fields, we will create one special instance of each class
     /// and we will store it in this map
-    statics: HashMap<ClassId, ObjectValue<'a>>,
+    statics: HashMap<ClassId, Object<'a>>,
 
     /// Stores native methods
     pub native_methods_registry: NativeMethodsRegistry<'a>,
@@ -69,7 +69,7 @@ impl<'a> Vm<'a> {
 
     pub fn extract_str_from_java_lang_string(
         &self,
-        object: &ObjectValue<'a>,
+        object: &Object<'a>,
     ) -> Result<String, VmError> {
         let class = self.get_class_by_id(object.get_class_id())?;
         if class.name == "java/lang/String" {
@@ -91,7 +91,7 @@ impl<'a> Vm<'a> {
         Err(VmError::ValidationException)
     }
 
-    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectValue<'a>> {
+    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<Object<'a>> {
         self.statics.get(&class_id).cloned()
     }
 
@@ -174,7 +174,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<ObjectValue<'a>>,
+        object: Option<Object<'a>>,
         args: Vec<Value<'a>>,
     ) -> MethodCallResult<'a> {
         if class_and_method.method.is_native() {
@@ -193,7 +193,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<ObjectValue<'a>>,
+        object: Option<Object<'a>>,
         args: Vec<Value<'a>>,
     ) -> MethodCallResult<'a> {
         let native_callback = self.native_methods_registry.get_method(&class_and_method);
@@ -225,12 +225,12 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
+    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
         let class = self.get_or_resolve_class(call_stack, class_name)?;
         Ok(self.new_object_of_class(class))
     }
 
-    pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> ObjectValue<'a> {
+    pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> Object<'a> {
         debug!("allocating new instance of {}", class.name);
         self.object_allocator.allocate(class)
     }
@@ -239,7 +239,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         string: &str,
-    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
+    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
         let char_array: Vec<Value<'a>> = string
             .encode_utf16()
             .map(|c| Value::Int(c as i32))
@@ -266,7 +266,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
+    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
         let class_object = self.new_object(call_stack, "java/lang/Class")?;
         // TODO: build a proper instance of Class object
         let string_object = Self::new_java_lang_string_object(self, call_stack, class_name)?;
@@ -278,7 +278,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         stack_trace_element: &StackTraceElement<'a>,
-    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
+    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
         let class_name = Value::Object(
             self.new_java_lang_string_object(call_stack, stack_trace_element.class_name)?,
         );
@@ -311,7 +311,7 @@ impl<'a> Vm<'a> {
 
     pub(crate) fn associate_stack_trace_with_throwable(
         &mut self,
-        throwable: ObjectValue<'a>,
+        throwable: Object<'a>,
         call_stack: Vec<StackTraceElement<'a>>,
     ) {
         self.throwable_call_stacks
@@ -320,7 +320,7 @@ impl<'a> Vm<'a> {
 
     pub(crate) fn get_stack_trace_associated_with_throwable(
         &self,
-        throwable: ObjectValue<'a>,
+        throwable: Object<'a>,
     ) -> Option<&Vec<StackTraceElement<'a>>> {
         self.throwable_call_stacks
             .get(&throwable.identity_hash_code())
