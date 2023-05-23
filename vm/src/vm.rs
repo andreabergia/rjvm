@@ -7,7 +7,6 @@ use rjvm_reader::{
     line_number::LineNumber,
 };
 
-use crate::value::ObjectValue;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
@@ -18,6 +17,7 @@ use crate::{
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
+    object::ObjectValue,
     stack_trace_element::StackTraceElement,
     value::Value,
     vm_error::VmError,

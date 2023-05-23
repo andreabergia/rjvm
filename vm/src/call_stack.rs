@@ -9,8 +9,9 @@ use rjvm_utils::type_conversion::ToUsizeSafe;
 use crate::{
     call_frame::CallFrame,
     class_and_method::ClassAndMethod,
+    object::ObjectValue,
     stack_trace_element::StackTraceElement,
-    value::{ObjectValue, Value, Value::Object},
+    value::{Value, Value::Object},
     vm_error::VmError,
 };
 

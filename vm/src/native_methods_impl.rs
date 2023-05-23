@@ -2,12 +2,12 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::value::ObjectValue;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
     exceptions::MethodCallFailed,
     native_methods_registry::NativeMethodsRegistry,
+    object::ObjectValue,
     time::{get_current_time_millis, get_nano_time},
     value::{
         expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_object_at,

@@ -1,9 +1,8 @@
 use std::{collections::HashMap, fmt, fmt::Formatter};
 
-use crate::value::ObjectValue;
 use crate::{
     call_frame::MethodCallResult, call_stack::CallStack, class_and_method::ClassAndMethod,
-    value::Value, vm::Vm,
+    object::ObjectValue, value::Value, vm::Vm,
 };
 
 pub type NativeCallback<'a> = fn(

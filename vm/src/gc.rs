@@ -1,7 +1,6 @@
-use std::alloc::Layout;
-use std::{fmt, fmt::Formatter, marker::PhantomData};
+use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
-use crate::{class::Class, value::ObjectValue};
+use crate::{class::Class, object::ObjectValue};
 
 pub struct ObjectAllocator<'a> {
     memory: *mut u8,

@@ -13,13 +13,13 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::value::ObjectValue;
 use crate::{
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
     class::Class,
     class_and_method::ClassAndMethod,
     exceptions::{JavaException, MethodCallFailed},
+    object::ObjectValue,
     stack_trace_element::StackTraceElement,
     value::{
         clone_array, ArrayRef, Value,

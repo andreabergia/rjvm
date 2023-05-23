@@ -1,5 +1,4 @@
-use crate::value::ObjectValue;
-use crate::{value_stack::ValueStackError, vm_error::VmError};
+use crate::{object::ObjectValue, value_stack::ValueStackError, vm_error::VmError};
 
 #[derive(Debug, PartialEq)]
 pub enum MethodCallFailed<'a> {
