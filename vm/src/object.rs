@@ -142,21 +142,11 @@ fn identity_hash_code(ptr: *mut u8) -> u32 {
 
 impl<'a> Debug for Object<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "class: {} fields [", self.get_class_id())?;
-        // for field in self.fields.borrow().iter() {
-        //     match field {
-        //         Value::Object(object) => write!(f, "object cid = {}", object.get_class_id())?,
-        //         Value::Array(arr_type, arr_ref) => write!(
-        //             f,
-        //             "array of type {} len {}",
-        //             arr_type,
-        //             arr_ref.borrow().len()
-        //         )?,
-        //         _ => field.fmt(f)?,
-        //     }
-        //     write!(f, ", ")?;
-        // }
-        write!(f, "{:?}", self.data)?;
-        write!(f, "]")
+        write!(
+            f,
+            "class:{}, data:{:#0x}",
+            self.get_class_id(),
+            self.data as usize
+        )
     }
 }
