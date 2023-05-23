@@ -24,6 +24,7 @@ Things not implemented (and not planned to):
 - annotations
 - [class file verification](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10)
 - I/O
+- just in time code execution
 
 However, there's quite a few things implemented:
 
@@ -33,7 +34,7 @@ However, there's quite a few things implemented:
     - primitive types, arrays, strings
     - control flow statements
     - classes, subclasses, interfaces
-    - methods (virtual, static)
+    - methods (virtual, static, natives)
     - exception throwing and catching
     - stack traces
 
@@ -53,6 +54,8 @@ Before declaring the project "complete", these are the things I still plan to im
 There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
 but it is "good enough" to execute some simple code; for example arrays aren't real objects, or we don't really have the
 concept of "identity hash code". However, it is unlikely I will fix those issues.
+
+The VM is limited to 64 bits platforms, as there are a few places where we assume that the size of a pointer is 8 bytes.
 
 ## Code structure
 
