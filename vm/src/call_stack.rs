@@ -10,7 +10,7 @@ use crate::{
     call_frame::CallFrame,
     class_and_method::ClassAndMethod,
     stack_trace_element::StackTraceElement,
-    value::{ObjectRef, Value, Value::Object},
+    value::{ObjectValue, Value, Value::Object},
     vm_error::VmError,
 };
 
@@ -48,10 +48,10 @@ impl<'a> CallStack<'a> {
     pub fn add_frame(
         &mut self,
         class_and_method: ClassAndMethod<'a>,
-        receiver: Option<ObjectRef<'a>>,
+        receiver: Option<ObjectValue<'a>>,
         args: Vec<Value<'a>>,
     ) -> Result<CallFrameReference<'a>, VmError> {
-        let code = Self::get_code(&class_and_method, receiver)?;
+        let code = Self::get_code(&class_and_method, receiver.clone())?;
         let locals = Self::prepare_locals(code, receiver, args);
         let new_frame = self
             .allocator
@@ -64,7 +64,7 @@ impl<'a> CallStack<'a> {
 
     fn get_code<'b>(
         class_and_method: &'b ClassAndMethod,
-        receiver: Option<ObjectRef>,
+        receiver: Option<ObjectValue>,
     ) -> Result<&'b ClassFileMethodCode, VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
@@ -84,7 +84,7 @@ impl<'a> CallStack<'a> {
 
     fn prepare_locals(
         code: &ClassFileMethodCode,
-        receiver: Option<ObjectRef<'a>>,
+        receiver: Option<ObjectValue<'a>>,
         args: Vec<Value<'a>>,
     ) -> Vec<Value<'a>> {
         let mut locals: Vec<Value<'a>> = receiver

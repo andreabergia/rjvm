@@ -13,6 +13,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::value::ObjectValue;
 use crate::{
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
@@ -21,7 +22,7 @@ use crate::{
     exceptions::{JavaException, MethodCallFailed},
     stack_trace_element::StackTraceElement,
     value::{
-        clone_array, ArrayRef, ObjectRef, Value,
+        clone_array, ArrayRef, Value,
         Value::{Array, Double, Float, Int, Long, Null, Object},
     },
     value_stack::ValueStack,
@@ -767,7 +768,7 @@ impl<'a> CallFrame<'a> {
             self.get_method_receiver_and_params(&static_method_reference)?;
         let class_and_method = match kind {
             InvokeKind::Virtual | InvokeKind::Interface => {
-                Self::resolve_virtual_method(vm, receiver, static_method_reference)?
+                Self::resolve_virtual_method(vm, receiver.clone(), static_method_reference)?
             }
             _ => static_method_reference,
         };
@@ -799,7 +800,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_long, Long, i64);
     generate_pop!(pop_float, Float, f32);
     generate_pop!(pop_double, Double, f64);
-    generate_pop!(pop_object, Object, ObjectRef<'a>);
+    generate_pop!(pop_object, Object, ObjectValue<'a>);
 
     fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), MethodCallFailed<'a>> {
         let receiver = self.pop()?;
@@ -959,7 +960,7 @@ impl<'a> CallFrame<'a> {
 
     fn resolve_virtual_method(
         vm: &Vm<'a>,
-        receiver: Option<ObjectRef>,
+        receiver: Option<ObjectValue>,
         class_and_method: ClassAndMethod,
     ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         match receiver {
@@ -994,7 +995,7 @@ impl<'a> CallFrame<'a> {
     fn get_method_receiver_and_params(
         &self,
         class_and_method: &ClassAndMethod<'a>,
-    ) -> Result<(Option<ObjectRef<'a>>, Vec<Value<'a>>, usize), VmError> {
+    ) -> Result<(Option<ObjectValue<'a>>, Vec<Value<'a>>, usize), VmError> {
         let cur_stack_len = self.stack.len();
         let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
         let num_params = class_and_method.num_arguments();
@@ -1044,12 +1045,12 @@ impl<'a> CallFrame<'a> {
         &self,
         index: usize,
         _expected_class: &Class,
-    ) -> Result<ObjectRef<'a>, VmError> {
+    ) -> Result<ObjectValue<'a>, VmError> {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
             Object(object) => {
                 // TODO: here we should check "instanceof" the expected class of a subclass
-                Ok(object)
+                Ok(object.clone())
             }
             _ => Err(VmError::ValidationException),
         }
@@ -1211,7 +1212,7 @@ impl<'a> CallFrame<'a> {
         let value1 = self.pop()?;
         let equal = match value1 {
             Object(object1) => match value2 {
-                Object(object2) => std::ptr::eq(object1, object2),
+                Object(object2) => object1.is_same_as(&object2),
                 Null | Array(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(

@@ -1,4 +1,3 @@
-use std::alloc::Layout;
 use std::marker::PhantomData;
 use std::{
     cell::RefCell,
@@ -6,7 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use log::info;
+use log::debug;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
@@ -23,7 +22,7 @@ pub enum Value<'a> {
     Long(i64),
     Float(f32),
     Double(f64),
-    Object(ObjectRef<'a>),
+    Object(ObjectValue<'a>),
     Null, // TODO: should this be merged with Object and use an Option?
 
     // TODO: avoid RC and use garbage collector to allocate
@@ -31,7 +30,7 @@ pub enum Value<'a> {
     // TODO: return address
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub struct ObjectValue<'a> {
     data: *mut u8,
     marker: PhantomData<Value<'a>>,
@@ -63,49 +62,59 @@ fn field_size(field: &ClassFileField) -> usize {
 */
 
 impl<'a> ObjectValue<'a> {
-    pub fn new(class: &Class<'a>) -> Self {
+    pub(crate) fn size(class: &Class<'a>) -> usize {
         let fields_sizes: usize = 8 * class.num_total_fields;
         let object_size = fields_sizes + HEADER_SIZE;
-        info!(
+        debug!(
             "object of class {} should have size {}",
             class.name, object_size
         );
+        object_size
+    }
 
-        let layout = Layout::from_size_align(object_size, 8).unwrap();
-        let data = unsafe {
-            let ptr = std::alloc::alloc_zeroed(layout);
+    pub fn new(class: &Class<'a>, ptr: *mut u8) -> Self {
+        // Header is composed of
+        //   32 bits for the class id
+        //   32 bits for the identity hash code
+        let header = (class.id.as_u32() as u64) << 32 | identity_hash_code(ptr) as u64;
+        unsafe {
             let header_ptr = ptr as *mut u64;
-            let header = (class.id.as_u32() as u64) << 32;
             std::ptr::write(header_ptr, header);
-            ptr
         };
 
         Self {
-            data,
+            data: ptr,
             marker: PhantomData::default(),
         }
     }
 
     pub fn get_class_id(&self) -> ClassId {
-        let header = unsafe {
+        ClassId::new((self.header() >> 32) as u32)
+    }
+
+    pub fn identity_hash_code(&self) -> i32 {
+        (self.header() & 0xFFFFFFFF) as i32
+    }
+
+    fn header(&self) -> u64 {
+        unsafe {
             let header_ptr = self.data as *mut u64;
             std::ptr::read(header_ptr)
-        };
-        ClassId::new((header >> 32) as u32)
+        }
     }
 
     pub fn set_field(&self, index: usize, value: Value<'a>) {
         let preceding_fields_size: usize = 8 * index;
         let offset = HEADER_SIZE + preceding_fields_size;
         unsafe {
-            let ptr = self.data.offset(offset as isize);
+            let ptr = self.data.add(offset);
             match value {
                 Value::Int(int) => std::ptr::write(ptr as *mut i32, int),
                 Value::Long(long) => std::ptr::write(ptr as *mut i64, long),
                 Value::Float(float) => std::ptr::write(ptr as *mut f32, float),
                 Value::Double(double) => std::ptr::write(ptr as *mut f64, double),
                 Value::Uninitialized | Value::Null => std::ptr::write(ptr, 0),
-                Value::Object(obj) => std::ptr::write(ptr as *mut ObjectRef, obj),
+                Value::Object(obj) => std::ptr::write(ptr as *mut ObjectValue, obj),
                 Value::Array(_, arr) => std::ptr::write(ptr as *mut ArrayRef, arr),
             }
         }
@@ -117,7 +126,7 @@ impl<'a> ObjectValue<'a> {
         let preceding_fields_size: usize = 8 * index;
         let offset = HEADER_SIZE + preceding_fields_size;
         unsafe {
-            let ptr = self.data.offset(offset as isize);
+            let ptr = self.data.add(offset);
             match &field.type_descriptor {
                 FieldType::Base(BaseType::Boolean)
                 | FieldType::Base(BaseType::Byte)
@@ -129,7 +138,7 @@ impl<'a> ObjectValue<'a> {
                 FieldType::Base(BaseType::Double) => {
                     Value::Double(std::ptr::read(ptr as *const f64))
                 }
-                FieldType::Object(_) => Value::Object(std::ptr::read(ptr as *const ObjectRef)),
+                FieldType::Object(_) => Value::Object(std::ptr::read(ptr as *const ObjectValue)),
                 FieldType::Array(entry_type) => Value::Array(
                     entry_type.as_ref().clone(),
                     std::ptr::read(ptr as *const ArrayRef),
@@ -137,9 +146,18 @@ impl<'a> ObjectValue<'a> {
             }
         }
     }
+
+    pub fn is_same_as(&self, other: &ObjectValue) -> bool {
+        self.data == other.data
+    }
 }
 
-pub type ObjectRef<'a> = &'a ObjectValue<'a>;
+fn identity_hash_code(ptr: *mut u8) -> u32 {
+    let addr = ptr as u64;
+    let hash = (addr >> 32) ^ (addr);
+    hash as u32
+}
+
 pub type ArrayRef<'a> = Rc<RefCell<Vec<Value<'a>>>>;
 
 impl<'a> Value<'a> {
@@ -231,10 +249,10 @@ impl<'a> Debug for ObjectValue<'a> {
     }
 }
 
-pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<ObjectRef<'a>, VmError> {
+pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<ObjectValue<'a>, VmError> {
     let value = vec.get(index);
     if let Some(Value::Object(object)) = value {
-        Ok(object)
+        Ok(object.clone())
     } else {
         Err(VmError::ValidationException)
     }
@@ -279,7 +297,7 @@ pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
     }
 }
 
-pub fn expect_receiver(receiver: Option<ObjectRef>) -> Result<ObjectRef, VmError> {
+pub fn expect_receiver(receiver: Option<ObjectValue>) -> Result<ObjectValue, VmError> {
     match receiver {
         Some(v) => Ok(v),
         None => Err(VmError::ValidationException),

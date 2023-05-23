@@ -1,9 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::{hash_map::DefaultHasher, HashMap},
-    hash::Hasher,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use log::{debug, error};
 
@@ -12,6 +7,7 @@ use rjvm_reader::{
     line_number::LineNumber,
 };
 
+use crate::value::ObjectValue;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
@@ -23,11 +19,11 @@ use crate::{
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
     stack_trace_element::StackTraceElement,
-    value::{ObjectRef, Value},
+    value::Value,
     vm_error::VmError,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Vm<'a> {
     /// Responsible for allocating and storing classes
     class_manager: ClassManager<'a>,
@@ -37,7 +33,7 @@ pub struct Vm<'a> {
 
     /// To model static fields, we will create one special instance of each class
     /// and we will store it in this map
-    statics: HashMap<ClassId, ObjectRef<'a>>,
+    statics: HashMap<ClassId, ObjectValue<'a>>,
 
     /// Stores native methods
     pub native_methods_registry: NativeMethodsRegistry<'a>,
@@ -49,21 +45,31 @@ pub struct Vm<'a> {
     /// keep it in this weird map.
     /// See the implementation of Throwable::getStackTrace() in our rt.jar for
     /// clarity.
-    throwable_call_stacks: HashMap<u64, Vec<StackTraceElement<'a>>>,
+    throwable_call_stacks: HashMap<i32, Vec<StackTraceElement<'a>>>,
 
     pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 }
 
+const ONE_MEGABYTE: usize = 1024 * 1024;
+const DEFAULT_MAX_MEMORY: usize = 100 * ONE_MEGABYTE;
+
 impl<'a> Vm<'a> {
     pub fn new() -> Self {
-        let mut result: Self = Default::default();
+        let mut result = Self {
+            class_manager: Default::default(),
+            object_allocator: ObjectAllocator::with_maximum_memory(DEFAULT_MAX_MEMORY),
+            statics: Default::default(),
+            native_methods_registry: Default::default(),
+            throwable_call_stacks: Default::default(),
+            printed: Vec::new(),
+        };
         crate::native_methods_impl::register_natives(&mut result.native_methods_registry);
         result
     }
 
     pub fn extract_str_from_java_lang_string(
         &self,
-        object: ObjectRef<'a>,
+        object: &ObjectValue<'a>,
     ) -> Result<String, VmError> {
         let class = self.get_class_by_id(object.get_class_id())?;
         if class.name == "java/lang/String" {
@@ -85,7 +91,7 @@ impl<'a> Vm<'a> {
         Err(VmError::ValidationException)
     }
 
-    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectRef<'a>> {
+    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<ObjectValue<'a>> {
         self.statics.get(&class_id).cloned()
     }
 
@@ -168,7 +174,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<ObjectRef<'a>>,
+        object: Option<ObjectValue<'a>>,
         args: Vec<Value<'a>>,
     ) -> MethodCallResult<'a> {
         if class_and_method.method.is_native() {
@@ -187,7 +193,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<ObjectRef<'a>>,
+        object: Option<ObjectValue<'a>>,
         args: Vec<Value<'a>>,
     ) -> MethodCallResult<'a> {
         let native_callback = self.native_methods_registry.get_method(&class_and_method);
@@ -219,12 +225,12 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
+    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
         let class = self.get_or_resolve_class(call_stack, class_name)?;
         Ok(self.new_object_of_class(class))
     }
 
-    pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> ObjectRef<'a> {
+    pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> ObjectValue<'a> {
         debug!("allocating new instance of {}", class.name);
         self.object_allocator.allocate(class)
     }
@@ -233,7 +239,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         string: &str,
-    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
+    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
         let char_array: Vec<Value<'a>> = string
             .encode_utf16()
             .map(|c| Value::Int(c as i32))
@@ -260,7 +266,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
+    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
         let class_object = self.new_object(call_stack, "java/lang/Class")?;
         // TODO: build a proper instance of Class object
         let string_object = Self::new_java_lang_string_object(self, call_stack, class_name)?;
@@ -272,7 +278,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         stack_trace_element: &StackTraceElement<'a>,
-    ) -> Result<ObjectRef<'a>, MethodCallFailed<'a>> {
+    ) -> Result<ObjectValue<'a>, MethodCallFailed<'a>> {
         let class_name = Value::Object(
             self.new_java_lang_string_object(call_stack, stack_trace_element.class_name)?,
         );
@@ -305,22 +311,19 @@ impl<'a> Vm<'a> {
 
     pub(crate) fn associate_stack_trace_with_throwable(
         &mut self,
-        throwable: ObjectRef<'a>,
+        throwable: ObjectValue<'a>,
         call_stack: Vec<StackTraceElement<'a>>,
     ) {
-        let mut hasher = DefaultHasher::new();
-        std::ptr::hash(throwable, &mut hasher);
         self.throwable_call_stacks
-            .insert(hasher.finish(), call_stack);
+            .insert(throwable.identity_hash_code(), call_stack);
     }
 
     pub(crate) fn get_stack_trace_associated_with_throwable(
         &self,
-        throwable: ObjectRef<'a>,
+        throwable: ObjectValue<'a>,
     ) -> Option<&Vec<StackTraceElement<'a>>> {
-        let mut hasher = DefaultHasher::new();
-        std::ptr::hash(throwable, &mut hasher);
-        self.throwable_call_stacks.get(&hasher.finish())
+        self.throwable_call_stacks
+            .get(&throwable.identity_hash_code())
     }
 
     pub fn debug_stats(&self) {

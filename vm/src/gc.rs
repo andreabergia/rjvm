@@ -1,40 +1,50 @@
+use std::alloc::Layout;
 use std::{fmt, fmt::Formatter, marker::PhantomData};
 
-use typed_arena::Arena;
-
-use crate::{
-    class::Class,
-    value::{ObjectRef, ObjectValue},
-};
+use crate::{class::Class, value::ObjectValue};
 
 pub struct ObjectAllocator<'a> {
-    arena: Arena<ObjectValue<'a>>,
+    memory: *mut u8,
+    used: usize,
+    capacity: usize,
     marker: PhantomData<&'a ObjectValue<'a>>,
 }
 
-impl<'a> Default for ObjectAllocator<'a> {
-    fn default() -> Self {
+impl<'a> ObjectAllocator<'a> {
+    pub fn with_maximum_memory(max_size: usize) -> Self {
+        let result = Layout::from_size_align(max_size, 8).unwrap();
+        let memory = unsafe { std::alloc::alloc_zeroed(result) };
         Self {
-            arena: Arena::with_capacity(1000),
+            memory,
+            used: 0,
+            capacity: max_size,
             marker: Default::default(),
         }
+    }
+
+    pub fn allocate(&mut self, class: &Class<'a>) -> ObjectValue<'a> {
+        let size = ObjectValue::size(class);
+        let ptr = self.alloc(size);
+        ObjectValue::new(class, ptr)
+    }
+
+    fn alloc(&mut self, size: usize) -> *mut u8 {
+        if self.used + size > self.capacity {
+            // TODO: trigger garbage collection!
+            panic!("no more memory!")
+        }
+        let ptr = unsafe { self.memory.add(self.used) };
+        self.used += size;
+        ptr
     }
 }
 
 impl<'a> fmt::Debug for ObjectAllocator<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "object_allocator={{len={}}}", self.arena.len())
-    }
-}
-
-impl<'a> ObjectAllocator<'a> {
-    pub fn allocate(&mut self, class: &Class<'a>) -> ObjectRef<'a> {
-        let new_object = self.arena.alloc(ObjectValue::new(class));
-
-        // SAFETY: same as ClassAllocator
-        unsafe {
-            let object_ptr: *const ObjectValue = new_object;
-            &*object_ptr
-        }
+        write!(
+            f,
+            "object_allocator={{used={}, capacity={}}}",
+            self.used, self.capacity
+        )
     }
 }

@@ -2,6 +2,7 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::value::ObjectValue;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
@@ -10,7 +11,7 @@ use crate::{
     time::{get_current_time_millis, get_nano_time},
     value::{
         expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_object_at,
-        expect_receiver, ObjectRef, Value,
+        expect_receiver, Value,
     },
     vm::Vm,
     vm_error::VmError,
@@ -146,11 +147,7 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
 
 fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     let object = expect_object_at(&args, 0)?;
-    // TODO: we need some sort of object id when we implement the GC
-    //  For the moment we'll use the raw address
-    let ptr = &object as *const ObjectRef<'a>;
-    let address: i32 = ptr as i32;
-    Ok(Some(Value::Int(address)))
+    Ok(Some(Value::Int(object.identity_hash_code())))
 }
 
 fn array_copy(args: Vec<Value>) -> MethodCallResult {
@@ -185,7 +182,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
     Ok(Some(Value::Long(long_bits)))
 }
 
-fn get_class_loader(receiver: Option<ObjectRef>) -> MethodCallResult {
+fn get_class_loader(receiver: Option<ObjectValue>) -> MethodCallResult {
     debug!(
         "invoked get class loader for class {:?}",
         receiver.map(|r| r.get_class_id())
@@ -201,7 +198,7 @@ fn get_primitive_class<'a>(
     args: &[Value<'a>],
 ) -> MethodCallResult<'a> {
     let arg = expect_object_at(args, 0)?;
-    let class_name = vm.extract_str_from_java_lang_string(arg)?;
+    let class_name = vm.extract_str_from_java_lang_string(&arg)?;
     let java_lang_class_instance = vm.new_java_lang_class_object(stack, &class_name)?;
     Ok(Some(Value::Object(java_lang_class_instance)))
 }
@@ -209,17 +206,17 @@ fn get_primitive_class<'a>(
 fn fill_in_stack_trace<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    receiver: Option<ObjectRef<'a>>,
+    receiver: Option<ObjectValue<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
     let stack_trace_elements = call_stack.get_stack_trace_elements();
-    vm.associate_stack_trace_with_throwable(receiver, stack_trace_elements);
+    vm.associate_stack_trace_with_throwable(receiver.clone(), stack_trace_elements);
     Ok(Some(Value::Object(receiver)))
 }
 
 fn get_stack_trace_depth<'a>(
     vm: &mut Vm<'a>,
-    receiver: Option<ObjectRef<'a>>,
+    receiver: Option<ObjectValue<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
     match vm.get_stack_trace_associated_with_throwable(receiver) {
@@ -233,7 +230,7 @@ fn get_stack_trace_depth<'a>(
 fn get_stack_trace_element<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    receiver: Option<ObjectRef<'a>>,
+    receiver: Option<ObjectValue<'a>>,
     args: Vec<Value<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
