@@ -65,11 +65,11 @@ impl<'a> Vm<'a> {
         &self,
         object: ObjectRef<'a>,
     ) -> Result<String, VmError> {
-        let class = self.get_class_by_id(object.class_id)?;
+        let class = self.get_class_by_id(object.get_class_id())?;
         if class.name == "java/lang/String" {
             // In our JRE's rt.jar, the first fields of String is
             //    private final char[] value;
-            if let Value::Array(_, array_ref) = object.get_field(0) {
+            if let Value::Array(_, array_ref) = object.get_field(class, 0) {
                 let string_bytes: Vec<u8> = array_ref
                     .borrow()
                     .iter()

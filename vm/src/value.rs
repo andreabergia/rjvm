@@ -1,8 +1,12 @@
+use std::alloc::Layout;
+use std::marker::PhantomData;
 use std::{
     cell::RefCell,
     fmt::{Debug, Formatter},
     rc::Rc,
 };
+
+use log::info;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
@@ -27,45 +31,111 @@ pub enum Value<'a> {
     // TODO: return address
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub struct ObjectValue<'a> {
-    pub class_id: ClassId,
-    fields: RefCell<Vec<Value<'a>>>,
+    data: *mut u8,
+    marker: PhantomData<Value<'a>>,
 }
+
+const HEADER_SIZE: usize = 8;
+
+/*
+let fields_sizes: usize = (0..class.num_total_fields)
+            .map(|index| class.field_at_index(index).unwrap())
+            .map(|field| field_size(field))
+            .sum();
+
+fn field_size(field: &ClassFileField) -> usize {
+    match &field.type_descriptor {
+        FieldType::Base(base_type) => match base_type {
+            BaseType::Byte
+            | BaseType::Char
+            | BaseType::Float
+            | BaseType::Int
+            | BaseType::Short
+            | BaseType::Boolean => 4,
+            BaseType::Double | BaseType::Long => 8,
+        },
+        FieldType::Object(_) => std::mem::size_of::<*mut ObjectValue<'a>>(),
+        FieldType::Array(_) => std::mem::size_of::<*mut ObjectValue<'a>>(),
+    }
+}
+*/
 
 impl<'a> ObjectValue<'a> {
     pub fn new(class: &Class<'a>) -> Self {
-        let fields = (0..class.num_total_fields)
-            .map(|index| {
-                let field = class.field_at_index(index).unwrap();
-                match &field.type_descriptor {
-                    FieldType::Base(base_type) => match base_type {
-                        BaseType::Byte => Value::Int(0),
-                        BaseType::Char => Value::Int(0),
-                        BaseType::Double => Value::Double(0f64),
-                        BaseType::Float => Value::Float(0f32),
-                        BaseType::Int => Value::Int(0),
-                        BaseType::Long => Value::Long(0),
-                        BaseType::Short => Value::Int(0),
-                        BaseType::Boolean => Value::Int(0),
-                    },
-                    FieldType::Object(_) => Value::Null,
-                    FieldType::Array(_) => Value::Null,
-                }
-            })
-            .collect();
+        let fields_sizes: usize = 8 * class.num_total_fields;
+        let object_size = fields_sizes + HEADER_SIZE;
+        info!(
+            "object of class {} should have size {}",
+            class.name, object_size
+        );
+
+        let layout = Layout::from_size_align(object_size, 8).unwrap();
+        let data = unsafe {
+            let ptr = std::alloc::alloc_zeroed(layout);
+            let header_ptr = ptr as *mut u64;
+            let header = (class.id.as_u32() as u64) << 32;
+            std::ptr::write(header_ptr, header);
+            ptr
+        };
+
         Self {
-            class_id: class.id,
-            fields: RefCell::new(fields),
+            data,
+            marker: PhantomData::default(),
         }
     }
 
-    pub fn set_field(&self, index: usize, value: Value<'a>) {
-        self.fields.borrow_mut()[index] = value;
+    pub fn get_class_id(&self) -> ClassId {
+        let header = unsafe {
+            let header_ptr = self.data as *mut u64;
+            std::ptr::read(header_ptr)
+        };
+        ClassId::new((header >> 32) as u32)
     }
 
-    pub fn get_field(&self, index: usize) -> Value<'a> {
-        self.fields.borrow()[index].clone()
+    pub fn set_field(&self, index: usize, value: Value<'a>) {
+        let preceding_fields_size: usize = 8 * index;
+        let offset = HEADER_SIZE + preceding_fields_size;
+        unsafe {
+            let ptr = self.data.offset(offset as isize);
+            match value {
+                Value::Int(int) => std::ptr::write(ptr as *mut i32, int),
+                Value::Long(long) => std::ptr::write(ptr as *mut i64, long),
+                Value::Float(float) => std::ptr::write(ptr as *mut f32, float),
+                Value::Double(double) => std::ptr::write(ptr as *mut f64, double),
+                Value::Uninitialized | Value::Null => std::ptr::write(ptr, 0),
+                Value::Object(obj) => std::ptr::write(ptr as *mut ObjectRef, obj),
+                Value::Array(_, arr) => std::ptr::write(ptr as *mut ArrayRef, arr),
+            }
+        }
+    }
+
+    pub fn get_field(&self, object_class: ClassRef, index: usize) -> Value<'a> {
+        let field = object_class.field_at_index(index).unwrap();
+
+        let preceding_fields_size: usize = 8 * index;
+        let offset = HEADER_SIZE + preceding_fields_size;
+        unsafe {
+            let ptr = self.data.offset(offset as isize);
+            match &field.type_descriptor {
+                FieldType::Base(BaseType::Boolean)
+                | FieldType::Base(BaseType::Byte)
+                | FieldType::Base(BaseType::Char)
+                | FieldType::Base(BaseType::Short)
+                | FieldType::Base(BaseType::Int) => Value::Int(std::ptr::read(ptr as *const i32)),
+                FieldType::Base(BaseType::Long) => Value::Long(std::ptr::read(ptr as *const i64)),
+                FieldType::Base(BaseType::Float) => Value::Float(std::ptr::read(ptr as *const f32)),
+                FieldType::Base(BaseType::Double) => {
+                    Value::Double(std::ptr::read(ptr as *const f64))
+                }
+                FieldType::Object(_) => Value::Object(std::ptr::read(ptr as *const ObjectRef)),
+                FieldType::Array(entry_type) => Value::Array(
+                    entry_type.as_ref().clone(),
+                    std::ptr::read(ptr as *const ArrayRef),
+                ),
+            }
+        }
     }
 }
 
@@ -113,7 +183,7 @@ impl<'a> Value<'a> {
                 // TODO: with multiple class loaders, we should check the class identity,
                 //  not the name, since the same class could be loaded by multiple class loader
                 FieldType::Object(expected_class_name) => {
-                    let value_class = class_resolver_by_id(object_ref.class_id);
+                    let value_class = class_resolver_by_id(object_ref.get_class_id());
                     if let Some(object_class) = value_class {
                         let expected_class = class_resolver_by_name(&expected_class_name);
                         expected_class.map_or(false, |expected_class| {
@@ -142,20 +212,21 @@ impl<'a> Value<'a> {
 
 impl<'a> Debug for ObjectValue<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "class: {} fields [", self.class_id)?;
-        for field in self.fields.borrow().iter() {
-            match field {
-                Value::Object(object) => write!(f, "object cid = {}", object.class_id)?,
-                Value::Array(arr_type, arr_ref) => write!(
-                    f,
-                    "array of type {} len {}",
-                    arr_type,
-                    arr_ref.borrow().len()
-                )?,
-                _ => field.fmt(f)?,
-            }
-            write!(f, ", ")?;
-        }
+        write!(f, "class: {} fields [", self.get_class_id())?;
+        // for field in self.fields.borrow().iter() {
+        //     match field {
+        //         Value::Object(object) => write!(f, "object cid = {}", object.get_class_id())?,
+        //         Value::Array(arr_type, arr_ref) => write!(
+        //             f,
+        //             "array of type {} len {}",
+        //             arr_type,
+        //             arr_ref.borrow().len()
+        //         )?,
+        //         _ => field.fmt(f)?,
+        //     }
+        //     write!(f, ", ")?;
+        // }
+        write!(f, "{:?}", self.data)?;
         write!(f, "]")
     }
 }

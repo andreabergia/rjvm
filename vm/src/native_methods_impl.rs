@@ -188,7 +188,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
 fn get_class_loader(receiver: Option<ObjectRef>) -> MethodCallResult {
     debug!(
         "invoked get class loader for class {:?}",
-        receiver.map(|r| r.class_id)
+        receiver.map(|r| r.get_class_id())
     );
 
     // TODO: it seems ok to return just null for the moment

@@ -18,7 +18,7 @@ pub(crate) struct ClassManager<'a> {
     classes_by_id: HashMap<ClassId, ClassRef<'a>>,
     classes_by_name: HashMap<String, ClassRef<'a>>,
     arena: Arena<Class<'a>>,
-    next_id: u64,
+    next_id: u32,
     current_class_loader: ClassLoader<'a>,
 }
 

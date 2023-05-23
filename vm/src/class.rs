@@ -6,7 +6,7 @@ use rjvm_reader::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ClassId(u64);
+pub struct ClassId(u32);
 
 impl fmt::Display for ClassId {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -15,8 +15,12 @@ impl fmt::Display for ClassId {
 }
 
 impl ClassId {
-    pub(crate) fn new(id: u64) -> Self {
+    pub(crate) fn new(id: u32) -> Self {
         Self(id)
+    }
+
+    pub fn as_u32(&self) -> u32 {
+        self.0
     }
 }
 

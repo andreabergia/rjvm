@@ -967,8 +967,8 @@ impl<'a> CallFrame<'a> {
                 VmError::ValidationException,
             )),
             Some(receiver) => {
-                let receiver_class = vm.find_class_by_id(receiver.class_id).ok_or(
-                    VmError::ClassNotFoundException(receiver.class_id.to_string()),
+                let receiver_class = vm.find_class_by_id(receiver.get_class_id()).ok_or(
+                    VmError::ClassNotFoundException(receiver.get_class_id().to_string()),
                 )?;
                 let resolved_method = Self::get_method_checking_superclasses(
                     receiver_class,
@@ -1486,7 +1486,7 @@ impl<'a> CallFrame<'a> {
                 if is_array {
                     false
                 } else {
-                    let object_class = vm.get_class_by_id(object.class_id)?;
+                    let object_class = vm.get_class_by_id(object.get_class_id())?;
                     object_class.is_subclass_of(expected_class)
                 }
             }
@@ -1518,9 +1518,9 @@ impl<'a> CallFrame<'a> {
         let object = self.pop()?;
         if let Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
-            let object_class = vm.get_class_by_id(object_ref.class_id)?;
+            let object_class = vm.get_class_by_id(object_ref.get_class_id())?;
             let (index, field) = Self::get_field(object_class, field_reference)?;
-            let field_value = object_ref.get_field(index);
+            let field_value = object_ref.get_field(object_class, index);
             Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
             self.push(field_value)?;
             Ok(())
@@ -1540,7 +1540,7 @@ impl<'a> CallFrame<'a> {
         let object = self.pop()?;
         if let Object(object_ref) = object {
             let field_reference = self.get_constant_field_reference(field_index)?;
-            let object_class = vm.get_class_by_id(object_ref.class_id)?;
+            let object_class = vm.get_class_by_id(object_ref.get_class_id())?;
             let (index, field) = Self::get_field(object_class, field_reference)?;
             Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
             object_ref.set_field(index, value);
@@ -1563,7 +1563,7 @@ impl<'a> CallFrame<'a> {
         let (index, field) = Self::get_field(object_class, field_reference)?;
         let object = vm.get_static_instance(self.class_and_method.class.id);
         if let Some(object_ref) = object {
-            let field_value = object_ref.get_field(index);
+            let field_value = object_ref.get_field(object_class, index);
             Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
             self.push(field_value)?;
             Ok(())
@@ -1658,7 +1658,7 @@ impl<'a> CallFrame<'a> {
                 None => return Ok(Some(catch_handler.handler_pc)),
                 Some(class_name) => {
                     let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
-                    let exception_class = vm.get_class_by_id(exception.0.class_id)?;
+                    let exception_class = vm.get_class_by_id(exception.0.get_class_id())?;
                     if exception_class.is_subclass_of(catch_class) {
                         return Ok(Some(catch_handler.handler_pc));
                     }
