@@ -2,8 +2,8 @@ use std::fmt::Debug;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::array::Array;
 use crate::{
+    array::Array,
     class::{ClassId, ClassRef},
     object::Object,
     vm_error::VmError,
@@ -85,7 +85,14 @@ impl<'a> Value<'a> {
 
             Value::Array(array) => match expected_type {
                 FieldType::Array(expected_field_type) => {
-                    array.get_elements_type() == *expected_field_type
+                    let array_entry_type = array
+                        .get_elements_type()
+                        .into_field_type(class_resolver_by_id);
+                    if let Some(array_entry_type) = array_entry_type {
+                        array_entry_type == *expected_field_type
+                    } else {
+                        false
+                    }
                 }
                 _ => false,
             },

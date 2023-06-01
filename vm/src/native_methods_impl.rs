@@ -2,8 +2,8 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::array::Array;
 use crate::{
+    array::Array,
     call_frame::MethodCallResult,
     call_stack::CallStack,
     exceptions::MethodCallFailed,
@@ -146,7 +146,7 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
     Ok(None)
 }
 
-fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> MethodCallResult<'a> {
+fn identity_hash_code(args: Vec<Value<'_>>) -> MethodCallResult<'_> {
     let object = expect_object_at(&args, 0)?;
     Ok(Some(Value::Int(object.identity_hash_code())))
 }

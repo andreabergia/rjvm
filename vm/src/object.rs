@@ -5,8 +5,8 @@ use std::{
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::array::Array;
 use crate::{
+    array::Array,
     class::{Class, ClassId, ClassRef},
     value::Value,
 };

@@ -3,12 +3,13 @@ use std::{
     marker::PhantomData,
 };
 
-use rjvm_reader::field_type::{BaseType, FieldType};
+use rjvm_reader::field_type::BaseType;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::native_methods_impl::array_copy;
-use crate::vm_error::VmError;
-use crate::{object::Object, value::Value};
+use crate::{
+    array_entry_type::ArrayEntryType, native_methods_impl::array_copy, object::Object,
+    value::Value, vm_error::VmError,
+};
 
 // Memory layout:
 //   first we have 4 bytes with the length
@@ -22,19 +23,19 @@ pub struct Array<'a> {
     marker: PhantomData<&'a [u8]>,
 }
 
-const HEADER_LEN: usize = std::mem::size_of::<u32>() + std::mem::size_of::<FieldType>();
+const HEADER_LEN: usize = std::mem::size_of::<u32>() + std::mem::size_of::<ArrayEntryType>();
 
 impl<'a> Array<'a> {
     pub(crate) fn size(length: usize) -> usize {
         HEADER_LEN + length * 8
     }
 
-    pub fn new(elements_type: FieldType, length: usize, ptr: *mut u8) -> Self {
+    pub fn new(elements_type: ArrayEntryType, length: usize, ptr: *mut u8) -> Self {
         unsafe {
             let header_ptr = ptr as *mut u32;
             std::ptr::write(header_ptr, length as u32);
 
-            let header_ptr = header_ptr.add(1) as *mut FieldType;
+            let header_ptr = header_ptr.add(1) as *mut ArrayEntryType;
             std::ptr::write(header_ptr, elements_type);
         };
 
@@ -55,10 +56,10 @@ impl<'a> Array<'a> {
         self.len() == 0
     }
 
-    pub fn get_elements_type(&self) -> FieldType {
+    pub fn get_elements_type(&self) -> ArrayEntryType {
         unsafe {
             let header_ptr = self.data as *const u32;
-            let header_ptr = header_ptr.add(1) as *const FieldType;
+            let header_ptr = header_ptr.add(1) as *const ArrayEntryType;
             std::ptr::read(header_ptr)
         }
     }
@@ -70,27 +71,27 @@ impl<'a> Array<'a> {
             unsafe {
                 let ptr = self.data.add(HEADER_LEN).add(index * 8);
                 Ok(match self.get_elements_type() {
-                    FieldType::Base(BaseType::Boolean)
-                    | FieldType::Base(BaseType::Byte)
-                    | FieldType::Base(BaseType::Char)
-                    | FieldType::Base(BaseType::Short)
-                    | FieldType::Base(BaseType::Int) => {
+                    ArrayEntryType::Base(BaseType::Boolean)
+                    | ArrayEntryType::Base(BaseType::Byte)
+                    | ArrayEntryType::Base(BaseType::Char)
+                    | ArrayEntryType::Base(BaseType::Short)
+                    | ArrayEntryType::Base(BaseType::Int) => {
                         Value::Int(std::ptr::read(ptr as *const i32))
                     }
-                    FieldType::Base(BaseType::Long) => {
+                    ArrayEntryType::Base(BaseType::Long) => {
                         Value::Long(std::ptr::read(ptr as *const i64))
                     }
-                    FieldType::Base(BaseType::Float) => {
+                    ArrayEntryType::Base(BaseType::Float) => {
                         Value::Float(std::ptr::read(ptr as *const f32))
                     }
-                    FieldType::Base(BaseType::Double) => {
+                    ArrayEntryType::Base(BaseType::Double) => {
                         Value::Double(std::ptr::read(ptr as *const f64))
                     }
-                    FieldType::Object(_) => match std::ptr::read(ptr as *const i64) {
+                    ArrayEntryType::Object(_) => match std::ptr::read(ptr as *const i64) {
                         0 => Value::Null,
                         _ => Value::Object(std::ptr::read(ptr as *const Object)),
                     },
-                    FieldType::Array(_) => Value::Array(std::ptr::read(ptr as *const Array)),
+                    ArrayEntryType::Array => Value::Array(std::ptr::read(ptr as *const Array)),
                 })
             }
         }
@@ -103,32 +104,32 @@ impl<'a> Array<'a> {
             unsafe {
                 let ptr = self.data.add(HEADER_LEN).add(index * 8);
                 match self.get_elements_type() {
-                    FieldType::Base(BaseType::Boolean)
-                    | FieldType::Base(BaseType::Byte)
-                    | FieldType::Base(BaseType::Char)
-                    | FieldType::Base(BaseType::Short)
-                    | FieldType::Base(BaseType::Int) => match value {
+                    ArrayEntryType::Base(BaseType::Boolean)
+                    | ArrayEntryType::Base(BaseType::Byte)
+                    | ArrayEntryType::Base(BaseType::Char)
+                    | ArrayEntryType::Base(BaseType::Short)
+                    | ArrayEntryType::Base(BaseType::Int) => match value {
                         Value::Int(int) => std::ptr::write(ptr as *mut i32, int),
                         _ => return Err(VmError::ValidationException),
                     },
-                    FieldType::Base(BaseType::Long) => match value {
+                    ArrayEntryType::Base(BaseType::Long) => match value {
                         Value::Long(long) => std::ptr::write(ptr as *mut i64, long),
                         _ => return Err(VmError::ValidationException),
                     },
-                    FieldType::Base(BaseType::Float) => match value {
+                    ArrayEntryType::Base(BaseType::Float) => match value {
                         Value::Float(float) => std::ptr::write(ptr as *mut f32, float),
                         _ => return Err(VmError::ValidationException),
                     },
-                    FieldType::Base(BaseType::Double) => match value {
+                    ArrayEntryType::Base(BaseType::Double) => match value {
                         Value::Double(double) => std::ptr::write(ptr as *mut f64, double),
                         _ => return Err(VmError::ValidationException),
                     },
-                    FieldType::Object(_) => match value {
+                    ArrayEntryType::Object(_) => match value {
                         Value::Object(object) => std::ptr::write(ptr as *mut Object, object),
                         Value::Null => std::ptr::write(ptr as *mut i64, 0),
                         _ => return Err(VmError::ValidationException),
                     },
-                    FieldType::Array(_) => match value {
+                    ArrayEntryType::Array => match value {
                         Value::Array(array) => std::ptr::write(ptr as *mut Array, array),
                         _ => return Err(VmError::ValidationException),
                     },
@@ -150,13 +151,14 @@ impl<'a> Array<'a> {
     // TODO
     pub(crate) fn utf16_code_points(&self) -> Result<Vec<u16>, VmError> {
         match self.get_elements_type() {
-            FieldType::Base(BaseType::Char) => {
+            ArrayEntryType::Base(BaseType::Char) => {
                 let len = self.len().into_usize_safe();
                 let mut vec: Vec<u16> = Vec::with_capacity(len);
                 unsafe {
-                    let ptr = self.data.add(HEADER_LEN) as *const i32;
+                    let ptr = self.data.add(HEADER_LEN) as *const i64;
                     for i in 0..len {
-                        let next_codepoint = std::ptr::read(ptr.add(i)) as u16;
+                        let ptr = ptr.add(i);
+                        let next_codepoint = std::ptr::read(ptr as *const i32) as u16;
                         vec.push(next_codepoint);
                     }
                 }

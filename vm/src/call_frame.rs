@@ -11,8 +11,9 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::array::Array;
 use crate::{
+    array::Array,
+    array_entry_type::ArrayEntryType,
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
     class::Class,
@@ -622,7 +623,7 @@ impl<'a> CallFrame<'a> {
                 self.execute_newarray(vm, array_type)?;
             }
             Instruction::Anewarray(constant_index) => {
-                self.execute_anewarray(vm, constant_index)?;
+                self.execute_anewarray(vm, call_stack, constant_index)?;
             }
 
             Instruction::Arraylength => self.execute_array_length()?,
@@ -1344,14 +1345,14 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let length = self.pop_int()?.into_usize_safe();
         let elements_type = match array_type {
-            NewArrayType::Boolean => Base(BaseType::Boolean),
-            NewArrayType::Char => Base(BaseType::Char),
-            NewArrayType::Float => Base(BaseType::Float),
-            NewArrayType::Double => Base(BaseType::Double),
-            NewArrayType::Byte => Base(BaseType::Byte),
-            NewArrayType::Short => Base(BaseType::Short),
-            NewArrayType::Int => Base(BaseType::Int),
-            NewArrayType::Long => Base(BaseType::Long),
+            NewArrayType::Boolean => ArrayEntryType::Base(BaseType::Boolean),
+            NewArrayType::Char => ArrayEntryType::Base(BaseType::Char),
+            NewArrayType::Float => ArrayEntryType::Base(BaseType::Float),
+            NewArrayType::Double => ArrayEntryType::Base(BaseType::Double),
+            NewArrayType::Byte => ArrayEntryType::Base(BaseType::Byte),
+            NewArrayType::Short => ArrayEntryType::Base(BaseType::Short),
+            NewArrayType::Int => ArrayEntryType::Base(BaseType::Int),
+            NewArrayType::Long => ArrayEntryType::Base(BaseType::Long),
         };
 
         let array = vm.new_array(elements_type, length);
@@ -1361,11 +1362,13 @@ impl<'a> CallFrame<'a> {
     fn execute_anewarray(
         &mut self,
         vm: &mut Vm<'a>,
+        call_stack: &mut CallStack<'a>,
         constant_index: u16,
     ) -> Result<(), MethodCallFailed<'a>> {
         let length = self.pop_int()?.into_usize_safe();
         let class_name = self.get_constant_class_reference(constant_index)?;
-        let elements_type = FieldType::Object(class_name.to_string());
+        let class = vm.get_or_resolve_class(call_stack, class_name)?;
+        let elements_type = ArrayEntryType::Object(class.id);
 
         let array = vm.new_array(elements_type, length);
         self.push(Value::Array(array))
@@ -1381,38 +1384,73 @@ impl<'a> CallFrame<'a> {
 
     generate_execute_array_load!(
         execute_baload,
-        Base(BaseType::Byte),
-        Base(BaseType::Boolean)
+        ArrayEntryType::Base(BaseType::Byte),
+        ArrayEntryType::Base(BaseType::Boolean)
     );
-    generate_execute_array_load!(execute_caload, Base(BaseType::Char));
-    generate_execute_array_load!(execute_saload, Base(BaseType::Short));
-    generate_execute_array_load!(execute_iaload, Base(BaseType::Int));
-    generate_execute_array_load!(execute_laload, Base(BaseType::Long));
-    generate_execute_array_load!(execute_faload, Base(BaseType::Float));
-    generate_execute_array_load!(execute_daload, Base(BaseType::Double));
-    generate_execute_array_load!(execute_aaload, FieldType::Object(_));
+    generate_execute_array_load!(execute_caload, ArrayEntryType::Base(BaseType::Char));
+    generate_execute_array_load!(execute_saload, ArrayEntryType::Base(BaseType::Short));
+    generate_execute_array_load!(execute_iaload, ArrayEntryType::Base(BaseType::Int));
+    generate_execute_array_load!(execute_laload, ArrayEntryType::Base(BaseType::Long));
+    generate_execute_array_load!(execute_faload, ArrayEntryType::Base(BaseType::Float));
+    generate_execute_array_load!(execute_daload, ArrayEntryType::Base(BaseType::Double));
+    generate_execute_array_load!(execute_aaload, ArrayEntryType::Object(..));
 
     generate_execute_array_store!(
         execute_bastore,
         pop_int,
         i2b,
-        Base(BaseType::Byte),
-        Base(BaseType::Boolean)
+        ArrayEntryType::Base(BaseType::Byte),
+        ArrayEntryType::Base(BaseType::Boolean)
     );
-    generate_execute_array_store!(execute_castore, pop_int, i2c, Base(BaseType::Char));
-    generate_execute_array_store!(execute_sastore, pop_int, i2s, Base(BaseType::Short));
-    generate_execute_array_store!(execute_iastore, pop_int, i2i, Base(BaseType::Int));
-    generate_execute_array_store!(execute_lastore, pop_long, l2l, Base(BaseType::Long));
-    generate_execute_array_store!(execute_fastore, pop_float, f2f, Base(BaseType::Float));
-    generate_execute_array_store!(execute_dastore, pop_double, d2d, Base(BaseType::Double));
+    generate_execute_array_store!(
+        execute_castore,
+        pop_int,
+        i2c,
+        ArrayEntryType::Base(BaseType::Char)
+    );
+    generate_execute_array_store!(
+        execute_sastore,
+        pop_int,
+        i2s,
+        ArrayEntryType::Base(BaseType::Short)
+    );
+    generate_execute_array_store!(
+        execute_iastore,
+        pop_int,
+        i2i,
+        ArrayEntryType::Base(BaseType::Int)
+    );
+    generate_execute_array_store!(
+        execute_lastore,
+        pop_long,
+        l2l,
+        ArrayEntryType::Base(BaseType::Long)
+    );
+    generate_execute_array_store!(
+        execute_fastore,
+        pop_float,
+        f2f,
+        ArrayEntryType::Base(BaseType::Float)
+    );
+    generate_execute_array_store!(
+        execute_dastore,
+        pop_double,
+        d2d,
+        ArrayEntryType::Base(BaseType::Double)
+    );
 
     fn execute_aastore(&mut self, vm: &Vm) -> Result<(), MethodCallFailed<'a>> {
         let value = Value::Object(self.pop_object()?);
         let index = self.pop_int()?.into_usize_safe();
         let array = self.pop_array()?;
         match array.get_elements_type() {
-            FieldType::Object(array_type) => {
-                Self::validate_type(vm, FieldType::Object(array_type.clone()), &value)?;
+            ArrayEntryType::Object(elements_class_id) => {
+                let elements_class_name = vm.get_class_by_id(elements_class_id)?;
+                Self::validate_type(
+                    vm,
+                    FieldType::Object(elements_class_name.name.clone()),
+                    &value,
+                )?;
                 array.set_item_at(index, value)?
             }
             _ => {
@@ -1482,13 +1520,12 @@ impl<'a> CallFrame<'a> {
             }
 
             Value::Array(array) => match array.get_elements_type() {
-                Base(_) => false,
-                FieldType::Object(components_class_name) => {
-                    let components_class =
-                        vm.get_or_resolve_class(call_stack, &components_class_name)?;
+                ArrayEntryType::Base(_) => false,
+                ArrayEntryType::Object(elements_class_id) => {
+                    let components_class = vm.get_class_by_id(elements_class_id)?;
                     components_class.is_subclass_of(expected_class)
                 }
-                FieldType::Array(_) => false,
+                ArrayEntryType::Array => false,
             },
 
             _ => {

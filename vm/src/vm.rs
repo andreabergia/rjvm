@@ -2,14 +2,12 @@ use std::collections::HashMap;
 
 use log::{debug, error};
 
-use rjvm_reader::{
-    field_type::{BaseType, FieldType},
-    line_number::LineNumber,
-};
+use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::array::Array;
 use crate::{
+    array::Array,
+    array_entry_type::ArrayEntryType,
     call_frame::MethodCallResult,
     call_stack::CallStack,
     class::{ClassId, ClassRef},
@@ -241,7 +239,7 @@ impl<'a> Vm<'a> {
             .map(|c| Value::Int(c as i32))
             .collect();
 
-        let java_array = self.new_array(FieldType::Base(BaseType::Char), char_array.len());
+        let java_array = self.new_array(ArrayEntryType::Base(BaseType::Char), char_array.len());
         char_array
             .into_iter()
             .enumerate()
@@ -309,7 +307,7 @@ impl<'a> Vm<'a> {
         Ok(stack_trace_element_java_object)
     }
 
-    pub fn new_array(&mut self, elements_type: FieldType, length: usize) -> Array<'a> {
+    pub fn new_array(&mut self, elements_type: ArrayEntryType, length: usize) -> Array<'a> {
         self.object_allocator.allocate_array(elements_type, length)
     }
 
