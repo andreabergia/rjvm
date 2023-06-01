@@ -1,5 +1,8 @@
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
+use rjvm_reader::field_type::FieldType;
+
+use crate::array::Array;
 use crate::{class::Class, object::Object};
 
 pub struct ObjectAllocator<'a> {
@@ -25,6 +28,12 @@ impl<'a> ObjectAllocator<'a> {
         let size = Object::size(class);
         let ptr = self.alloc(size);
         Object::new(class, ptr)
+    }
+
+    pub fn allocate_array(&mut self, elements_type: FieldType, length: usize) -> Array<'a> {
+        let size = Array::size(length);
+        let ptr = self.alloc(size);
+        Array::new(elements_type, length, ptr)
     }
 
     fn alloc(&mut self, size: usize) -> *mut u8 {

@@ -2,6 +2,7 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::array::Array;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
@@ -77,7 +78,7 @@ fn register_native_repr_methods(registry: &mut NativeMethodsRegistry) {
         "java/lang/System",
         "arraycopy",
         "(Ljava/lang/Object;ILjava/lang/Object;II)V",
-        |_, _, _, args| array_copy(args),
+        |_, _, _, args| native_array_copy(args),
     );
     registry.register(
         "java/lang/Float",
@@ -150,24 +151,39 @@ fn identity_hash_code<'a>(args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     Ok(Some(Value::Int(object.identity_hash_code())))
 }
 
-fn array_copy(args: Vec<Value>) -> MethodCallResult {
-    let (_src_type, src) = expect_array_at(&args, 0)?;
+fn native_array_copy(args: Vec<Value>) -> MethodCallResult {
+    // TODO: handle NullPointerException
+
+    let src = expect_array_at(&args, 0)?;
     let src_pos = expect_int_at(&args, 1)?;
-    let (_dest_type, dest) = expect_array_at(&args, 2)?;
+    let dest = expect_array_at(&args, 2)?;
     let dest_pos = expect_int_at(&args, 3)?;
     let length = expect_int_at(&args, 4)?;
+    array_copy(src, src_pos, dest, dest_pos, length.into_usize_safe())?;
+    Ok(None)
+}
 
-    // TODO: handle NullPointerException
-    // TODO: validate coherence of arrays types, or throw ArrayStoreException
-    // TODO: validate length and indexes, or throw IndexOutOfBoundsException
-
-    for i in 0..length {
-        let src_index = (src_pos + i).into_usize_safe();
-        let dest_index = (dest_pos + i).into_usize_safe();
-        dest.borrow_mut()[dest_index] = src.borrow()[src_index].clone();
+pub fn array_copy(
+    src: &Array,
+    src_pos: i32,
+    dest: &Array,
+    dest_pos: i32,
+    length: usize,
+) -> Result<(), VmError> {
+    if dest.get_elements_type() != src.get_elements_type() {
+        // TODO: we should throw ArrayStoreException
+        return Err(VmError::ValidationException);
     }
 
-    Ok(None)
+    for i in 0..length {
+        let src_index = src_pos.into_usize_safe() + i;
+        let src_item = src.get_item_at(src_index)?;
+
+        let dest_index = dest_pos.into_usize_safe() + i;
+        dest.set_item_at(dest_index, src_item)?;
+    }
+
+    Ok(())
 }
 
 fn float_to_raw_int_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {

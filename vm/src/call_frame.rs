@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use log::{debug, warn};
 
 use rjvm_reader::{
@@ -13,6 +11,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::array::Array;
 use crate::{
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
@@ -22,8 +21,8 @@ use crate::{
     object::Object,
     stack_trace_element::StackTraceElement,
     value::{
-        clone_array, ArrayRef, Value,
-        Value::{Array, Double, Float, Int, Long, Null},
+        Value,
+        Value::{Double, Float, Int, Long, Null},
     },
     value_stack::ValueStack,
     vm::Vm,
@@ -148,13 +147,11 @@ macro_rules! generate_execute_array_load {
     ($name:ident, $($variant:pat),+) => {
         fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
             let index = self.pop_int()?.into_usize_safe();
-            let (field_type, array) = self.pop_array()?;
-            let value = match field_type {
-                $($variant => array
-                    .borrow()
-                    .get(index)
-                    .ok_or(VmError::ArrayIndexOutOfBoundsException)
-                    .map(|value| value.clone()),)+
+            let array = self.pop_array()?;
+            let value = match array.get_elements_type() {
+                $($variant => {
+                    array.get_item_at(index)
+                })+
                 _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }?;
             self.push(value)
@@ -167,13 +164,10 @@ macro_rules! generate_execute_array_store {
         fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
             let value = Self::$map_fn(self.$pop_fn()?);
             let index = self.pop_int()?.into_usize_safe();
-            let (field_type, array) = self.pop_array()?;
-            match field_type {
+            let array = self.pop_array()?;
+            match array.get_elements_type() {
                 $($variant => {
-                    match array.borrow_mut().get_mut(index) {
-                        None => return Err(MethodCallFailed::InternalError(VmError::ArrayIndexOutOfBoundsException)),
-                        Some(reference) => *reference = value,
-                    }
+                     array.set_item_at(index, value)?
                 })+
                 _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }
@@ -625,10 +619,10 @@ impl<'a> CallFrame<'a> {
             Instruction::Dcmpl => self.execute_double_compare(1)?,
 
             Instruction::Newarray(array_type) => {
-                self.execute_newarray(array_type)?;
+                self.execute_newarray(vm, array_type)?;
             }
             Instruction::Anewarray(constant_index) => {
-                self.execute_anewarray(constant_index)?;
+                self.execute_anewarray(vm, constant_index)?;
             }
 
             Instruction::Arraylength => self.execute_array_length()?,
@@ -758,7 +752,7 @@ impl<'a> CallFrame<'a> {
             // Since we have NOT modelled arrays properly (i.e. they are not an object, as they
             // should be), we need a special case for invoking "clone" on an array.
             let array = self.pop()?;
-            let clone = clone_array(array)?;
+            let clone = vm.clone_array(array)?;
             return self.push(clone);
         }
 
@@ -802,10 +796,10 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_double, Double, f64);
     generate_pop!(pop_object, Object, Object<'a>);
 
-    fn pop_array(&mut self) -> Result<(FieldType, ArrayRef<'a>), MethodCallFailed<'a>> {
+    fn pop_array(&mut self) -> Result<Array<'a>, MethodCallFailed<'a>> {
         let receiver = self.pop()?;
         match receiver {
-            Array(field_type, vector) => Ok((field_type, vector)),
+            Value::Array(array) => Ok(array),
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -1184,7 +1178,7 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
-            Value::Object(_) | Array(..) => {
+            Value::Object(_) | Value::Array(..) => {
                 if !jump_on_null {
                     self.goto(jump_address);
                 }
@@ -1213,7 +1207,7 @@ impl<'a> CallFrame<'a> {
         let equal = match value1 {
             Value::Object(object1) => match value2 {
                 Value::Object(object2) => object1.is_same_as(&object2),
-                Null | Array(..) => false,
+                Null | Value::Array(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1222,19 +1216,15 @@ impl<'a> CallFrame<'a> {
             },
             Null => match value2 {
                 Null => true,
-                Value::Object(..) | Array(..) => false,
+                Value::Object(..) | Value::Array(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
                     ))
                 }
             },
-            Array(_, array1) => match value2 {
-                Array(_, array2) => {
-                    let x = array1.borrow();
-                    let y = array2.borrow();
-                    x.as_ptr() == y.as_ptr()
-                }
+            Value::Array(array1) => match value2 {
+                Value::Array(array2) => array1.is_same_as(&array2),
                 Null | Value::Object(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
@@ -1261,7 +1251,7 @@ impl<'a> CallFrame<'a> {
     fn execute_aload(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
         match local {
-            Value::Object(..) | Array(..) | Null => self.push(local.clone()),
+            Value::Object(..) | Value::Array(..) | Null => self.push(local.clone()),
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -1276,7 +1266,7 @@ impl<'a> CallFrame<'a> {
     fn execute_astore(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
-            Value::Object(..) | Array(..) => {
+            Value::Object(..) | Value::Array(..) => {
                 self.locals[index] = value;
                 Ok(())
             }
@@ -1347,39 +1337,45 @@ impl<'a> CallFrame<'a> {
         }
     }
 
-    fn execute_newarray(&mut self, array_type: NewArrayType) -> Result<(), MethodCallFailed<'a>> {
+    fn execute_newarray(
+        &mut self,
+        vm: &mut Vm<'a>,
+        array_type: NewArrayType,
+    ) -> Result<(), MethodCallFailed<'a>> {
         let length = self.pop_int()?.into_usize_safe();
-
-        let (elements_type, default_value) = match array_type {
-            NewArrayType::Boolean => (Base(BaseType::Boolean), Int(0)),
-            NewArrayType::Char => (Base(BaseType::Char), Int(0)),
-            NewArrayType::Float => (Base(BaseType::Float), Float(0f32)),
-            NewArrayType::Double => (Base(BaseType::Double), Double(0f64)),
-            NewArrayType::Byte => (Base(BaseType::Byte), Int(0)),
-            NewArrayType::Short => (Base(BaseType::Short), Int(0)),
-            NewArrayType::Int => (Base(BaseType::Int), Int(0)),
-            NewArrayType::Long => (Base(BaseType::Long), Long(0)),
+        let elements_type = match array_type {
+            NewArrayType::Boolean => Base(BaseType::Boolean),
+            NewArrayType::Char => Base(BaseType::Char),
+            NewArrayType::Float => Base(BaseType::Float),
+            NewArrayType::Double => Base(BaseType::Double),
+            NewArrayType::Byte => Base(BaseType::Byte),
+            NewArrayType::Short => Base(BaseType::Short),
+            NewArrayType::Int => Base(BaseType::Int),
+            NewArrayType::Long => Base(BaseType::Long),
         };
 
-        let vec = vec![default_value; length];
-        let vec = Rc::new(RefCell::new(vec));
-        let array_value = Array(elements_type, vec);
-        self.push(array_value)
+        let array = vm.new_array(elements_type, length);
+        self.push(Value::Array(array))
     }
 
-    fn execute_anewarray(&mut self, constant_index: u16) -> Result<(), MethodCallFailed<'a>> {
+    fn execute_anewarray(
+        &mut self,
+        vm: &mut Vm<'a>,
+        constant_index: u16,
+    ) -> Result<(), MethodCallFailed<'a>> {
         let length = self.pop_int()?.into_usize_safe();
         let class_name = self.get_constant_class_reference(constant_index)?;
+        let elements_type = FieldType::Object(class_name.to_string());
 
-        let vec = vec![Null; length];
-        let vec = Rc::new(RefCell::new(vec));
-        let array_value = Array(FieldType::Object(class_name.to_string()), vec);
-        self.push(array_value)
+        let array = vm.new_array(elements_type, length);
+        self.push(Value::Array(array))
     }
 
     fn execute_array_length(&mut self) -> Result<(), MethodCallFailed<'a>> {
-        let (_, array) = self.pop_array()?;
-        self.push(Int(array.borrow().len() as i32))?;
+        let array = self.pop_array()?;
+        let len = array.len();
+        let len = len as i32;
+        self.push(Int(len))?;
         Ok(())
     }
 
@@ -1413,18 +1409,11 @@ impl<'a> CallFrame<'a> {
     fn execute_aastore(&mut self, vm: &Vm) -> Result<(), MethodCallFailed<'a>> {
         let value = Value::Object(self.pop_object()?);
         let index = self.pop_int()?.into_usize_safe();
-        let (field_type, array) = self.pop_array()?;
-        match field_type {
+        let array = self.pop_array()?;
+        match array.get_elements_type() {
             FieldType::Object(array_type) => {
-                Self::validate_type(vm, FieldType::Object(array_type), &value)?;
-                match array.borrow_mut().get_mut(index) {
-                    None => {
-                        return Err(MethodCallFailed::InternalError(
-                            VmError::ArrayIndexOutOfBoundsException,
-                        ))
-                    }
-                    Some(reference) => *reference = value,
-                }
+                Self::validate_type(vm, FieldType::Object(array_type.clone()), &value)?;
+                array.set_item_at(index, value)?
             }
             _ => {
                 return Err(MethodCallFailed::InternalError(
@@ -1492,11 +1481,11 @@ impl<'a> CallFrame<'a> {
                 }
             }
 
-            Array(components_type, _) => match components_type {
+            Value::Array(array) => match array.get_elements_type() {
                 Base(_) => false,
                 FieldType::Object(components_class_name) => {
                     let components_class =
-                        vm.get_or_resolve_class(call_stack, components_class_name)?;
+                        vm.get_or_resolve_class(call_stack, &components_class_name)?;
                     components_class.is_subclass_of(expected_class)
                 }
                 FieldType::Array(_) => false,
@@ -1680,8 +1669,9 @@ impl<'a> CallFrame<'a> {
 
     fn debug_print_status(&self, instruction: &Instruction) {
         debug!(
-            "FRAME STATUS: executing {} - pc: {}",
+            "FRAME STATUS: executing {} signature {} pc: {}",
             self.to_stack_trace_element(),
+            self.class_and_method.method.type_descriptor,
             self.pc
         );
         debug!("  stack:");

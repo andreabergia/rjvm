@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
 use log::{debug, error};
 
@@ -6,7 +6,9 @@ use rjvm_reader::{
     field_type::{BaseType, FieldType},
     line_number::LineNumber,
 };
+use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::array::Array;
 use crate::{
     call_frame::MethodCallResult,
     call_stack::CallStack,
@@ -75,16 +77,10 @@ impl<'a> Vm<'a> {
         if class.name == "java/lang/String" {
             // In our JRE's rt.jar, the first fields of String is
             //    private final char[] value;
-            if let Value::Array(_, array_ref) = object.get_field(class, 0) {
-                let string_bytes: Vec<u8> = array_ref
-                    .borrow()
-                    .iter()
-                    .map(|v| match v {
-                        Value::Int(c) => *c as u8,
-                        _ => panic!("array items should be chars"),
-                    })
-                    .collect();
-                let string = String::from_utf8(string_bytes).expect("should have valid utf8 bytes");
+            if let Value::Array(array) = object.get_field(class, 0) {
+                let string_bytes = array.utf16_code_points()?;
+                let string =
+                    String::from_utf16(&string_bytes).expect("should have valid utf8 bytes");
                 return Ok(string);
             }
         }
@@ -244,8 +240,12 @@ impl<'a> Vm<'a> {
             .encode_utf16()
             .map(|c| Value::Int(c as i32))
             .collect();
-        let char_array = Rc::new(RefCell::new(char_array));
-        let char_array = Value::Array(FieldType::Base(BaseType::Char), char_array);
+
+        let java_array = self.new_array(FieldType::Base(BaseType::Char), char_array.len());
+        char_array
+            .into_iter()
+            .enumerate()
+            .for_each(|(index, value)| java_array.set_item_at(index, value).unwrap());
 
         // In our JRE's rt.jar, the fields for String are:
         //    private final char[] value;
@@ -256,7 +256,7 @@ impl<'a> Vm<'a> {
         //    private static final int HASHING_SEED;
         //    private transient int hash32;
         let string_object = self.new_object(call_stack, "java/lang/String")?;
-        string_object.set_field(0, char_array);
+        string_object.set_field(0, Value::Array(java_array));
         string_object.set_field(1, Value::Int(0));
         string_object.set_field(6, Value::Int(0));
         Ok(string_object)
@@ -307,6 +307,22 @@ impl<'a> Vm<'a> {
         stack_trace_element_java_object.set_field(3, line_number);
 
         Ok(stack_trace_element_java_object)
+    }
+
+    pub fn new_array(&mut self, elements_type: FieldType, length: usize) -> Array<'a> {
+        self.object_allocator.allocate_array(elements_type, length)
+    }
+
+    pub fn clone_array(&mut self, value: Value<'a>) -> Result<Value<'a>, VmError> {
+        match &value {
+            Value::Array(array) => {
+                let new_array =
+                    self.new_array(array.get_elements_type(), array.len().into_usize_safe());
+                new_array.copy_from(array)?;
+                Ok(Value::Array(new_array))
+            }
+            _ => Err(VmError::ValidationException),
+        }
     }
 
     pub(crate) fn associate_stack_trace_with_throwable(

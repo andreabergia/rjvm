@@ -3,13 +3,12 @@ use std::{
     marker::PhantomData,
 };
 
-use log::debug;
-
 use rjvm_reader::field_type::{BaseType, FieldType};
 
+use crate::array::Array;
 use crate::{
     class::{Class, ClassId, ClassRef},
-    value::{ArrayRef, Value},
+    value::Value,
 };
 
 #[derive(PartialEq, Clone)]
@@ -46,12 +45,7 @@ impl<'a> Object<'a> {
         */
 
         let fields_sizes: usize = 8 * class.num_total_fields;
-        let object_size = fields_sizes + HEADER_SIZE;
-        debug!(
-            "object of class {} should have size {}",
-            class.name, object_size
-        );
-        object_size
+        fields_sizes + HEADER_SIZE
     }
 
     pub fn new(class: &Class<'a>, ptr: *mut u8) -> Self {
@@ -86,7 +80,7 @@ impl<'a> Object<'a> {
     }
 
     pub fn set_field(&self, index: usize, value: Value<'a>) {
-        let preceding_fields_size: usize = 8 * index;
+        let preceding_fields_size = 8 * index;
         let offset = HEADER_SIZE + preceding_fields_size;
         unsafe {
             let ptr = self.data.add(offset);
@@ -95,9 +89,9 @@ impl<'a> Object<'a> {
                 Value::Long(long) => std::ptr::write(ptr as *mut i64, long),
                 Value::Float(float) => std::ptr::write(ptr as *mut f32, float),
                 Value::Double(double) => std::ptr::write(ptr as *mut f64, double),
-                Value::Uninitialized | Value::Null => std::ptr::write(ptr, 0),
+                Value::Uninitialized | Value::Null => std::ptr::write(ptr as *mut u64, 0),
                 Value::Object(obj) => std::ptr::write(ptr as *mut Object, obj),
-                Value::Array(_, arr) => std::ptr::write(ptr as *mut ArrayRef, arr),
+                Value::Array(arr) => std::ptr::write(ptr as *mut Array, arr),
             }
         }
     }
@@ -105,7 +99,7 @@ impl<'a> Object<'a> {
     pub fn get_field(&self, object_class: ClassRef, index: usize) -> Value<'a> {
         let field = object_class.field_at_index(index).unwrap();
 
-        let preceding_fields_size: usize = 8 * index;
+        let preceding_fields_size = 8 * index;
         let offset = HEADER_SIZE + preceding_fields_size;
         unsafe {
             let ptr = self.data.add(offset);
@@ -120,15 +114,19 @@ impl<'a> Object<'a> {
                 FieldType::Base(BaseType::Double) => {
                     Value::Double(std::ptr::read(ptr as *const f64))
                 }
-                FieldType::Object(_) => Value::Object(std::ptr::read(ptr as *const Object)),
-                FieldType::Array(entry_type) => Value::Array(
-                    entry_type.as_ref().clone(),
-                    std::ptr::read(ptr as *const ArrayRef),
-                ),
+                FieldType::Object(_) => match std::ptr::read(ptr as *const i64) {
+                    0 => Value::Null,
+                    _ => Value::Object(std::ptr::read(ptr as *const Object)),
+                },
+                FieldType::Array(_) => match std::ptr::read(ptr as *const i64) {
+                    0 => Value::Null,
+                    _ => Value::Array(std::ptr::read(ptr as *const Array)),
+                },
             }
         }
     }
 
+    // TODO: impl eq
     pub fn is_same_as(&self, other: &Object) -> bool {
         self.data == other.data
     }

@@ -1,3 +1,4 @@
+pub mod array;
 mod call_frame;
 pub mod call_stack;
 pub mod class;

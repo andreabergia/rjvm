@@ -1,7 +1,8 @@
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::fmt::Debug;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
+use crate::array::Array;
 use crate::{
     class::{ClassId, ClassRef},
     object::Object,
@@ -17,14 +18,10 @@ pub enum Value<'a> {
     Float(f32),
     Double(f64),
     Object(Object<'a>),
-    Null, // TODO: should this be merged with Object and use an Option?
-
-    // TODO: avoid RC and use garbage collector to allocate
-    Array(FieldType, ArrayRef<'a>),
+    Null,
+    Array(Array<'a>),
     // TODO: return address
 }
-
-pub type ArrayRef<'a> = Rc<RefCell<Vec<Value<'a>>>>;
 
 impl<'a> Value<'a> {
     pub fn matches_type<'b, ResById, ResByName>(
@@ -86,8 +83,10 @@ impl<'a> Value<'a> {
                 FieldType::Array(_) => true,
             },
 
-            Value::Array(field_type, _) => match expected_type {
-                FieldType::Array(expected_field_type) => *field_type == *expected_field_type,
+            Value::Array(array) => match expected_type {
+                FieldType::Array(expected_field_type) => {
+                    array.get_elements_type() == *expected_field_type
+                }
                 _ => false,
             },
         }
@@ -106,10 +105,10 @@ pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<Object<'a
 pub fn expect_array_at<'a, 'b>(
     vec: &'b [Value<'a>],
     index: usize,
-) -> Result<(&'b FieldType, &'b ArrayRef<'a>), VmError> {
+) -> Result<&'b Array<'a>, VmError> {
     let value = vec.get(index);
-    if let Some(Value::Array(field_type, array_ref)) = value {
-        Ok((field_type, array_ref))
+    if let Some(Value::Array(array)) = value {
+        Ok(array)
     } else {
         Err(VmError::ValidationException)
     }
@@ -146,23 +145,5 @@ pub fn expect_receiver(receiver: Option<Object>) -> Result<Object, VmError> {
     match receiver {
         Some(v) => Ok(v),
         None => Err(VmError::ValidationException),
-    }
-}
-
-pub fn clone_array(array: Value) -> Result<Value, VmError> {
-    match array {
-        Value::Array(elements_type, array_ref) => {
-            let existing_vec = array_ref.borrow();
-
-            let mut new_vec = Vec::with_capacity(existing_vec.len());
-            for value in existing_vec.iter() {
-                new_vec.push(value.clone());
-            }
-
-            let new_vec = Rc::new(RefCell::new(new_vec));
-            let new_array = Value::Array(elements_type, new_vec);
-            Ok(new_array)
-        }
-        _ => Err(VmError::ValidationException),
     }
 }

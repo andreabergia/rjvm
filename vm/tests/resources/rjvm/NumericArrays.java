@@ -10,6 +10,7 @@ public class NumericArrays {
         playWithArrayOfLongs(new long[]{4, 2});
         playWithArrayOfFloats(new float[]{1.2f, 0.2f});
         playWithArrayOfDoubles(new double[]{0.0, 3.3});
+        copyArrays();
     }
 
     private static void playWithArrayOfBooleans(boolean[] array) {
@@ -20,30 +21,49 @@ public class NumericArrays {
 
     private static void playWithArrayOfBytes(byte[] array) {
         tempPrint(array[0] | array[1]);
+        tempPrint(array.length);
     }
 
     private static void playWithArrayOfChars(char[] array) {
         tempPrint(array[0] > array[1] ? array[0] : array[1]);
+        tempPrint(array.length);
     }
 
     private static void playWithArrayOfShorts(short[] array) {
         tempPrint(array[0] - array[1]);
+        tempPrint(array.length);
     }
 
     private static void playWithArrayOfInts(int[] array) {
         tempPrint(array[0] * array[1]);
+        tempPrint(array.length);
     }
 
     private static void playWithArrayOfLongs(long[] array) {
         tempPrint(array[0] / array[1]);
+        tempPrint(array.length);
     }
 
     private static void playWithArrayOfFloats(float[] array) {
         tempPrint(array[0] + array[1]);
+        tempPrint(array.length);
     }
 
     private static void playWithArrayOfDoubles(double[] array) {
         tempPrint(array[0] * array[1]);
+        tempPrint(array.length);
+    }
+
+    private static void copyArrays() {
+        int[] source = new int[]{1, 2, 3, 4};
+        int[] dest = new int[]{0, 0, 0, 0, 0};
+        System.arraycopy(source, 1, dest, 1, 3);
+        tempPrint(dest[0]);
+        tempPrint(dest[1]);
+        tempPrint(dest[2]);
+        tempPrint(dest[3]);
+        tempPrint(dest[4]);
+        tempPrint(dest.length);
     }
 
     private static native void tempPrint(boolean value);
