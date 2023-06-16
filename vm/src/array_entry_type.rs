@@ -1,11 +1,6 @@
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::{
-    call_stack::CallStack,
-    class::{ClassId, ClassRef},
-    exceptions::MethodCallFailed,
-    vm::Vm,
-};
+use crate::class::{ClassId, ClassRef};
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ArrayEntryType {
@@ -17,21 +12,6 @@ pub enum ArrayEntryType {
 }
 
 impl ArrayEntryType {
-    fn from<'a>(
-        vm: &mut Vm<'a>,
-        call_stack: &mut CallStack<'a>,
-        field_type: FieldType,
-    ) -> Result<Self, MethodCallFailed<'a>> {
-        Ok(match field_type {
-            FieldType::Base(base_type) => ArrayEntryType::Base(base_type),
-            FieldType::Object(class_name) => {
-                let class = vm.get_or_resolve_class(call_stack, &class_name)?;
-                ArrayEntryType::Object(class.id)
-            }
-            FieldType::Array(_) => ArrayEntryType::Array,
-        })
-    }
-
     pub fn into_field_type<'a, ResById>(self, class_resolver_by_id: ResById) -> Option<FieldType>
     where
         ResById: FnOnce(ClassId) -> Option<ClassRef<'a>>,
