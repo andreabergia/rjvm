@@ -1,3 +1,4 @@
+use std::ptr::NonNull;
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
 use bitfield_struct::bitfield;
@@ -86,22 +87,25 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    pub fn allocate(&mut self, class: &Class<'a>) -> Object<'a> {
+    pub fn allocate(&mut self, class: &Class<'a>) -> Option<Object<'a>> {
         let size = Object::size(class);
-        let ptr = self.alloc(size, AllocKind::Object);
-        Object::new(class, ptr)
+        self.alloc(size, AllocKind::Object)
+            .map(|ptr| Object::new(class, ptr.as_ptr()))
     }
 
-    pub fn allocate_array(&mut self, elements_type: ArrayEntryType, length: usize) -> Array<'a> {
+    pub fn allocate_array(
+        &mut self,
+        elements_type: ArrayEntryType,
+        length: usize,
+    ) -> Option<Array<'a>> {
         let size = Array::size(length);
-        let ptr = self.alloc(size, AllocKind::Array);
-        Array::new(elements_type, length, ptr)
+        self.alloc(size, AllocKind::Array)
+            .map(|ptr| Array::new(elements_type, length, ptr.as_ptr()))
     }
 
-    fn alloc(&mut self, size: usize, kind: AllocKind) -> *mut u8 {
+    fn alloc(&mut self, size: usize, kind: AllocKind) -> Option<NonNull<u8>> {
         if self.used + size > self.capacity {
-            // TODO: trigger garbage collection!
-            panic!("no more memory!")
+            return None;
         }
 
         let alloc_size = size + HEADER_SIZE;
@@ -114,7 +118,7 @@ impl<'a> ObjectAllocator<'a> {
             .with_size(size);
         unsafe {
             std::ptr::write(ptr as *mut Header, header);
-            ptr.add(HEADER_SIZE)
+            NonNull::new(ptr.add(HEADER_SIZE))
         }
     }
 }

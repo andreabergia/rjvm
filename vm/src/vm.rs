@@ -226,7 +226,9 @@ impl<'a> Vm<'a> {
 
     pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> Object<'a> {
         debug!("allocating new instance of {}", class.name);
-        self.object_allocator.allocate(class)
+        self.object_allocator
+            .allocate(class)
+            .expect("cannot allocate object, out of memory!")
     }
 
     pub fn new_java_lang_string_object(
@@ -308,7 +310,9 @@ impl<'a> Vm<'a> {
     }
 
     pub fn new_array(&mut self, elements_type: ArrayEntryType, length: usize) -> Array<'a> {
-        self.object_allocator.allocate_array(elements_type, length)
+        self.object_allocator
+            .allocate_array(elements_type, length)
+            .expect("cannot allocate array, out of memory!")
     }
 
     pub fn clone_array(&mut self, value: Value<'a>) -> Result<Value<'a>, VmError> {
