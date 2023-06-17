@@ -1,7 +1,11 @@
+
+use std::ops::DerefMut;
+
+
 use clap::Parser;
 
+use rjvm_vm::vm::CallStackRef;
 use rjvm_vm::{
-    call_stack::CallStack,
     class_and_method::ClassAndMethod,
     exceptions::MethodCallFailed,
     vm::{Vm, DEFAULT_MAX_MEMORY},
@@ -33,11 +37,11 @@ fn append_classpath(vm: &mut Vm, args: &Args) -> Result<(), String> {
 fn resolve_class_and_main_method<'a>(
     vm: &mut Vm<'a>,
     args: &Args,
-) -> Result<(CallStack<'a>, ClassAndMethod<'a>), String> {
-    let mut call_stack = vm.allocate_call_stack();
+) -> Result<(CallStackRef<'a>, ClassAndMethod<'a>), String> {
+    let call_stack = vm.allocate_call_stack();
     let main_method = vm
         .resolve_class_method(
-            &mut call_stack,
+            call_stack.borrow_mut().deref_mut(),
             &args.class_name,
             "main",
             "([Ljava/lang/String;)V",
@@ -58,11 +62,16 @@ fn run(args: Args) -> Result<i32, String> {
     let mut vm = Vm::new(DEFAULT_MAX_MEMORY);
     append_classpath(&mut vm, &args)?;
 
-    let (mut call_stack, main_method) = resolve_class_and_main_method(&mut vm, &args)?;
+    let (call_stack, main_method) = resolve_class_and_main_method(&mut vm, &args)?;
 
     // TODO: args
     let main_result = vm
-        .invoke(&mut call_stack, main_method, None, vec![])
+        .invoke(
+            call_stack.borrow_mut().deref_mut(),
+            main_method,
+            None,
+            vec![],
+        )
         .map_err(|v| format!("execution error: {:?}", v))?;
 
     match main_result {

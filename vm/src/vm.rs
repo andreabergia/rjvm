@@ -1,6 +1,8 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-use log::{debug, error};
+use log::{debug, error, info};
 
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 use rjvm_utils::type_conversion::ToUsizeSafe;
@@ -23,6 +25,8 @@ use crate::{
     vm_error::VmError,
 };
 
+pub type CallStackRef<'a> = Rc<RefCell<CallStack<'a>>>;
+
 #[derive(Debug)]
 pub struct Vm<'a> {
     /// Responsible for allocating and storing classes
@@ -30,6 +34,9 @@ pub struct Vm<'a> {
 
     /// Responsible for allocating objects
     object_allocator: ObjectAllocator<'a>,
+
+    /// Allocated call stacks
+    call_stacks: Vec<CallStackRef<'a>>,
 
     /// To model static fields, we will create one special instance of each class
     /// and we will store it in this map
@@ -58,6 +65,7 @@ impl<'a> Vm<'a> {
         let mut result = Self {
             class_manager: Default::default(),
             object_allocator: ObjectAllocator::with_maximum_memory(max_memory),
+            call_stacks: Vec::new(),
             statics: Default::default(),
             native_methods_registry: Default::default(),
             throwable_call_stacks: Default::default(),
@@ -210,9 +218,11 @@ impl<'a> Vm<'a> {
         }
     }
 
-    // TODO: do we need it?
-    pub fn allocate_call_stack(&self) -> CallStack<'a> {
-        CallStack::new()
+    pub fn allocate_call_stack(&mut self) -> CallStackRef<'a> {
+        let stack = CallStack::new();
+        let stack = Rc::new(RefCell::new(stack));
+        self.call_stacks.push(stack.clone());
+        stack
     }
 
     pub fn new_object(
@@ -226,9 +236,15 @@ impl<'a> Vm<'a> {
 
     pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> Object<'a> {
         debug!("allocating new instance of {}", class.name);
-        self.object_allocator
-            .allocate(class)
-            .expect("cannot allocate object, out of memory!")
+        match self.object_allocator.allocate(class) {
+            Some(object) => object,
+            None => {
+                self.do_garbage_collection();
+                self.object_allocator
+                    .allocate(class)
+                    .expect("cannot allocate object even after full garbage collection!")
+            }
+        }
     }
 
     pub fn new_java_lang_string_object(
@@ -310,9 +326,18 @@ impl<'a> Vm<'a> {
     }
 
     pub fn new_array(&mut self, elements_type: ArrayEntryType, length: usize) -> Array<'a> {
-        self.object_allocator
-            .allocate_array(elements_type, length)
-            .expect("cannot allocate array, out of memory!")
+        match self
+            .object_allocator
+            .allocate_array(elements_type.clone(), length)
+        {
+            Some(array) => array,
+            None => {
+                self.do_garbage_collection();
+                self.object_allocator
+                    .allocate_array(elements_type, length)
+                    .expect("cannot allocate array even after full garbage collection!")
+            }
+        }
     }
 
     pub fn clone_array(&mut self, value: Value<'a>) -> Result<Value<'a>, VmError> {
@@ -349,5 +374,11 @@ impl<'a> Vm<'a> {
             "VM classes={:?}, objects = {:?}",
             self.class_manager, self.object_allocator
         )
+    }
+
+    fn do_garbage_collection(&mut self) {
+        info!("running garbage collection");
+        todo!("implement garbage collection")
+        // self.object_allocator.do_garbage_collection()
     }
 }
