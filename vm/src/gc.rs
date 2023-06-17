@@ -106,16 +106,16 @@ impl<'a> ObjectAllocator<'a> {
 
         let alloc_size = size + HEADER_SIZE;
         let ptr = unsafe { self.memory.add(self.used) };
+        self.used += alloc_size;
+
         let header = Header::new()
             .with_kind(kind)
             .with_state(GcState::Unmarked)
             .with_size(size);
         unsafe {
             std::ptr::write(ptr as *mut Header, header);
+            ptr.add(HEADER_SIZE)
         }
-
-        self.used += alloc_size;
-        unsafe { ptr.add(HEADER_SIZE) }
     }
 }
 
