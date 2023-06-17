@@ -1,11 +1,12 @@
+use rjvm_vm::vm::DEFAULT_MAX_MEMORY;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
     value::{expect_object_at, Value},
-    vm::{Vm, DEFAULT_MAX_MEMORY},
+    vm::Vm,
 };
 
-fn create_base_vm() -> Vm<'static> {
-    let mut vm = Vm::new(DEFAULT_MAX_MEMORY);
+fn create_base_vm(max_memory: usize) -> Vm<'static> {
+    let mut vm = Vm::new(max_memory);
 
     let src_dir = env!("CARGO_MANIFEST_DIR");
     vm.append_class_path(&format!("{src_dir}/rt.jar:{src_dir}/tests/resources",))
@@ -40,7 +41,7 @@ fn extract_printed_string(vm: &Vm, index: usize) -> String {
 
 #[test_log::test]
 fn simple_main() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(&mut vm, "rjvm/SimpleMain", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
 
@@ -49,7 +50,7 @@ fn simple_main() {
 
 #[test_log::test]
 fn superclasses() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/SuperClasses",
@@ -63,7 +64,7 @@ fn superclasses() {
 
 #[test_log::test]
 fn control_flow() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/ControlFlow",
@@ -93,7 +94,7 @@ fn control_flow() {
 
 #[test_log::test]
 fn numeric_types() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/NumericTypes",
@@ -134,7 +135,7 @@ fn numeric_types() {
 
 #[test_log::test]
 fn numeric_arrays() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/NumericArrays",
@@ -175,7 +176,7 @@ fn numeric_arrays() {
 
 #[test_log::test]
 fn object_arrays() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/ObjectArrays",
@@ -189,7 +190,7 @@ fn object_arrays() {
 
 #[test_log::test]
 fn statics() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(&mut vm, "rjvm/Statics", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
 
@@ -198,7 +199,7 @@ fn statics() {
 
 #[test_log::test]
 fn instance_of() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(&mut vm, "rjvm/InstanceOf", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
 
@@ -238,7 +239,7 @@ fn instance_of() {
 
 #[test_log::test]
 fn instance_of_array() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/InstanceOfArray",
@@ -266,7 +267,7 @@ fn instance_of_array() {
 
 #[test_log::test]
 fn strings() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(&mut vm, "rjvm/Strings", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
 
@@ -279,7 +280,7 @@ fn strings() {
 
 #[test_log::test]
 fn invoke_interface() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/InvokeInterface",
@@ -296,7 +297,7 @@ fn invoke_interface() {
 
 #[test_log::test]
 fn check_cast() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(&mut vm, "rjvm/CheckCast", "main", "([Ljava/lang/String;)V");
     assert_eq!(Ok(None), main_result);
 
@@ -305,7 +306,7 @@ fn check_cast() {
 
 #[test_log::test]
 fn stack_trace_printing() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/StackTracePrinting",
@@ -335,7 +336,7 @@ fn stack_trace_printing() {
 
 #[test_log::test]
 fn exceptions_throwing_and_catching() {
-    let mut vm = create_base_vm();
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
     let main_result = invoke(
         &mut vm,
         "rjvm/ExceptionsThrowingAndCatching",
@@ -354,4 +355,16 @@ fn exceptions_throwing_and_catching() {
         ],
         vm.printed
     );
+}
+
+// #[test_log::test]
+fn gabarge_collector() {
+    let mut vm = create_base_vm(5_000_000);
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/GarbageCollection",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
 }
