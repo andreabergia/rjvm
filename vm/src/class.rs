@@ -87,4 +87,14 @@ impl<'a> Class<'a> {
             self.fields.get(index - self.first_field_index)
         }
     }
+
+    pub fn all_fields(&self) -> impl Iterator<Item = &ClassFileField> {
+        let mut all_fields = Vec::from_iter(
+            self.superclass
+                .iter()
+                .flat_map(|superclass| superclass.all_fields()),
+        );
+        all_fields.extend(self.fields.iter());
+        all_fields.into_iter()
+    }
 }

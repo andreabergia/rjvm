@@ -131,12 +131,16 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    pub unsafe fn do_garbage_collection(&mut self, roots: Vec<*mut Object<'a>>) {
+    pub unsafe fn do_garbage_collection(
+        &mut self,
+        roots: Vec<*mut Object<'a>>,
+        class_resolver: &impl ClassByIdResolver<'a>,
+    ) {
         self.unmark_all_objects();
 
         // Mark all reachable objects
         for root in roots {
-            self.mark(root);
+            self.mark(root, class_resolver);
         }
 
         self.log_marked_objects_for_debug();
@@ -152,7 +156,11 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    unsafe fn mark(&self, object_ptr: *mut Object<'a>) {
+    unsafe fn mark(
+        &self,
+        object_ptr: *mut Object<'a>,
+        class_resolver: &impl ClassByIdResolver<'a>,
+    ) {
         let referred_object_ptr = *(object_ptr as *const *mut u8);
         assert!(
             referred_object_ptr >= self.memory && referred_object_ptr <= self.memory.add(self.used)
@@ -163,7 +171,7 @@ impl<'a> ObjectAllocator<'a> {
         match header.state() {
             GcState::Unmarked => {
                 header.set_state(GcState::InProgress);
-                self.visit_members_of(&*object_ptr);
+                self.visit_members_of(&*object_ptr, class_resolver);
                 header.set_state(GcState::Marked);
             }
 
@@ -173,9 +181,35 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    unsafe fn visit_members_of(&self, object: &Object<'a>) {
-        // TODO
-        debug!("should visit members of {:?}", object);
+    unsafe fn visit_members_of(
+        &self,
+        object: &Object<'a>,
+        class_resolver: &impl ClassByIdResolver<'a>,
+    ) {
+        // TODO: return an error
+        let class = class_resolver
+            .find_class_by_id(object.class_id())
+            .expect("objects should have a valid class reference");
+
+        debug!(
+            "should visit members of {:?} of class {}",
+            object, class.name
+        );
+
+        class
+            .all_fields()
+            .filter(|f| {
+                matches!(
+                    f.type_descriptor,
+                    FieldType::Object(_) | FieldType::Array(_)
+                )
+            })
+            .for_each(|f| {
+                debug!(
+                    "  should visit recursively field {} of object {:?}",
+                    f.name, object
+                );
+            })
     }
 
     // TODO: remove

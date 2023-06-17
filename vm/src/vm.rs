@@ -82,7 +82,7 @@ impl<'a> Vm<'a> {
         &self,
         object: &Object<'a>,
     ) -> Result<String, VmError> {
-        let class = self.get_class_by_id(object.get_class_id())?;
+        let class = self.get_class_by_id(object.class_id())?;
         if class.name == "java/lang/String" {
             // In our JRE's rt.jar, the first fields of String is
             //    private final char[] value;
@@ -388,7 +388,8 @@ impl<'a> Vm<'a> {
         roots.extend(self.call_stacks.iter_mut().flat_map(|s| s.gc_roots()));
 
         unsafe {
-            self.object_allocator.do_garbage_collection(roots);
+            self.object_allocator
+                .do_garbage_collection(roots, &self.class_manager);
         }
 
         // todo!("implement garbage collection")
