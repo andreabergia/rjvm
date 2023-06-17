@@ -142,7 +142,7 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
     let formatted = match arg {
         Value::Object(object) => {
             let class = vm
-                .get_class_by_id(object.get_class_id())
+                .get_class_by_id(object.class_id())
                 .expect("cannot get an object without a valid class id");
             if class.name == "java/lang/String" {
                 vm.extract_str_from_java_lang_string(object)
@@ -213,7 +213,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
 fn get_class_loader(receiver: Option<Object>) -> MethodCallResult {
     debug!(
         "invoked get class loader for class {:?}",
-        receiver.map(|r| r.get_class_id())
+        receiver.map(|r| r.class_id())
     );
 
     // TODO: it seems ok to return just null for the moment

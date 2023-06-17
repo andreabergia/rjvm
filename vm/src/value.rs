@@ -61,8 +61,7 @@ impl<'a> Value<'a> {
                 // TODO: with multiple class loaders, we should check the class identity,
                 //  not the name, since the same class could be loaded by multiple class loader
                 FieldType::Object(expected_class_name) => {
-                    let value_class =
-                        class_resolver_by_id.find_class_by_id(object_ref.get_class_id());
+                    let value_class = class_resolver_by_id.find_class_by_id(object_ref.class_id());
                     if let Some(object_class) = value_class {
                         let expected_class = class_resolver_by_name(&expected_class_name);
                         expected_class.map_or(false, |expected_class| {

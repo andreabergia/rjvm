@@ -65,7 +65,7 @@ impl<'a> Object<'a> {
         }
     }
 
-    pub fn get_class_id(&self) -> ClassId {
+    pub fn class_id(&self) -> ClassId {
         ClassId::new((self.header() >> 32) as u32)
     }
 
@@ -144,7 +144,7 @@ impl<'a> Debug for Object<'a> {
         write!(
             f,
             "class:{}, data:{:#0x}",
-            self.get_class_id(),
+            self.class_id(),
             self.data as usize
         )
     }
