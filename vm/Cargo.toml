@@ -14,3 +14,4 @@ result = "1.0.0"
 typed-arena = "2.0.2"
 zip = { version = "0.6.4", features = ["deflate"] }
 indexmap = "1.9.2"
+bitfield-struct = "0.4.4"
