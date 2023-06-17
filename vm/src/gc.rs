@@ -2,6 +2,7 @@ use std::ptr::NonNull;
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
 use bitfield_struct::bitfield;
+use log::debug;
 
 use crate::{array::Array, array_entry_type::ArrayEntryType, class::Class, object::Object};
 
@@ -13,15 +14,14 @@ pub struct ObjectAllocator<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-#[repr(u8)]
 enum GcState {
-    Unmarked = 0,
-    InProgress = 1,
-    Marked = 2,
+    Unmarked,
+    InProgress,
+    Marked,
 }
 
-impl From<u32> for GcState {
-    fn from(value: u32) -> Self {
+impl From<u64> for GcState {
+    fn from(value: u64) -> Self {
         match value {
             0 => Self::Unmarked,
             1 => Self::InProgress,
@@ -31,21 +31,20 @@ impl From<u32> for GcState {
     }
 }
 
-impl From<GcState> for u32 {
+impl From<GcState> for u64 {
     fn from(value: GcState) -> Self {
-        value as u32
+        value as u64
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-#[repr(u8)]
 enum AllocKind {
-    Object = 0,
-    Array = 1,
+    Object,
+    Array,
 }
 
-impl From<u32> for AllocKind {
-    fn from(value: u32) -> Self {
+impl From<u64> for AllocKind {
+    fn from(value: u64) -> Self {
         match value {
             0 => Self::Object,
             1 => Self::Array,
@@ -54,13 +53,13 @@ impl From<u32> for AllocKind {
     }
 }
 
-impl From<AllocKind> for u32 {
+impl From<AllocKind> for u64 {
     fn from(value: AllocKind) -> Self {
-        value as u32
+        value as u64
     }
 }
 
-#[bitfield(u32)]
+#[bitfield(u64)]
 #[derive(PartialEq, Eq)]
 struct Header {
     #[bits(1)]
@@ -69,7 +68,7 @@ struct Header {
     #[bits(2)]
     state: GcState,
 
-    #[bits(29)]
+    #[bits(61)]
     size: usize,
 }
 
@@ -104,21 +103,89 @@ impl<'a> ObjectAllocator<'a> {
     }
 
     fn alloc(&mut self, size: usize, kind: AllocKind) -> Option<NonNull<u8>> {
-        if self.used + size > self.capacity {
+        if self.used + size + HEADER_SIZE > self.capacity {
             return None;
         }
 
+        // Align to 8 bytes
         let alloc_size = size + HEADER_SIZE;
+        let alloc_size = match alloc_size % 8 {
+            0 => alloc_size,
+            n => alloc_size + (8 - n),
+        };
+
         let ptr = unsafe { self.memory.add(self.used) };
         self.used += alloc_size;
 
         let header = Header::new()
             .with_kind(kind)
             .with_state(GcState::Unmarked)
-            .with_size(size);
+            .with_size(alloc_size);
         unsafe {
             std::ptr::write(ptr as *mut Header, header);
             NonNull::new(ptr.add(HEADER_SIZE))
+        }
+    }
+
+    pub unsafe fn do_garbage_collection(&mut self, roots: Vec<*mut Object<'a>>) {
+        self.unmark_all_objects();
+
+        // Mark all reachable objects
+        for root in roots {
+            self.mark(root);
+        }
+
+        self.log_marked_objects_for_debug();
+    }
+
+    unsafe fn unmark_all_objects(&mut self) {
+        let end_ptr = self.memory.add(self.used);
+        let mut ptr = self.memory;
+        while ptr < end_ptr {
+            let header = &mut *(ptr as *mut Header);
+            header.set_state(GcState::Unmarked);
+            ptr = ptr.add(header.size());
+        }
+    }
+
+    unsafe fn mark(&self, object_ptr: *mut Object<'a>) {
+        let referred_object_ptr = *(object_ptr as *const *mut u8);
+        assert!(
+            referred_object_ptr >= self.memory && referred_object_ptr <= self.memory.add(self.used)
+        );
+        let header_location = referred_object_ptr.offset(-(HEADER_SIZE as isize));
+        let header = &mut *(header_location as *mut Header);
+
+        match header.state() {
+            GcState::Unmarked => {
+                header.set_state(GcState::InProgress);
+                self.visit_members_of(&*object_ptr);
+                header.set_state(GcState::Marked);
+            }
+
+            GcState::InProgress | GcState::Marked => {
+                // Already visited
+            }
+        }
+    }
+
+    unsafe fn visit_members_of(&self, object: &Object<'a>) {
+        // TODO
+        debug!("should visit members of {:?}", object);
+    }
+
+    // TODO: remove
+    unsafe fn log_marked_objects_for_debug(&mut self) {
+        let end_ptr = self.memory.add(self.used);
+        let mut ptr = self.memory;
+        while ptr < end_ptr {
+            let header = &mut *(ptr as *mut Header);
+            if header.state() == GcState::Marked {
+                debug!("marked object: {:?}", ptr);
+            } else {
+                debug!("unmarked object: {:?}", ptr);
+            }
+            ptr = ptr.add(header.size());
         }
     }
 }

@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 use rjvm_vm::vm::DEFAULT_MAX_MEMORY;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
@@ -24,20 +22,10 @@ fn invoke<'a>(
 ) -> Result<Option<Value<'a>>, MethodCallFailed<'a>> {
     let call_stack = vm.allocate_call_stack();
     let main_method = vm
-        .resolve_class_method(
-            call_stack.borrow_mut().deref_mut(),
-            class_name,
-            method_name,
-            descriptor,
-        )
+        .resolve_class_method(call_stack, class_name, method_name, descriptor)
         .expect("should find main method");
 
-    let main_result = vm.invoke(
-        call_stack.borrow_mut().deref_mut(),
-        main_method,
-        None,
-        vec![],
-    );
+    let main_result = vm.invoke(call_stack, main_method, None, vec![]);
     vm.debug_stats();
     print!("result of {class_name}::{method_name}: {main_result:?}");
 
@@ -369,7 +357,7 @@ fn exceptions_throwing_and_catching() {
     );
 }
 
-// #[test_log::test]
+#[test_log::test]
 fn gabarge_collector() {
     let mut vm = create_base_vm(5_000_000);
     let main_result = invoke(

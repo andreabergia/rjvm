@@ -1,8 +1,7 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use log::{debug, error, info};
+use typed_arena::Arena;
 
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 use rjvm_utils::type_conversion::ToUsizeSafe;
@@ -25,9 +24,6 @@ use crate::{
     vm_error::VmError,
 };
 
-pub type CallStackRef<'a> = Rc<RefCell<CallStack<'a>>>;
-
-#[derive(Debug)]
 pub struct Vm<'a> {
     /// Responsible for allocating and storing classes
     class_manager: ClassManager<'a>,
@@ -36,7 +32,7 @@ pub struct Vm<'a> {
     object_allocator: ObjectAllocator<'a>,
 
     /// Allocated call stacks
-    call_stacks: Vec<CallStackRef<'a>>,
+    call_stacks: Arena<CallStack<'a>>,
 
     /// To model static fields, we will create one special instance of each class
     /// and we will store it in this map
@@ -65,7 +61,7 @@ impl<'a> Vm<'a> {
         let mut result = Self {
             class_manager: Default::default(),
             object_allocator: ObjectAllocator::with_maximum_memory(max_memory),
-            call_stacks: Vec::new(),
+            call_stacks: Arena::new(),
             statics: Default::default(),
             native_methods_registry: Default::default(),
             throwable_call_stacks: Default::default(),
@@ -218,11 +214,12 @@ impl<'a> Vm<'a> {
         }
     }
 
-    pub fn allocate_call_stack(&mut self) -> CallStackRef<'a> {
-        let stack = CallStack::new();
-        let stack = Rc::new(RefCell::new(stack));
-        self.call_stacks.push(stack.clone());
-        stack
+    pub fn allocate_call_stack(&mut self) -> &'a mut CallStack<'a> {
+        let stack = self.call_stacks.alloc(CallStack::new());
+        unsafe {
+            let stack_ptr: *mut CallStack<'a> = stack;
+            &mut *stack_ptr
+        }
     }
 
     pub fn new_object(
@@ -378,7 +375,19 @@ impl<'a> Vm<'a> {
 
     fn do_garbage_collection(&mut self) {
         info!("running garbage collection");
-        todo!("implement garbage collection")
-        // self.object_allocator.do_garbage_collection()
+
+        let mut roots = vec![];
+        roots.extend(
+            self.statics
+                .iter_mut()
+                .map(|(_, object)| object as *mut Object<'a>),
+        );
+        roots.extend(self.call_stacks.iter_mut().flat_map(|s| s.gc_roots()));
+
+        unsafe {
+            self.object_allocator.do_garbage_collection(roots);
+        }
+
+        // todo!("implement garbage collection")
     }
 }

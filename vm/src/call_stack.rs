@@ -1,8 +1,8 @@
 use std::{fmt, fmt::Formatter};
 
-use rjvm_reader::class_file_method::ClassFileMethodCode;
 use typed_arena::Arena;
 
+use rjvm_reader::class_file_method::ClassFileMethodCode;
 use rjvm_reader::method_flags::MethodFlags;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
@@ -108,6 +108,17 @@ impl<'a> CallStack<'a> {
             .rev()
             .map(|frame| frame.as_ref().to_stack_trace_element())
             .collect()
+    }
+
+    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut Object<'a>> {
+        let mut roots = vec![];
+        roots.extend(
+            self.frames
+                .iter_mut()
+                .map(|frame| frame.as_mut().gc_roots())
+                .flatten(),
+        );
+        roots.into_iter()
     }
 }
 

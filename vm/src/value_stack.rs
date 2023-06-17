@@ -1,3 +1,4 @@
+use std::slice::IterMut;
 use std::{
     ops::Index,
     slice::{Iter, SliceIndex},
@@ -69,6 +70,10 @@ impl<'a> ValueStack<'a> {
 
     pub fn iter(&self) -> Iter<Value<'a>> {
         self.stack.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<Value<'a>> {
+        self.stack.iter_mut()
     }
 
     pub fn dup(&mut self) -> Result<(), ValueStackError> {

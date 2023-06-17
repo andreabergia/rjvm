@@ -12,6 +12,7 @@ use crate::{
 };
 
 #[derive(PartialEq, Clone)]
+#[repr(transparent)]
 pub struct Object<'a> {
     data: *mut u8,
     marker: PhantomData<&'a [u8]>,

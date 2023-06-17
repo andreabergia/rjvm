@@ -1728,4 +1728,17 @@ impl<'a> CallFrame<'a> {
             self.class_and_method.class.name, self.class_and_method.method.name, result
         )
     }
+
+    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut Object<'a>> {
+        let mut roots = vec![];
+        roots.extend(self.stack.iter_mut().filter_map(|v| match v {
+            Value::Object(o) => Some(o as *mut Object),
+            _ => None,
+        }));
+        roots.extend(self.locals.iter_mut().filter_map(|v| match v {
+            Value::Object(o) => Some(o as *mut Object),
+            _ => None,
+        }));
+        roots.into_iter()
+    }
 }

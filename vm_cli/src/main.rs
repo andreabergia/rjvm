@@ -1,10 +1,6 @@
-
-use std::ops::DerefMut;
-
-
 use clap::Parser;
 
-use rjvm_vm::vm::CallStackRef;
+use rjvm_vm::call_stack::CallStack;
 use rjvm_vm::{
     class_and_method::ClassAndMethod,
     exceptions::MethodCallFailed,
@@ -37,11 +33,11 @@ fn append_classpath(vm: &mut Vm, args: &Args) -> Result<(), String> {
 fn resolve_class_and_main_method<'a>(
     vm: &mut Vm<'a>,
     args: &Args,
-) -> Result<(CallStackRef<'a>, ClassAndMethod<'a>), String> {
+) -> Result<(&'a mut CallStack<'a>, ClassAndMethod<'a>), String> {
     let call_stack = vm.allocate_call_stack();
     let main_method = vm
         .resolve_class_method(
-            call_stack.borrow_mut().deref_mut(),
+            call_stack,
             &args.class_name,
             "main",
             "([Ljava/lang/String;)V",
@@ -66,12 +62,7 @@ fn run(args: Args) -> Result<i32, String> {
 
     // TODO: args
     let main_result = vm
-        .invoke(
-            call_stack.borrow_mut().deref_mut(),
-            main_method,
-            None,
-            vec![],
-        )
+        .invoke(call_stack, main_method, None, vec![])
         .map_err(|v| format!("execution error: {:?}", v))?;
 
     match main_result {
