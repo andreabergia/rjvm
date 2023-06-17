@@ -138,10 +138,22 @@ fn register_throwable_methods(registry: &mut NativeMethodsRegistry) {
 
 fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     let arg = args.get(0).ok_or(VmError::ValidationException)?;
-    info!(
-        "TEMP implementation of native method: printing value {:?}",
-        args
-    );
+
+    let formatted = match arg {
+        Value::Object(object) => {
+            let class = vm
+                .get_class_by_id(object.get_class_id())
+                .expect("cannot get an object without a valid class id");
+            if class.name == "java/lang/String" {
+                vm.extract_str_from_java_lang_string(object)
+                    .expect("should be able to get a string's content")
+            } else {
+                format!("{:?}", object)
+            }
+        }
+        _ => format!("{:?}", arg),
+    };
+    info!("TEMP implementation of native method: printing value {formatted}",);
     vm.printed.push(arg.clone());
     Ok(None)
 }
