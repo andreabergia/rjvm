@@ -1,11 +1,11 @@
 use rjvm_vm::{
     exceptions::MethodCallFailed,
     value::{expect_object_at, Value},
-    vm::Vm,
+    vm::{Vm, DEFAULT_MAX_MEMORY},
 };
 
 fn create_base_vm() -> Vm<'static> {
-    let mut vm = Vm::new();
+    let mut vm = Vm::new(DEFAULT_MAX_MEMORY);
 
     let src_dir = env!("CARGO_MANIFEST_DIR");
     vm.append_class_path(&format!("{src_dir}/rt.jar:{src_dir}/tests/resources",))

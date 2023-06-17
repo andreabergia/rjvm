@@ -51,13 +51,13 @@ pub struct Vm<'a> {
 }
 
 const ONE_MEGABYTE: usize = 1024 * 1024;
-const DEFAULT_MAX_MEMORY: usize = 100 * ONE_MEGABYTE;
+pub const DEFAULT_MAX_MEMORY: usize = 100 * ONE_MEGABYTE;
 
 impl<'a> Vm<'a> {
-    pub fn new() -> Self {
+    pub fn new(max_memory: usize) -> Self {
         let mut result = Self {
             class_manager: Default::default(),
-            object_allocator: ObjectAllocator::with_maximum_memory(DEFAULT_MAX_MEMORY),
+            object_allocator: ObjectAllocator::with_maximum_memory(max_memory),
             statics: Default::default(),
             native_methods_registry: Default::default(),
             throwable_call_stacks: Default::default(),

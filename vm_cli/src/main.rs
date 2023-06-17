@@ -1,7 +1,10 @@
 use clap::Parser;
 
 use rjvm_vm::{
-    call_stack::CallStack, class_and_method::ClassAndMethod, exceptions::MethodCallFailed, vm::Vm,
+    call_stack::CallStack,
+    class_and_method::ClassAndMethod,
+    exceptions::MethodCallFailed,
+    vm::{Vm, DEFAULT_MAX_MEMORY},
     vm_error::VmError,
 };
 
@@ -52,7 +55,7 @@ fn resolve_class_and_main_method<'a>(
 }
 
 fn run(args: Args) -> Result<i32, String> {
-    let mut vm = Vm::new();
+    let mut vm = Vm::new(DEFAULT_MAX_MEMORY);
     append_classpath(&mut vm, &args)?;
 
     let (mut call_stack, main_method) = resolve_class_and_main_method(&mut vm, &args)?;
