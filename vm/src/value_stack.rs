@@ -1,7 +1,6 @@
-use std::slice::IterMut;
 use std::{
     ops::Index,
-    slice::{Iter, SliceIndex},
+    slice::{Iter, IterMut, SliceIndex},
 };
 
 use thiserror::Error;

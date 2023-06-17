@@ -2,8 +2,7 @@ use std::{fmt, fmt::Formatter};
 
 use typed_arena::Arena;
 
-use rjvm_reader::class_file_method::ClassFileMethodCode;
-use rjvm_reader::method_flags::MethodFlags;
+use rjvm_reader::{class_file_method::ClassFileMethodCode, method_flags::MethodFlags};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{

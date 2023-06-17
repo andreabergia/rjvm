@@ -1,15 +1,16 @@
-use log::debug;
 use std::{collections::HashMap, fmt, fmt::Formatter};
 
+use indexmap::IndexMap;
+use log::debug;
 use typed_arena::Arena;
 
-use indexmap::IndexMap;
 use rjvm_reader::{class_file::ClassFile, class_reader};
 
 use crate::{
     class::{Class, ClassId, ClassRef},
     class_loader::ClassLoader,
     class_path::{ClassPath, ClassPathParseError},
+    class_resolver_by_id::ClassByIdResolver,
     vm_error::VmError,
 };
 
@@ -62,13 +63,15 @@ pub(crate) struct ClassesToInitialize<'a> {
     pub(crate) to_initialize: Vec<ClassRef<'a>>,
 }
 
+impl<'a> ClassByIdResolver<'a> for ClassManager<'a> {
+    fn find_class_by_id(&self, id: ClassId) -> Option<ClassRef<'a>> {
+        self.classes_by_id.get(&id).cloned()
+    }
+}
+
 impl<'a> ClassManager<'a> {
     pub fn append_class_path(&mut self, class_path: &str) -> Result<(), ClassPathParseError> {
         self.class_path.push(class_path)
-    }
-
-    pub fn find_class_by_id(&self, id: ClassId) -> Option<ClassRef<'a>> {
-        self.classes_by_id.get(&id).cloned()
     }
 
     pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {

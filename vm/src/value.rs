@@ -3,9 +3,7 @@ use std::fmt::Debug;
 use rjvm_reader::field_type::{BaseType, FieldType};
 
 use crate::{
-    array::Array,
-    class::{ClassId, ClassRef},
-    object::Object,
+    array::Array, class::ClassRef, class_resolver_by_id::ClassByIdResolver, object::Object,
     vm_error::VmError,
 };
 
@@ -24,14 +22,13 @@ pub enum Value<'a> {
 }
 
 impl<'a> Value<'a> {
-    pub fn matches_type<'b, ResById, ResByName>(
+    pub fn matches_type<'b, 'c, ResByName>(
         &self,
         expected_type: FieldType,
-        class_resolver_by_id: ResById,
+        class_resolver_by_id: &impl ClassByIdResolver<'c>,
         class_resolver_by_name: ResByName,
     ) -> bool
     where
-        ResById: FnOnce(ClassId) -> Option<ClassRef<'b>>,
         ResByName: FnOnce(&str) -> Option<ClassRef<'b>>,
     {
         match self {
@@ -64,7 +61,8 @@ impl<'a> Value<'a> {
                 // TODO: with multiple class loaders, we should check the class identity,
                 //  not the name, since the same class could be loaded by multiple class loader
                 FieldType::Object(expected_class_name) => {
-                    let value_class = class_resolver_by_id(object_ref.get_class_id());
+                    let value_class =
+                        class_resolver_by_id.find_class_by_id(object_ref.get_class_id());
                     if let Some(object_class) = value_class {
                         let expected_class = class_resolver_by_name(&expected_class_name);
                         expected_class.map_or(false, |expected_class| {

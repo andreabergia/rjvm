@@ -18,6 +18,7 @@ use crate::{
     call_stack::CallStack,
     class::Class,
     class_and_method::ClassAndMethod,
+    class_resolver_by_id::ClassByIdResolver,
     exceptions::{JavaException, MethodCallFailed},
     object::Object,
     stack_trace_element::StackTraceElement,
@@ -1069,11 +1070,9 @@ impl<'a> CallFrame<'a> {
     }
 
     fn validate_type(vm: &Vm, expected_type: FieldType, value: &Value) -> Result<(), VmError> {
-        if value.matches_type(
-            expected_type,
-            |class_id| vm.find_class_by_id(class_id),
-            |class_name| vm.find_class_by_name(class_name),
-        ) {
+        if value.matches_type(expected_type, vm, |class_name| {
+            vm.find_class_by_name(class_name)
+        }) {
             Ok(())
         } else {
             Err(VmError::ValidationException)

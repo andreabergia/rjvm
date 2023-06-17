@@ -1,8 +1,7 @@
-use rjvm_vm::vm::DEFAULT_MAX_MEMORY;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
     value::{expect_object_at, Value},
-    vm::Vm,
+    vm::{Vm, DEFAULT_MAX_MEMORY},
 };
 
 fn create_base_vm(max_memory: usize) -> Vm<'static> {

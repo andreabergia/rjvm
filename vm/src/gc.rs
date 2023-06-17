@@ -1,10 +1,14 @@
-use std::ptr::NonNull;
-use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
+use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData, ptr::NonNull};
 
 use bitfield_struct::bitfield;
 use log::debug;
 
-use crate::{array::Array, array_entry_type::ArrayEntryType, class::Class, object::Object};
+use rjvm_reader::field_type::FieldType;
+
+use crate::{
+    array::Array, array_entry_type::ArrayEntryType, class::Class,
+    class_resolver_by_id::ClassByIdResolver, object::Object,
+};
 
 pub struct ObjectAllocator<'a> {
     memory: *mut u8,

@@ -8,6 +8,7 @@ mod class_loader;
 mod class_manager;
 mod class_path;
 mod class_path_entry;
+mod class_resolver_by_id;
 pub mod exceptions;
 mod file_system_class_path_entry;
 mod gc;

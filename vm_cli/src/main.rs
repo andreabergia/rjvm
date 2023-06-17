@@ -1,7 +1,7 @@
 use clap::Parser;
 
-use rjvm_vm::call_stack::CallStack;
 use rjvm_vm::{
+    call_stack::CallStack,
     class_and_method::ClassAndMethod,
     exceptions::MethodCallFailed,
     vm::{Vm, DEFAULT_MAX_MEMORY},

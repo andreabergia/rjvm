@@ -15,6 +15,7 @@ use crate::{
     class_and_method::ClassAndMethod,
     class_manager::{ClassManager, ResolvedClass},
     class_path::ClassPathParseError,
+    class_resolver_by_id::ClassByIdResolver,
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
@@ -55,6 +56,12 @@ pub struct Vm<'a> {
 
 const ONE_MEGABYTE: usize = 1024 * 1024;
 pub const DEFAULT_MAX_MEMORY: usize = 100 * ONE_MEGABYTE;
+
+impl<'a> ClassByIdResolver<'a> for Vm<'a> {
+    fn find_class_by_id(&self, class_id: ClassId) -> Option<ClassRef<'a>> {
+        self.class_manager.find_class_by_id(class_id)
+    }
+}
 
 impl<'a> Vm<'a> {
     pub fn new(max_memory: usize) -> Self {
@@ -136,10 +143,6 @@ impl<'a> Vm<'a> {
     pub fn get_class_by_id(&self, class_id: ClassId) -> Result<ClassRef<'a>, VmError> {
         self.find_class_by_id(class_id)
             .ok_or(VmError::ValidationException)
-    }
-
-    pub fn find_class_by_id(&self, class_id: ClassId) -> Option<ClassRef<'a>> {
-        self.class_manager.find_class_by_id(class_id)
     }
 
     pub fn find_class_by_name(&self, class_name: &str) -> Option<ClassRef<'a>> {
