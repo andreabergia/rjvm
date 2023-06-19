@@ -802,9 +802,7 @@ impl<'a> CallFrame<'a> {
     fn pop_array(&mut self) -> Result<impl Array2<'a>, MethodCallFailed<'a>> {
         let receiver = self.pop()?;
         match receiver {
-            Value::Object(object) if object.kind() == ObjectKind::Array => {
-                Ok(object.as_array_unchecked())
-            }
+            Value::Object(object) if object.kind() == ObjectKind::Array => Ok(object),
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -964,7 +962,6 @@ impl<'a> CallFrame<'a> {
     ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         match receiver {
             Some(receiver) if receiver.kind() == ObjectKind::Object => {
-                let receiver = receiver.as_object_unchecked();
                 let receiver_class = vm.find_class_by_id(receiver.class_id()).ok_or(
                     VmError::ClassNotFoundException(receiver.class_id().to_string()),
                 )?;
@@ -1509,12 +1506,11 @@ impl<'a> CallFrame<'a> {
                     if is_array {
                         false
                     } else {
-                        let object_class =
-                            vm.get_class_by_id(object.as_object_unchecked().class_id())?;
+                        let object_class = vm.get_class_by_id(object.class_id())?;
                         object_class.is_subclass_of(expected_class)
                     }
                 }
-                ObjectKind::Array => match object.as_array_unchecked().elements_type() {
+                ObjectKind::Array => match object.elements_type() {
                     ArrayEntryType::Base(_) => false,
                     ArrayEntryType::Object(elements_class_id) => {
                         let components_class = vm.get_class_by_id(elements_class_id)?;
@@ -1541,7 +1537,6 @@ impl<'a> CallFrame<'a> {
         let object = self.pop()?;
         if let Value::Object(object_ref) = object {
             if object_ref.kind() == ObjectKind::Object {
-                let object_ref = object_ref.as_object_unchecked();
                 let field_reference = self.get_constant_field_reference(field_index)?;
                 let object_class = vm.get_class_by_id(object_ref.class_id())?;
                 let (index, field) = Self::get_field(object_class, field_reference)?;
@@ -1565,7 +1560,6 @@ impl<'a> CallFrame<'a> {
         let object = self.pop()?;
         if let Value::Object(object_ref) = object {
             if object_ref.kind() == ObjectKind::Object {
-                let object_ref = object_ref.as_object_unchecked();
                 let field_reference = self.get_constant_field_reference(field_index)?;
                 let object_class = vm.get_class_by_id(object_ref.class_id())?;
                 let (index, field) = Self::get_field(object_class, field_reference)?;
@@ -1591,7 +1585,6 @@ impl<'a> CallFrame<'a> {
         let object = vm.get_static_instance(self.class_and_method.class.id);
         if let Some(object_ref) = object {
             if object_ref.kind() == ObjectKind::Object {
-                let object_ref = object_ref.as_object_unchecked();
                 let field_value = object_ref.get_field(object_class, index);
                 Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
                 self.push(field_value)?;
@@ -1617,7 +1610,6 @@ impl<'a> CallFrame<'a> {
         let object = vm.get_static_instance(self.class_and_method.class.id);
         if let Some(object_ref) = object {
             if object_ref.kind() == ObjectKind::Object {
-                let object_ref = object_ref.as_object_unchecked();
                 object_ref.set_field(index, value);
                 return Ok(());
             }
@@ -1692,8 +1684,7 @@ impl<'a> CallFrame<'a> {
                 Some(class_name) => {
                     let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
                     // TODO: can we change type?
-                    let exception_class =
-                        vm.get_class_by_id(exception.0.as_object_unchecked().class_id())?;
+                    let exception_class = vm.get_class_by_id(exception.0.class_id())?;
                     if exception_class.is_subclass_of(catch_class) {
                         return Ok(Some(catch_handler.handler_pc));
                     }

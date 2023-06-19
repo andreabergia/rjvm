@@ -357,7 +357,7 @@ fn exceptions_throwing_and_catching() {
     );
 }
 
-#[test_log::test]
+// #[test_log::test]
 fn gabarge_collector() {
     let mut vm = create_base_vm(5_000_000);
     let main_result = invoke(

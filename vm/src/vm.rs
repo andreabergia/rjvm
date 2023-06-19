@@ -259,12 +259,7 @@ impl<'a> Vm<'a> {
         char_array
             .into_iter()
             .enumerate()
-            .for_each(|(index, value)| {
-                java_array
-                    .as_array_unchecked()
-                    .set_element(index, value)
-                    .unwrap()
-            });
+            .for_each(|(index, value)| java_array.set_element(index, value).unwrap());
 
         // In our JRE's rt.jar, the fields for String are:
         //    private final char[] value;
@@ -274,12 +269,11 @@ impl<'a> Vm<'a> {
         //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
         //    private static final int HASHING_SEED;
         //    private transient int hash32;
-        let abstract_string_object = self.new_object(call_stack, "java/lang/String")?;
-        let string_object = abstract_string_object.as_object_unchecked();
+        let string_object = self.new_object(call_stack, "java/lang/String")?;
         string_object.set_field(0, Value::Object(java_array));
         string_object.set_field(1, Value::Int(0));
         string_object.set_field(6, Value::Int(0));
-        Ok(abstract_string_object)
+        Ok(string_object)
     }
 
     pub fn new_java_lang_class_object(
@@ -287,12 +281,11 @@ impl<'a> Vm<'a> {
         call_stack: &mut CallStack<'a>,
         class_name: &str,
     ) -> Result<AbstractObject<'a>, MethodCallFailed<'a>> {
-        let abstract_class_object = self.new_object(call_stack, "java/lang/Class")?;
+        let class_object = self.new_object(call_stack, "java/lang/Class")?;
         // TODO: build a proper instance of Class object
         let string_object = Self::new_java_lang_string_object(self, call_stack, class_name)?;
-        let class_object = abstract_class_object.as_object_unchecked();
         class_object.set_field(5, Value::Object(string_object));
-        Ok(abstract_class_object)
+        Ok(class_object)
     }
 
     pub fn new_java_lang_stack_trace_element_object(
@@ -320,16 +313,14 @@ impl<'a> Vm<'a> {
         //     private String methodName;
         //     private String fileName;
         //     private int    lineNumber;
-        let abstract_stack_trace_element_java_object =
-            self.new_object(call_stack, "java/lang/StackTraceElement")?;
         let stack_trace_element_java_object =
-            abstract_stack_trace_element_java_object.as_object_unchecked();
+            self.new_object(call_stack, "java/lang/StackTraceElement")?;
         stack_trace_element_java_object.set_field(0, class_name);
         stack_trace_element_java_object.set_field(1, method_name);
         stack_trace_element_java_object.set_field(2, file_name);
         stack_trace_element_java_object.set_field(3, line_number);
 
-        Ok(abstract_stack_trace_element_java_object)
+        Ok(stack_trace_element_java_object)
     }
 
     pub fn new_array(
@@ -354,12 +345,10 @@ impl<'a> Vm<'a> {
     pub fn clone_array(&mut self, value: Value<'a>) -> Result<Value<'a>, VmError> {
         match &value {
             Value::Object(array) if array.kind() == ObjectKind::Array => {
-                let array = array.as_array_unchecked();
-                let abstract_new_array =
+                let new_array =
                     self.new_array(array.elements_type(), array.len().into_usize_safe());
-                let new_array = abstract_new_array.as_array_unchecked();
-                array_copy(&array, 0, &new_array, 0, array.len().into_usize_safe())?;
-                Ok(Value::Object(abstract_new_array))
+                array_copy(array, 0, &new_array, 0, array.len().into_usize_safe())?;
+                Ok(Value::Object(new_array))
             }
             _ => Err(VmError::ValidationException),
         }

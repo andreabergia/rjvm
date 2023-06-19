@@ -139,16 +139,15 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
     let arg = args.get(0).ok_or(VmError::ValidationException)?;
 
     let formatted = match arg {
-        Value::Object(abstract_object) if abstract_object.kind() == ObjectKind::Object => {
-            let object = abstract_object.as_object_unchecked();
+        Value::Object(object) if object.kind() == ObjectKind::Object => {
             let class = vm
                 .get_class_by_id(object.class_id())
                 .expect("cannot get an object without a valid class id");
             if class.name == "java/lang/String" {
-                vm.extract_str_from_java_lang_string(&object)
+                vm.extract_str_from_java_lang_string(object)
                     .expect("should be able to get a string's content")
             } else {
-                format!("{:?}", abstract_object)
+                format!("{:?}", object)
             }
         }
         _ => format!("{:?}", arg),
@@ -211,10 +210,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
 }
 
 fn get_class_loader(receiver: Option<AbstractObject>) -> MethodCallResult {
-    debug!(
-        "invoked get class loader for object {:?}",
-        receiver
-    );
+    debug!("invoked get class loader for object {:?}", receiver);
 
     // TODO: it seems ok to return just null for the moment
     Ok(Some(Value::Null))

@@ -163,7 +163,7 @@ impl<'a> AbstractObject<'a> {
         next_ptr.add(1) as *mut u8
     }
 
-    // TODO: impl eq
+    // TODO: should we implement eq rather than this function?
     pub fn is_same_as(&self, other: &AbstractObject) -> bool {
         self.data == other.data
     }
@@ -183,44 +183,6 @@ impl<'a> AbstractObject<'a> {
     pub fn alloc_size(&self) -> usize {
         self.header().size()
     }
-
-    pub fn as_object(&self) -> Option<impl Object2<'a>> {
-        if self.kind() == ObjectKind::Object {
-            Some(ObjectImpl {
-                data: self.data,
-                marker: PhantomData,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn as_object_unchecked(&self) -> impl Object2<'a> {
-        assert_eq!(self.kind(), ObjectKind::Object);
-        ObjectImpl {
-            data: self.data,
-            marker: PhantomData,
-        }
-    }
-
-    pub fn as_array(&self) -> Option<impl Array2<'a>> {
-        if self.kind() == ObjectKind::Array {
-            Some(ArrayImpl {
-                data: self.data,
-                marker: PhantomData,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn as_array_unchecked(&self) -> impl Array2<'a> {
-        assert_eq!(self.kind(), ObjectKind::Array);
-        ArrayImpl {
-            data: self.data,
-            marker: PhantomData,
-        }
-    }
 }
 
 impl<'a> Debug for AbstractObject<'a> {
@@ -233,12 +195,12 @@ impl<'a> Debug for AbstractObject<'a> {
             self.alloc_size(),
         )?;
         match self.kind() {
-            ObjectKind::Object => write!(f, " class_id {}", self.as_object_unchecked().class_id()),
+            ObjectKind::Object => write!(f, " class_id {}", self.class_id()),
             ObjectKind::Array => write!(
                 f,
                 " elements type {:?} len {}",
-                self.as_array_unchecked().elements_type(),
-                self.as_array_unchecked().len()
+                self.elements_type(),
+                self.len()
             ),
         }
     }
@@ -314,14 +276,8 @@ pub trait Object2<'a> {
     fn as_abstract_object(&self) -> AbstractObject;
 }
 
-#[repr(transparent)]
-struct ObjectImpl<'a> {
-    data: *mut u8,
-    marker: PhantomData<&'a [u8]>,
-}
-
-impl<'a> ObjectImpl<'a> {
-    fn header(&self) -> &ObjectHeader {
+impl<'a> AbstractObject<'a> {
+    fn object_header(&self) -> &ObjectHeader {
         unsafe {
             let ptr = self.data.add(ALLOC_HEADER_SIZE);
             let header_ptr = ptr as *const ObjectHeader;
@@ -336,9 +292,9 @@ impl<'a> ObjectImpl<'a> {
     }
 }
 
-impl<'a> Object2<'a> for ObjectImpl<'a> {
+impl<'a> Object2<'a> for AbstractObject<'a> {
     fn class_id(&self) -> ClassId {
-        self.header().class_id
+        self.object_header().class_id
     }
 
     fn set_field(&self, index: usize, value: Value<'a>) {
@@ -382,14 +338,8 @@ pub trait Array2<'a> {
     fn as_abstract_object(&self) -> AbstractObject;
 }
 
-#[repr(transparent)]
-struct ArrayImpl<'a> {
-    data: *mut u8,
-    marker: PhantomData<&'a [u8]>,
-}
-
-impl<'a> ArrayImpl<'a> {
-    fn header(&self) -> &ArrayHeader {
+impl<'a> AbstractObject<'a> {
+    fn array_header(&self) -> &ArrayHeader {
         unsafe {
             let ptr = self.data.add(ALLOC_HEADER_SIZE);
             let header_ptr = ptr as *const ArrayHeader;
@@ -404,13 +354,13 @@ impl<'a> ArrayImpl<'a> {
     }
 }
 
-impl<'a> Array2<'a> for ArrayImpl<'a> {
+impl<'a> Array2<'a> for AbstractObject<'a> {
     fn elements_type(&self) -> ArrayEntryType {
-        self.header().elements_type.clone()
+        self.array_header().elements_type.clone()
     }
 
     fn len(&self) -> u32 {
-        self.header().length
+        self.array_header().length
     }
 
     fn set_element(&self, index: usize, value: Value<'a>) -> Result<(), VmError> {
@@ -444,12 +394,11 @@ impl<'a> Array2<'a> for ArrayImpl<'a> {
     }
 }
 
-pub fn string_from_char_array(array_object: AbstractObject) -> Result<String, VmError> {
-    if array_object.kind() != ObjectKind::Array {
+pub fn string_from_char_array(array: AbstractObject) -> Result<String, VmError> {
+    if array.kind() != ObjectKind::Array {
         return Err(VmError::ValidationException);
     }
 
-    let array = array_object.as_array_unchecked();
     if array.elements_type() != ArrayEntryType::Base(BaseType::Char) {
         return Err(VmError::ValidationException);
     }
@@ -457,7 +406,7 @@ pub fn string_from_char_array(array_object: AbstractObject) -> Result<String, Vm
     let len = array.len().into_usize_safe();
     let mut string_chars: Vec<u16> = Vec::with_capacity(len);
     unsafe {
-        let ptr = array_object.data.add(ALLOC_HEADER_SIZE + ARRAY_HEADER_SIZE) as *const i64;
+        let ptr = array.data.add(ALLOC_HEADER_SIZE + ARRAY_HEADER_SIZE) as *const i64;
         for i in 0..len {
             let ptr = ptr.add(i);
             let next_codepoint = std::ptr::read(ptr as *const i32) as u16;

@@ -54,13 +54,12 @@ impl<'a> Value<'a> {
                 _ => false,
             },
 
-            Value::Object(abstract_object) => {
-                if abstract_object.kind() == ObjectKind::Array {
-                    let array = abstract_object.as_array_unchecked();
+            Value::Object(object) => {
+                if object.kind() == ObjectKind::Array {
                     match expected_type {
                         FieldType::Array(expected_field_type) => {
                             let array_entry_type =
-                                array.elements_type().into_field_type(class_resolver_by_id);
+                                object.elements_type().into_field_type(class_resolver_by_id);
                             if let Some(array_entry_type) = array_entry_type {
                                 array_entry_type == *expected_field_type
                             } else {
@@ -70,7 +69,6 @@ impl<'a> Value<'a> {
                         _ => false,
                     }
                 } else {
-                    let object = abstract_object.as_object_unchecked();
                     match expected_type {
                         // TODO: with multiple class loaders, we should check the class identity,
                         //  not the name, since the same class could be loaded by multiple class loader
@@ -118,7 +116,7 @@ pub fn expect_concrete_object_at<'a>(
 ) -> Result<impl Object2<'a>, VmError> {
     let value = expect_abstract_object_at(vec, index)?;
     if value.kind() == ObjectKind::Object {
-        Ok(value.as_object_unchecked())
+        Ok(value)
     } else {
         Err(VmError::ValidationException)
     }
@@ -127,7 +125,7 @@ pub fn expect_concrete_object_at<'a>(
 pub fn expect_array_at<'a>(vec: &[Value<'a>], index: usize) -> Result<impl Array2<'a>, VmError> {
     let value = expect_abstract_object_at(vec, index)?;
     if value.kind() == ObjectKind::Array {
-        Ok(value.as_array_unchecked())
+        Ok(value)
     } else {
         Err(VmError::ValidationException)
     }
