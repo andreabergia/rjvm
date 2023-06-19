@@ -5,9 +5,8 @@ use typed_arena::Arena;
 use rjvm_reader::{class_file_method::ClassFileMethodCode, method_flags::MethodFlags};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::AbstractObject;
 use crate::{
-    call_frame::CallFrame, class_and_method::ClassAndMethod,
+    abstract_object::AbstractObject, call_frame::CallFrame, class_and_method::ClassAndMethod,
     stack_trace_element::StackTraceElement, value::Value, vm_error::VmError,
 };
 

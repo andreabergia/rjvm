@@ -1,12 +1,7 @@
-
-
-
-
-
-use crate::abstract_object::AbstractObject;
-use crate::array_entry_type::ArrayEntryType;
-use crate::value::Value;
-use crate::vm_error::VmError;
+use crate::{
+    abstract_object::AbstractObject, array_entry_type::ArrayEntryType, value::Value,
+    vm_error::VmError,
+};
 
 pub trait Array<'a> {
     fn elements_type(&self) -> ArrayEntryType;

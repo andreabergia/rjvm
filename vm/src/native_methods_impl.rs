@@ -2,22 +2,22 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::{AbstractObject, ObjectKind};
-use crate::array::Array;
-use crate::value::{expect_abstract_object_at, expect_concrete_object_at};
 use crate::{
+    abstract_object::{AbstractObject, ObjectKind},
+    array::Array,
     call_frame::MethodCallResult,
     call_stack::CallStack,
     exceptions::MethodCallFailed,
     native_methods_registry::NativeMethodsRegistry,
+    object::Object,
     time::{get_current_time_millis, get_nano_time},
     value::{
-        expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_receiver, Value,
+        expect_abstract_object_at, expect_array_at, expect_concrete_object_at, expect_double_at,
+        expect_float_at, expect_int_at, expect_receiver, Value,
     },
     vm::Vm,
     vm_error::VmError,
 };
-use crate::object::Object;
 
 pub(crate) fn register_natives(registry: &mut NativeMethodsRegistry) {
     registry.register_temp_print(|vm, _, _, args| temp_print(vm, args));

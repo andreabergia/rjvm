@@ -1,7 +1,6 @@
-use rjvm_vm::value::expect_concrete_object_at;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
-    value::Value,
+    value::{expect_concrete_object_at, Value},
     vm::{Vm, DEFAULT_MAX_MEMORY},
 };
 

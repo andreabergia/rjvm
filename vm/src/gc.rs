@@ -1,8 +1,8 @@
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData, ptr::NonNull};
 
-use crate::abstract_object::AbstractObject;
 use crate::{
-    array_entry_type::ArrayEntryType, class::Class, class_resolver_by_id::ClassByIdResolver,
+    abstract_object::AbstractObject, array_entry_type::ArrayEntryType, class::Class,
+    class_resolver_by_id::ClassByIdResolver,
 };
 
 pub struct ObjectAllocator<'a> {

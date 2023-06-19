@@ -2,10 +2,14 @@ use std::fmt::Debug;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::abstract_object::{AbstractObject, ObjectKind};
-use crate::array::Array;
-use crate::{class::ClassRef, class_resolver_by_id::ClassByIdResolver, vm_error::VmError};
-use crate::object::Object;
+use crate::{
+    abstract_object::{AbstractObject, ObjectKind},
+    array::Array,
+    class::ClassRef,
+    class_resolver_by_id::ClassByIdResolver,
+    object::Object,
+    vm_error::VmError,
+};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {

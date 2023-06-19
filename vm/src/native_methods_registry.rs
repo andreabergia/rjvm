@@ -1,13 +1,16 @@
 use std::{collections::HashMap, fmt, fmt::Formatter};
 
 use crate::{
-    call_frame::MethodCallResult, call_stack::CallStack, class_and_method::ClassAndMethod,
-    value::Value, vm::Vm,
+    abstract_object::AbstractObject, call_frame::MethodCallResult, call_stack::CallStack,
+    class_and_method::ClassAndMethod, value::Value, vm::Vm,
 };
-use crate::abstract_object::AbstractObject;
 
-pub type NativeCallback<'a> =
-    fn(&mut Vm<'a>, &mut CallStack<'a>, Option<AbstractObject<'a>>, Vec<Value<'a>>) -> MethodCallResult<'a>;
+pub type NativeCallback<'a> = fn(
+    &mut Vm<'a>,
+    &mut CallStack<'a>,
+    Option<AbstractObject<'a>>,
+    Vec<Value<'a>>,
+) -> MethodCallResult<'a>;
 
 #[derive(Default)]
 pub struct NativeMethodsRegistry<'a> {

@@ -1,17 +1,21 @@
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
+use std::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+};
 
 use bitfield_struct::bitfield;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::array::Array;
-use crate::array_entry_type::ArrayEntryType;
-use crate::class::{Class, ClassId, ClassRef};
-use crate::object::Object;
-use crate::value::Value;
-use crate::vm_error::VmError;
+use crate::{
+    array::Array,
+    array_entry_type::ArrayEntryType,
+    class::{Class, ClassId, ClassRef},
+    object::Object,
+    value::Value,
+    vm_error::VmError,
+};
 
 #[derive(PartialEq, Clone)]
 #[repr(transparent)]

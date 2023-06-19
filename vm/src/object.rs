@@ -1,9 +1,8 @@
-
-
-
-use crate::abstract_object::AbstractObject;
-use crate::class::{ClassId, ClassRef};
-use crate::value::Value;
+use crate::{
+    abstract_object::AbstractObject,
+    class::{ClassId, ClassRef},
+    value::Value,
+};
 
 pub trait Object<'a> {
     fn class_id(&self) -> ClassId;

@@ -11,10 +11,9 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::object::Object;
-use crate::abstract_object::{AbstractObject, ObjectKind};
-use crate::array::Array;
 use crate::{
+    abstract_object::{AbstractObject, ObjectKind},
+    array::Array,
     array_entry_type::ArrayEntryType,
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
@@ -22,6 +21,7 @@ use crate::{
     class_and_method::ClassAndMethod,
     class_resolver_by_id::ClassByIdResolver,
     exceptions::{JavaException, MethodCallFailed},
+    object::Object,
     stack_trace_element::StackTraceElement,
     value::{
         Value,
