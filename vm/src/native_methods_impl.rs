@@ -2,7 +2,7 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::{AbstractObject, Array2, Object2, ObjectKind};
+use crate::abstract_object::{AbstractObject, Array, Object, ObjectKind};
 use crate::value::{expect_abstract_object_at, expect_concrete_object_at};
 use crate::{
     call_frame::MethodCallResult,
@@ -175,9 +175,9 @@ fn native_array_copy(args: Vec<Value>) -> MethodCallResult {
 }
 
 pub fn array_copy<'a>(
-    src: &impl Array2<'a>,
+    src: &impl Array<'a>,
     src_pos: i32,
-    dest: &impl Array2<'a>,
+    dest: &impl Array<'a>,
     dest_pos: i32,
     length: usize,
 ) -> Result<(), VmError> {

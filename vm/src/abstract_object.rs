@@ -266,7 +266,7 @@ unsafe fn read_value2<'a>(ptr: *const u8, field_type: &ArrayEntryType) -> Value<
 
 /// As objects
 
-pub trait Object2<'a> {
+pub trait Object<'a> {
     fn class_id(&self) -> ClassId;
 
     fn set_field(&self, index: usize, value: Value<'a>);
@@ -292,7 +292,7 @@ impl<'a> AbstractObject<'a> {
     }
 }
 
-impl<'a> Object2<'a> for AbstractObject<'a> {
+impl<'a> Object<'a> for AbstractObject<'a> {
     fn class_id(&self) -> ClassId {
         self.object_header().class_id
     }
@@ -322,7 +322,7 @@ impl<'a> Object2<'a> for AbstractObject<'a> {
 
 /// As arrays
 
-pub trait Array2<'a> {
+pub trait Array<'a> {
     fn elements_type(&self) -> ArrayEntryType;
 
     fn len(&self) -> u32;
@@ -354,7 +354,7 @@ impl<'a> AbstractObject<'a> {
     }
 }
 
-impl<'a> Array2<'a> for AbstractObject<'a> {
+impl<'a> Array<'a> for AbstractObject<'a> {
     fn elements_type(&self) -> ArrayEntryType {
         self.array_header().elements_type.clone()
     }

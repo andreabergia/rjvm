@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::abstract_object::{AbstractObject, Array2, Object2, ObjectKind};
+use crate::abstract_object::{AbstractObject, Array, Object, ObjectKind};
 use crate::{class::ClassRef, class_resolver_by_id::ClassByIdResolver, vm_error::VmError};
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -113,7 +113,7 @@ pub fn expect_abstract_object_at<'a>(
 pub fn expect_concrete_object_at<'a>(
     vec: &[Value<'a>],
     index: usize,
-) -> Result<impl Object2<'a>, VmError> {
+) -> Result<impl Object<'a>, VmError> {
     let value = expect_abstract_object_at(vec, index)?;
     if value.kind() == ObjectKind::Object {
         Ok(value)
@@ -122,7 +122,7 @@ pub fn expect_concrete_object_at<'a>(
     }
 }
 
-pub fn expect_array_at<'a>(vec: &[Value<'a>], index: usize) -> Result<impl Array2<'a>, VmError> {
+pub fn expect_array_at<'a>(vec: &[Value<'a>], index: usize) -> Result<impl Array<'a>, VmError> {
     let value = expect_abstract_object_at(vec, index)?;
     if value.kind() == ObjectKind::Array {
         Ok(value)

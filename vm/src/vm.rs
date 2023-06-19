@@ -6,7 +6,7 @@ use typed_arena::Arena;
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::{string_from_char_array, AbstractObject, Array2, Object2, ObjectKind};
+use crate::abstract_object::{string_from_char_array, AbstractObject, Array, Object, ObjectKind};
 use crate::native_methods_impl::array_copy;
 use crate::{
     array_entry_type::ArrayEntryType,
@@ -80,7 +80,7 @@ impl<'a> Vm<'a> {
 
     pub fn extract_str_from_java_lang_string(
         &self,
-        object: &impl Object2<'a>,
+        object: &impl Object<'a>,
     ) -> Result<String, VmError> {
         let class = self.get_class_by_id(object.class_id())?;
         if class.name == "java/lang/String" {

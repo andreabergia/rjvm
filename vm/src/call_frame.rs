@@ -11,8 +11,8 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::Object2;
-use crate::abstract_object::{AbstractObject, Array2, ObjectKind};
+use crate::abstract_object::Object;
+use crate::abstract_object::{AbstractObject, Array, ObjectKind};
 use crate::{
     array_entry_type::ArrayEntryType,
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
@@ -799,7 +799,7 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_double, Double, f64);
     generate_pop!(pop_object, Object, AbstractObject<'a>);
 
-    fn pop_array(&mut self) -> Result<impl Array2<'a>, MethodCallFailed<'a>> {
+    fn pop_array(&mut self) -> Result<impl Array<'a>, MethodCallFailed<'a>> {
         let receiver = self.pop()?;
         match receiver {
             Value::Object(object) if object.kind() == ObjectKind::Array => Ok(object),
