@@ -1683,7 +1683,6 @@ impl<'a> CallFrame<'a> {
                 None => return Ok(Some(catch_handler.handler_pc)),
                 Some(class_name) => {
                     let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
-                    // TODO: can we change type?
                     let exception_class = vm.get_class_by_id(exception.0.class_id())?;
                     if exception_class.is_subclass_of(catch_class) {
                         return Ok(Some(catch_handler.handler_pc));
