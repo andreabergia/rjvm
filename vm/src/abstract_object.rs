@@ -6,8 +6,10 @@ use bitfield_struct::bitfield;
 use rjvm_reader::field_type::{BaseType, FieldType};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::array::Array;
 use crate::array_entry_type::ArrayEntryType;
 use crate::class::{Class, ClassId, ClassRef};
+use crate::object::Object;
 use crate::value::Value;
 use crate::vm_error::VmError;
 
@@ -264,17 +266,7 @@ unsafe fn read_value2<'a>(ptr: *const u8, field_type: &ArrayEntryType) -> Value<
     }
 }
 
-/// As objects
-
-pub trait Object<'a> {
-    fn class_id(&self) -> ClassId;
-
-    fn set_field(&self, index: usize, value: Value<'a>);
-
-    fn get_field(&self, object_class: ClassRef, index: usize) -> Value<'a>;
-
-    fn as_abstract_object(&self) -> AbstractObject;
-}
+// As objects
 
 impl<'a> AbstractObject<'a> {
     fn object_header(&self) -> &ObjectHeader {
@@ -320,23 +312,7 @@ impl<'a> Object<'a> for AbstractObject<'a> {
     }
 }
 
-/// As arrays
-
-pub trait Array<'a> {
-    fn elements_type(&self) -> ArrayEntryType;
-
-    fn len(&self) -> u32;
-
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    fn set_element(&self, index: usize, value: Value<'a>) -> Result<(), VmError>;
-
-    fn get_element(&self, index: usize) -> Result<Value<'a>, VmError>;
-
-    fn as_abstract_object(&self) -> AbstractObject;
-}
+// As arrays
 
 impl<'a> AbstractObject<'a> {
     fn array_header(&self) -> &ArrayHeader {

@@ -6,7 +6,8 @@ use typed_arena::Arena;
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::{string_from_char_array, AbstractObject, Array, Object, ObjectKind};
+use crate::abstract_object::{AbstractObject, ObjectKind, string_from_char_array};
+use crate::array::Array;
 use crate::native_methods_impl::array_copy;
 use crate::{
     array_entry_type::ArrayEntryType,
@@ -24,6 +25,7 @@ use crate::{
     value::Value,
     vm_error::VmError,
 };
+use crate::object::Object;
 
 pub struct Vm<'a> {
     /// Responsible for allocating and storing classes

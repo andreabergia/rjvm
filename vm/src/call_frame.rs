@@ -11,8 +11,9 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::Object;
-use crate::abstract_object::{AbstractObject, Array, ObjectKind};
+use crate::object::Object;
+use crate::abstract_object::{AbstractObject, ObjectKind};
+use crate::array::Array;
 use crate::{
     array_entry_type::ArrayEntryType,
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},

@@ -1,4 +1,5 @@
 pub mod abstract_object;
+pub mod array;
 pub mod array_entry_type;
 mod call_frame;
 pub mod call_stack;
@@ -15,6 +16,7 @@ mod gc;
 mod jar_file_class_path_entry;
 mod native_methods_impl;
 pub mod native_methods_registry;
+pub mod object;
 pub mod stack_trace_element;
 mod time;
 pub mod value;
