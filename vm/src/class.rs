@@ -6,6 +6,7 @@ use rjvm_reader::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct ClassId(u32);
 
 impl fmt::Display for ClassId {

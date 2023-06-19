@@ -5,8 +5,9 @@ use typed_arena::Arena;
 use rjvm_reader::{class_file_method::ClassFileMethodCode, method_flags::MethodFlags};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::abstract_object::AbstractObject;
 use crate::{
-    call_frame::CallFrame, class_and_method::ClassAndMethod, object::Object,
+    call_frame::CallFrame, class_and_method::ClassAndMethod,
     stack_trace_element::StackTraceElement, value::Value, vm_error::VmError,
 };
 
@@ -44,7 +45,7 @@ impl<'a> CallStack<'a> {
     pub fn add_frame(
         &mut self,
         class_and_method: ClassAndMethod<'a>,
-        receiver: Option<Object<'a>>,
+        receiver: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
     ) -> Result<CallFrameReference<'a>, VmError> {
         let code = Self::get_code(&class_and_method, receiver.clone())?;
@@ -60,7 +61,7 @@ impl<'a> CallStack<'a> {
 
     fn get_code<'b>(
         class_and_method: &'b ClassAndMethod,
-        receiver: Option<Object>,
+        receiver: Option<AbstractObject>,
     ) -> Result<&'b ClassFileMethodCode, VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
@@ -80,7 +81,7 @@ impl<'a> CallStack<'a> {
 
     fn prepare_locals(
         code: &ClassFileMethodCode,
-        receiver: Option<Object<'a>>,
+        receiver: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
     ) -> Vec<Value<'a>> {
         let mut locals: Vec<Value<'a>> = receiver
@@ -109,13 +110,12 @@ impl<'a> CallStack<'a> {
             .collect()
     }
 
-    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut Object<'a>> {
+    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut AbstractObject<'a>> {
         let mut roots = vec![];
         roots.extend(
             self.frames
                 .iter_mut()
-                .map(|frame| frame.as_mut().gc_roots())
-                .flatten(),
+                .flat_map(|frame| frame.as_mut().gc_roots()),
         );
         roots.into_iter()
     }

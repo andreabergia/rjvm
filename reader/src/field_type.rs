@@ -24,6 +24,7 @@ impl fmt::Display for FieldType {
 }
 
 #[derive(Debug, Clone, PartialEq, strum_macros::Display)]
+#[repr(u8)]
 pub enum BaseType {
     Byte,
     Char,

@@ -2,10 +2,8 @@ use std::fmt::Debug;
 
 use rjvm_reader::field_type::{BaseType, FieldType};
 
-use crate::{
-    array::Array, class::ClassRef, class_resolver_by_id::ClassByIdResolver, object::Object,
-    vm_error::VmError,
-};
+use crate::abstract_object::{AbstractObject, Array2, Object2, ObjectKind};
+use crate::{class::ClassRef, class_resolver_by_id::ClassByIdResolver, vm_error::VmError};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {
@@ -15,9 +13,8 @@ pub enum Value<'a> {
     Long(i64),
     Float(f32),
     Double(f64),
-    Object(Object<'a>),
+    Object(AbstractObject<'a>),
     Null,
-    Array(Array<'a>),
     // TODO: return address
 }
 
@@ -57,47 +54,56 @@ impl<'a> Value<'a> {
                 _ => false,
             },
 
-            Value::Object(object_ref) => match expected_type {
-                // TODO: with multiple class loaders, we should check the class identity,
-                //  not the name, since the same class could be loaded by multiple class loader
-                FieldType::Object(expected_class_name) => {
-                    let value_class = class_resolver_by_id.find_class_by_id(object_ref.class_id());
-                    if let Some(object_class) = value_class {
-                        let expected_class = class_resolver_by_name(&expected_class_name);
-                        expected_class.map_or(false, |expected_class| {
-                            object_class.is_subclass_of(expected_class)
-                        })
-                    } else {
-                        false
+            Value::Object(abstract_object) => {
+                if abstract_object.kind() == ObjectKind::Array {
+                    let array = abstract_object.as_array_unchecked();
+                    match expected_type {
+                        FieldType::Array(expected_field_type) => {
+                            let array_entry_type =
+                                array.elements_type().into_field_type(class_resolver_by_id);
+                            if let Some(array_entry_type) = array_entry_type {
+                                array_entry_type == *expected_field_type
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    }
+                } else {
+                    let object = abstract_object.as_object_unchecked();
+                    match expected_type {
+                        // TODO: with multiple class loaders, we should check the class identity,
+                        //  not the name, since the same class could be loaded by multiple class loader
+                        FieldType::Object(expected_class_name) => {
+                            let value_class =
+                                class_resolver_by_id.find_class_by_id(object.class_id());
+                            if let Some(object_class) = value_class {
+                                let expected_class = class_resolver_by_name(&expected_class_name);
+                                expected_class.map_or(false, |expected_class| {
+                                    object_class.is_subclass_of(expected_class)
+                                })
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
                     }
                 }
-                _ => false,
-            },
+            }
 
             Value::Null => match expected_type {
                 FieldType::Base(_) => false,
                 FieldType::Object(_) => true,
                 FieldType::Array(_) => true,
             },
-
-            Value::Array(array) => match expected_type {
-                FieldType::Array(expected_field_type) => {
-                    let array_entry_type = array
-                        .get_elements_type()
-                        .into_field_type(class_resolver_by_id);
-                    if let Some(array_entry_type) = array_entry_type {
-                        array_entry_type == *expected_field_type
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            },
         }
     }
 }
 
-pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<Object<'a>, VmError> {
+pub fn expect_abstract_object_at<'a>(
+    vec: &[Value<'a>],
+    index: usize,
+) -> Result<AbstractObject<'a>, VmError> {
     let value = vec.get(index);
     if let Some(Value::Object(object)) = value {
         Ok(object.clone())
@@ -106,13 +112,22 @@ pub fn expect_object_at<'a>(vec: &[Value<'a>], index: usize) -> Result<Object<'a
     }
 }
 
-pub fn expect_array_at<'a, 'b>(
-    vec: &'b [Value<'a>],
+pub fn expect_concrete_object_at<'a>(
+    vec: &[Value<'a>],
     index: usize,
-) -> Result<&'b Array<'a>, VmError> {
-    let value = vec.get(index);
-    if let Some(Value::Array(array)) = value {
-        Ok(array)
+) -> Result<impl Object2<'a>, VmError> {
+    let value = expect_abstract_object_at(vec, index)?;
+    if value.kind() == ObjectKind::Object {
+        Ok(value.as_object_unchecked())
+    } else {
+        Err(VmError::ValidationException)
+    }
+}
+
+pub fn expect_array_at<'a>(vec: &[Value<'a>], index: usize) -> Result<impl Array2<'a>, VmError> {
+    let value = expect_abstract_object_at(vec, index)?;
+    if value.kind() == ObjectKind::Array {
+        Ok(value.as_array_unchecked())
     } else {
         Err(VmError::ValidationException)
     }
@@ -145,7 +160,7 @@ pub fn expect_double_at(vec: &[Value], index: usize) -> Result<f64, VmError> {
     }
 }
 
-pub fn expect_receiver(receiver: Option<Object>) -> Result<Object, VmError> {
+pub fn expect_receiver(receiver: Option<AbstractObject>) -> Result<AbstractObject, VmError> {
     match receiver {
         Some(v) => Ok(v),
         None => Err(VmError::ValidationException),

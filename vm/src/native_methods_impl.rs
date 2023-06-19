@@ -2,17 +2,16 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::abstract_object::{AbstractObject, Array2, Object2, ObjectKind};
+use crate::value::{expect_abstract_object_at, expect_concrete_object_at};
 use crate::{
-    array::Array,
     call_frame::MethodCallResult,
     call_stack::CallStack,
     exceptions::MethodCallFailed,
     native_methods_registry::NativeMethodsRegistry,
-    object::Object,
     time::{get_current_time_millis, get_nano_time},
     value::{
-        expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_object_at,
-        expect_receiver, Value,
+        expect_array_at, expect_double_at, expect_float_at, expect_int_at, expect_receiver, Value,
     },
     vm::Vm,
     vm_error::VmError,
@@ -140,15 +139,16 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
     let arg = args.get(0).ok_or(VmError::ValidationException)?;
 
     let formatted = match arg {
-        Value::Object(object) => {
+        Value::Object(abstract_object) if abstract_object.kind() == ObjectKind::Object => {
+            let object = abstract_object.as_object_unchecked();
             let class = vm
                 .get_class_by_id(object.class_id())
                 .expect("cannot get an object without a valid class id");
             if class.name == "java/lang/String" {
-                vm.extract_str_from_java_lang_string(object)
+                vm.extract_str_from_java_lang_string(&object)
                     .expect("should be able to get a string's content")
             } else {
-                format!("{:?}", object)
+                format!("{:?}", abstract_object)
             }
         }
         _ => format!("{:?}", arg),
@@ -159,7 +159,7 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
 }
 
 fn identity_hash_code(args: Vec<Value<'_>>) -> MethodCallResult<'_> {
-    let object = expect_object_at(&args, 0)?;
+    let object = expect_abstract_object_at(&args, 0)?;
     Ok(Some(Value::Int(object.identity_hash_code())))
 }
 
@@ -171,28 +171,28 @@ fn native_array_copy(args: Vec<Value>) -> MethodCallResult {
     let dest = expect_array_at(&args, 2)?;
     let dest_pos = expect_int_at(&args, 3)?;
     let length = expect_int_at(&args, 4)?;
-    array_copy(src, src_pos, dest, dest_pos, length.into_usize_safe())?;
+    array_copy(&src, src_pos, &dest, dest_pos, length.into_usize_safe())?;
     Ok(None)
 }
 
-pub fn array_copy(
-    src: &Array,
+pub fn array_copy<'a>(
+    src: &impl Array2<'a>,
     src_pos: i32,
-    dest: &Array,
+    dest: &impl Array2<'a>,
     dest_pos: i32,
     length: usize,
 ) -> Result<(), VmError> {
-    if dest.get_elements_type() != src.get_elements_type() {
+    if dest.elements_type() != src.elements_type() {
         // TODO: we should throw ArrayStoreException
         return Err(VmError::ValidationException);
     }
 
     for i in 0..length {
         let src_index = src_pos.into_usize_safe() + i;
-        let src_item = src.get_item_at(src_index)?;
+        let src_item = src.get_element(src_index)?;
 
         let dest_index = dest_pos.into_usize_safe() + i;
-        dest.set_item_at(dest_index, src_item)?;
+        dest.set_element(dest_index, src_item)?;
     }
 
     Ok(())
@@ -210,10 +210,10 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
     Ok(Some(Value::Long(long_bits)))
 }
 
-fn get_class_loader(receiver: Option<Object>) -> MethodCallResult {
+fn get_class_loader(receiver: Option<AbstractObject>) -> MethodCallResult {
     debug!(
-        "invoked get class loader for class {:?}",
-        receiver.map(|r| r.class_id())
+        "invoked get class loader for object {:?}",
+        receiver
     );
 
     // TODO: it seems ok to return just null for the moment
@@ -225,7 +225,7 @@ fn get_primitive_class<'a>(
     stack: &mut CallStack<'a>,
     args: &[Value<'a>],
 ) -> MethodCallResult<'a> {
-    let arg = expect_object_at(args, 0)?;
+    let arg = expect_concrete_object_at(args, 0)?;
     let class_name = vm.extract_str_from_java_lang_string(&arg)?;
     let java_lang_class_instance = vm.new_java_lang_class_object(stack, &class_name)?;
     Ok(Some(Value::Object(java_lang_class_instance)))
@@ -234,7 +234,7 @@ fn get_primitive_class<'a>(
 fn fill_in_stack_trace<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    receiver: Option<Object<'a>>,
+    receiver: Option<AbstractObject<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
     let stack_trace_elements = call_stack.get_stack_trace_elements();
@@ -244,7 +244,7 @@ fn fill_in_stack_trace<'a>(
 
 fn get_stack_trace_depth<'a>(
     vm: &mut Vm<'a>,
-    receiver: Option<Object<'a>>,
+    receiver: Option<AbstractObject<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;
     match vm.get_stack_trace_associated_with_throwable(receiver) {
@@ -258,7 +258,7 @@ fn get_stack_trace_depth<'a>(
 fn get_stack_trace_element<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    receiver: Option<Object<'a>>,
+    receiver: Option<AbstractObject<'a>>,
     args: Vec<Value<'a>>,
 ) -> MethodCallResult<'a> {
     let receiver = expect_receiver(receiver)?;

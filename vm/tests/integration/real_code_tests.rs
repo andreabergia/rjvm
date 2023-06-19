@@ -1,6 +1,7 @@
+use rjvm_vm::value::expect_concrete_object_at;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
-    value::{expect_object_at, Value},
+    value::Value,
     vm::{Vm, DEFAULT_MAX_MEMORY},
 };
 
@@ -32,7 +33,7 @@ fn invoke<'a>(
 }
 
 fn extract_printed_string(vm: &Vm, index: usize) -> String {
-    let string = expect_object_at(&vm.printed, index)
+    let string = expect_concrete_object_at(&vm.printed, index)
         .unwrap_or_else(|_| panic!("should have printed an object at position {index}"));
     vm.extract_str_from_java_lang_string(&string)
         .expect("should have a valid string")

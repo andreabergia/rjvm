@@ -11,8 +11,9 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::abstract_object::Object2;
+use crate::abstract_object::{AbstractObject, Array2, ObjectKind};
 use crate::{
-    array::Array,
     array_entry_type::ArrayEntryType,
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
     call_stack::CallStack,
@@ -20,7 +21,6 @@ use crate::{
     class_and_method::ClassAndMethod,
     class_resolver_by_id::ClassByIdResolver,
     exceptions::{JavaException, MethodCallFailed},
-    object::Object,
     stack_trace_element::StackTraceElement,
     value::{
         Value,
@@ -150,9 +150,9 @@ macro_rules! generate_execute_array_load {
         fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
             let index = self.pop_int()?.into_usize_safe();
             let array = self.pop_array()?;
-            let value = match array.get_elements_type() {
+            let value = match array.elements_type() {
                 $($variant => {
-                    array.get_item_at(index)
+                    array.get_element(index)
                 })+
                 _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }?;
@@ -167,9 +167,9 @@ macro_rules! generate_execute_array_store {
             let value = Self::$map_fn(self.$pop_fn()?);
             let index = self.pop_int()?.into_usize_safe();
             let array = self.pop_array()?;
-            match array.get_elements_type() {
+            match array.elements_type() {
                 $($variant => {
-                     array.set_item_at(index, value)?
+                     array.set_element(index, value)?
                 })+
                 _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }
@@ -751,6 +751,7 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let method_reference = self.get_constant_method_reference(constant_index)?;
         if method_reference.class_name.starts_with('[') && method_reference.method_name == "clone" {
+            // TODO:
             // Since we have NOT modelled arrays properly (i.e. they are not an object, as they
             // should be), we need a special case for invoking "clone" on an array.
             let array = self.pop()?;
@@ -796,12 +797,14 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_long, Long, i64);
     generate_pop!(pop_float, Float, f32);
     generate_pop!(pop_double, Double, f64);
-    generate_pop!(pop_object, Object, Object<'a>);
+    generate_pop!(pop_object, Object, AbstractObject<'a>);
 
-    fn pop_array(&mut self) -> Result<Array<'a>, MethodCallFailed<'a>> {
+    fn pop_array(&mut self) -> Result<impl Array2<'a>, MethodCallFailed<'a>> {
         let receiver = self.pop()?;
         match receiver {
-            Value::Array(array) => Ok(array),
+            Value::Object(object) if object.kind() == ObjectKind::Array => {
+                Ok(object.as_array_unchecked())
+            }
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -956,14 +959,12 @@ impl<'a> CallFrame<'a> {
 
     fn resolve_virtual_method(
         vm: &Vm<'a>,
-        receiver: Option<Object>,
+        receiver: Option<AbstractObject>,
         class_and_method: ClassAndMethod,
     ) -> Result<ClassAndMethod<'a>, MethodCallFailed<'a>> {
         match receiver {
-            None => Err(MethodCallFailed::InternalError(
-                VmError::ValidationException,
-            )),
-            Some(receiver) => {
+            Some(receiver) if receiver.kind() == ObjectKind::Object => {
+                let receiver = receiver.as_object_unchecked();
                 let receiver_class = vm.find_class_by_id(receiver.class_id()).ok_or(
                     VmError::ClassNotFoundException(receiver.class_id().to_string()),
                 )?;
@@ -985,13 +986,16 @@ impl<'a> CallFrame<'a> {
                 );
                 Ok(resolved_method)
             }
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
         }
     }
 
     fn get_method_receiver_and_params(
         &self,
         class_and_method: &ClassAndMethod<'a>,
-    ) -> Result<(Option<Object<'a>>, Vec<Value<'a>>, usize), VmError> {
+    ) -> Result<(Option<AbstractObject<'a>>, Vec<Value<'a>>, usize), VmError> {
         let cur_stack_len = self.stack.len();
         let receiver_count = if class_and_method.is_static() { 0 } else { 1 };
         let num_params = class_and_method.num_arguments();
@@ -1041,7 +1045,7 @@ impl<'a> CallFrame<'a> {
         &self,
         index: usize,
         _expected_class: &Class,
-    ) -> Result<Object<'a>, VmError> {
+    ) -> Result<AbstractObject<'a>, VmError> {
         let receiver = self.stack.get(index).ok_or(VmError::ValidationException)?;
         match receiver {
             Value::Object(object) => {
@@ -1178,7 +1182,7 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
-            Value::Object(_) | Value::Array(..) => {
+            Value::Object(_) => {
                 if !jump_on_null {
                     self.goto(jump_address);
                 }
@@ -1207,7 +1211,7 @@ impl<'a> CallFrame<'a> {
         let equal = match value1 {
             Value::Object(object1) => match value2 {
                 Value::Object(object2) => object1.is_same_as(&object2),
-                Null | Value::Array(..) => false,
+                Null => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1216,16 +1220,7 @@ impl<'a> CallFrame<'a> {
             },
             Null => match value2 {
                 Null => true,
-                Value::Object(..) | Value::Array(..) => false,
-                _ => {
-                    return Err(MethodCallFailed::InternalError(
-                        VmError::ValidationException,
-                    ))
-                }
-            },
-            Value::Array(array1) => match value2 {
-                Value::Array(array2) => array1.is_same_as(&array2),
-                Null | Value::Object(..) => false,
+                Value::Object(..) => false,
                 _ => {
                     return Err(MethodCallFailed::InternalError(
                         VmError::ValidationException,
@@ -1251,7 +1246,7 @@ impl<'a> CallFrame<'a> {
     fn execute_aload(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let local = self.locals.get(index).ok_or(VmError::ValidationException)?;
         match local {
-            Value::Object(..) | Value::Array(..) | Null => self.push(local.clone()),
+            Value::Object(..) | Null => self.push(local.clone()),
             _ => Err(MethodCallFailed::InternalError(
                 VmError::ValidationException,
             )),
@@ -1266,7 +1261,7 @@ impl<'a> CallFrame<'a> {
     fn execute_astore(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
         let value = self.pop()?;
         match value {
-            Value::Object(..) | Value::Array(..) => {
+            Value::Object(..) => {
                 self.locals[index] = value;
                 Ok(())
             }
@@ -1355,7 +1350,7 @@ impl<'a> CallFrame<'a> {
         };
 
         let array = vm.new_array(elements_type, length);
-        self.push(Value::Array(array))
+        self.push(Value::Object(array))
     }
 
     fn execute_anewarray(
@@ -1370,7 +1365,7 @@ impl<'a> CallFrame<'a> {
         let elements_type = ArrayEntryType::Object(class.id);
 
         let array = vm.new_array(elements_type, length);
-        self.push(Value::Array(array))
+        self.push(Value::Object(array))
     }
 
     fn execute_array_length(&mut self) -> Result<(), MethodCallFailed<'a>> {
@@ -1442,7 +1437,7 @@ impl<'a> CallFrame<'a> {
         let value = Value::Object(self.pop_object()?);
         let index = self.pop_int()?.into_usize_safe();
         let array = self.pop_array()?;
-        match array.get_elements_type() {
+        match array.elements_type() {
             ArrayEntryType::Object(elements_class_id) => {
                 let elements_class_name = vm.get_class_by_id(elements_class_id)?;
                 Self::validate_type(
@@ -1450,7 +1445,7 @@ impl<'a> CallFrame<'a> {
                     FieldType::Object(elements_class_name.name.clone()),
                     &value,
                 )?;
-                array.set_item_at(index, value)?
+                array.set_element(index, value)?
             }
             _ => {
                 return Err(MethodCallFailed::InternalError(
@@ -1509,22 +1504,24 @@ impl<'a> CallFrame<'a> {
         let is_instance_of = match &value {
             Null => false,
 
-            Value::Object(object) => {
-                if is_array {
-                    false
-                } else {
-                    let object_class = vm.get_class_by_id(object.class_id())?;
-                    object_class.is_subclass_of(expected_class)
+            Value::Object(object) => match object.kind() {
+                ObjectKind::Object => {
+                    if is_array {
+                        false
+                    } else {
+                        let object_class =
+                            vm.get_class_by_id(object.as_object_unchecked().class_id())?;
+                        object_class.is_subclass_of(expected_class)
+                    }
                 }
-            }
-
-            Value::Array(array) => match array.get_elements_type() {
-                ArrayEntryType::Base(_) => false,
-                ArrayEntryType::Object(elements_class_id) => {
-                    let components_class = vm.get_class_by_id(elements_class_id)?;
-                    components_class.is_subclass_of(expected_class)
-                }
-                ArrayEntryType::Array => false,
+                ObjectKind::Array => match object.as_array_unchecked().elements_type() {
+                    ArrayEntryType::Base(_) => false,
+                    ArrayEntryType::Object(elements_class_id) => {
+                        let components_class = vm.get_class_by_id(elements_class_id)?;
+                        components_class.is_subclass_of(expected_class)
+                    }
+                    ArrayEntryType::Array => false,
+                },
             },
 
             _ => {
@@ -1543,18 +1540,20 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(), MethodCallFailed<'a>> {
         let object = self.pop()?;
         if let Value::Object(object_ref) = object {
-            let field_reference = self.get_constant_field_reference(field_index)?;
-            let object_class = vm.get_class_by_id(object_ref.class_id())?;
-            let (index, field) = Self::get_field(object_class, field_reference)?;
-            let field_value = object_ref.get_field(object_class, index);
-            Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-            self.push(field_value)?;
-            Ok(())
-        } else {
-            Err(MethodCallFailed::InternalError(
-                VmError::ValidationException,
-            ))
+            if object_ref.kind() == ObjectKind::Object {
+                let object_ref = object_ref.as_object_unchecked();
+                let field_reference = self.get_constant_field_reference(field_index)?;
+                let object_class = vm.get_class_by_id(object_ref.class_id())?;
+                let (index, field) = Self::get_field(object_class, field_reference)?;
+                let field_value = object_ref.get_field(object_class, index);
+                Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
+                self.push(field_value)?;
+                return Ok(());
+            }
         }
+        Err(MethodCallFailed::InternalError(
+            VmError::ValidationException,
+        ))
     }
 
     fn execute_putfield(
@@ -1565,17 +1564,19 @@ impl<'a> CallFrame<'a> {
         let value = self.pop()?;
         let object = self.pop()?;
         if let Value::Object(object_ref) = object {
-            let field_reference = self.get_constant_field_reference(field_index)?;
-            let object_class = vm.get_class_by_id(object_ref.class_id())?;
-            let (index, field) = Self::get_field(object_class, field_reference)?;
-            Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
-            object_ref.set_field(index, value);
-            Ok(())
-        } else {
-            Err(MethodCallFailed::InternalError(
-                VmError::ValidationException,
-            ))
+            if object_ref.kind() == ObjectKind::Object {
+                let object_ref = object_ref.as_object_unchecked();
+                let field_reference = self.get_constant_field_reference(field_index)?;
+                let object_class = vm.get_class_by_id(object_ref.class_id())?;
+                let (index, field) = Self::get_field(object_class, field_reference)?;
+                Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
+                object_ref.set_field(index, value);
+                return Ok(());
+            }
         }
+        Err(MethodCallFailed::InternalError(
+            VmError::ValidationException,
+        ))
     }
 
     fn execute_getstatic(
@@ -1589,15 +1590,17 @@ impl<'a> CallFrame<'a> {
         let (index, field) = Self::get_field(object_class, field_reference)?;
         let object = vm.get_static_instance(self.class_and_method.class.id);
         if let Some(object_ref) = object {
-            let field_value = object_ref.get_field(object_class, index);
-            Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
-            self.push(field_value)?;
-            Ok(())
-        } else {
-            Err(MethodCallFailed::InternalError(
-                VmError::ValidationException,
-            ))
+            if object_ref.kind() == ObjectKind::Object {
+                let object_ref = object_ref.as_object_unchecked();
+                let field_value = object_ref.get_field(object_class, index);
+                Self::validate_type(vm, field.type_descriptor.clone(), &field_value)?;
+                self.push(field_value)?;
+                return Ok(());
+            }
         }
+        Err(MethodCallFailed::InternalError(
+            VmError::ValidationException,
+        ))
     }
 
     fn execute_putstatic(
@@ -1613,13 +1616,15 @@ impl<'a> CallFrame<'a> {
         Self::validate_type(vm, field.type_descriptor.clone(), &value)?;
         let object = vm.get_static_instance(self.class_and_method.class.id);
         if let Some(object_ref) = object {
-            object_ref.set_field(index, value);
-            Ok(())
-        } else {
-            Err(MethodCallFailed::InternalError(
-                VmError::ValidationException,
-            ))
+            if object_ref.kind() == ObjectKind::Object {
+                let object_ref = object_ref.as_object_unchecked();
+                object_ref.set_field(index, value);
+                return Ok(());
+            }
         }
+        Err(MethodCallFailed::InternalError(
+            VmError::ValidationException,
+        ))
     }
 
     fn execute_monitorenter(&mut self) -> Result<(), MethodCallFailed<'a>> {
@@ -1686,7 +1691,9 @@ impl<'a> CallFrame<'a> {
                 None => return Ok(Some(catch_handler.handler_pc)),
                 Some(class_name) => {
                     let catch_class = vm.get_or_resolve_class(call_stack, class_name)?;
-                    let exception_class = vm.get_class_by_id(exception.0.class_id())?;
+                    // TODO: can we change type?
+                    let exception_class =
+                        vm.get_class_by_id(exception.0.as_object_unchecked().class_id())?;
                     if exception_class.is_subclass_of(catch_class) {
                         return Ok(Some(catch_handler.handler_pc));
                     }
@@ -1728,14 +1735,14 @@ impl<'a> CallFrame<'a> {
         )
     }
 
-    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut Object<'a>> {
+    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut AbstractObject<'a>> {
         let mut roots = vec![];
         roots.extend(self.stack.iter_mut().filter_map(|v| match v {
-            Value::Object(o) => Some(o as *mut Object),
+            Value::Object(o) => Some(o as *mut AbstractObject),
             _ => None,
         }));
         roots.extend(self.locals.iter_mut().filter_map(|v| match v {
-            Value::Object(o) => Some(o as *mut Object),
+            Value::Object(o) => Some(o as *mut AbstractObject),
             _ => None,
         }));
         roots.into_iter()

@@ -1,82 +1,16 @@
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData, ptr::NonNull};
 
-use bitfield_struct::bitfield;
-use log::debug;
-
-use rjvm_reader::field_type::FieldType;
-
+use crate::abstract_object::AbstractObject;
 use crate::{
-    array::Array, array_entry_type::ArrayEntryType, class::Class,
-    class_resolver_by_id::ClassByIdResolver, object::Object,
+    array_entry_type::ArrayEntryType, class::Class, class_resolver_by_id::ClassByIdResolver,
 };
 
 pub struct ObjectAllocator<'a> {
     memory: *mut u8,
     used: usize,
     capacity: usize,
-    marker: PhantomData<&'a Object<'a>>,
+    marker: PhantomData<&'a AbstractObject<'a>>,
 }
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-enum GcState {
-    Unmarked,
-    InProgress,
-    Marked,
-}
-
-impl From<u64> for GcState {
-    fn from(value: u64) -> Self {
-        match value {
-            0 => Self::Unmarked,
-            1 => Self::InProgress,
-            2 => Self::Marked,
-            _ => panic!("invalid value for GcState: {}", value),
-        }
-    }
-}
-
-impl From<GcState> for u64 {
-    fn from(value: GcState) -> Self {
-        value as u64
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-enum AllocKind {
-    Object,
-    Array,
-}
-
-impl From<u64> for AllocKind {
-    fn from(value: u64) -> Self {
-        match value {
-            0 => Self::Object,
-            1 => Self::Array,
-            _ => panic!("invalid value for GcState: {}", value),
-        }
-    }
-}
-
-impl From<AllocKind> for u64 {
-    fn from(value: AllocKind) -> Self {
-        value as u64
-    }
-}
-
-#[bitfield(u64)]
-#[derive(PartialEq, Eq)]
-struct Header {
-    #[bits(1)]
-    kind: AllocKind,
-
-    #[bits(2)]
-    state: GcState,
-
-    #[bits(61)]
-    size: usize,
-}
-
-const HEADER_SIZE: usize = std::mem::size_of::<Header>();
 
 impl<'a> ObjectAllocator<'a> {
     pub fn with_maximum_memory(max_size: usize) -> Self {
@@ -90,29 +24,28 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    pub fn allocate(&mut self, class: &Class<'a>) -> Option<Object<'a>> {
-        let size = Object::size(class);
-        self.alloc(size, AllocKind::Object)
-            .map(|ptr| Object::new(class, ptr.as_ptr()))
+    pub fn allocate(&mut self, class: &Class<'a>) -> Option<AbstractObject<'a>> {
+        let size = AbstractObject::size_of_object(class);
+        self.alloc(size)
+            .map(|ptr| AbstractObject::new_object(class, ptr.as_ptr()))
     }
 
     pub fn allocate_array(
         &mut self,
         elements_type: ArrayEntryType,
         length: usize,
-    ) -> Option<Array<'a>> {
-        let size = Array::size(length);
-        self.alloc(size, AllocKind::Array)
-            .map(|ptr| Array::new(elements_type, length, ptr.as_ptr()))
+    ) -> Option<AbstractObject<'a>> {
+        let size = AbstractObject::size_of_array(length);
+        self.alloc(size)
+            .map(|ptr| AbstractObject::new_array(elements_type, length, ptr.as_ptr()))
     }
 
-    fn alloc(&mut self, size: usize, kind: AllocKind) -> Option<NonNull<u8>> {
-        if self.used + size + HEADER_SIZE > self.capacity {
+    fn alloc(&mut self, alloc_size: usize) -> Option<NonNull<u8>> {
+        if self.used + alloc_size > self.capacity {
             return None;
         }
 
         // Align to 8 bytes
-        let alloc_size = size + HEADER_SIZE;
         let alloc_size = match alloc_size % 8 {
             0 => alloc_size,
             n => alloc_size + (8 - n),
@@ -121,120 +54,114 @@ impl<'a> ObjectAllocator<'a> {
         let ptr = unsafe { self.memory.add(self.used) };
         self.used += alloc_size;
 
-        let header = Header::new()
-            .with_kind(kind)
-            .with_state(GcState::Unmarked)
-            .with_size(alloc_size);
-        unsafe {
-            std::ptr::write(ptr as *mut Header, header);
-            NonNull::new(ptr.add(HEADER_SIZE))
-        }
+        NonNull::new(ptr)
     }
 
     pub unsafe fn do_garbage_collection(
         &mut self,
-        roots: Vec<*mut Object<'a>>,
-        class_resolver: &impl ClassByIdResolver<'a>,
+        _roots: Vec<*mut AbstractObject<'a>>,
+        _class_resolver: &impl ClassByIdResolver<'a>,
     ) {
-        self.unmark_all_objects();
+        todo!("Implement GC");
+        /*  self.unmark_all_objects();
 
-        // Mark all reachable objects
-        for root in roots {
-            self.mark(root, class_resolver);
-        }
-
-        self.log_marked_objects_for_debug();
-    }
-
-    unsafe fn unmark_all_objects(&mut self) {
-        let end_ptr = self.memory.add(self.used);
-        let mut ptr = self.memory;
-        while ptr < end_ptr {
-            let header = &mut *(ptr as *mut Header);
-            header.set_state(GcState::Unmarked);
-            ptr = ptr.add(header.size());
-        }
-    }
-
-    unsafe fn mark(
-        &self,
-        object_ptr: *mut Object<'a>,
-        class_resolver: &impl ClassByIdResolver<'a>,
-    ) {
-        let referred_object_ptr = *(object_ptr as *const *mut u8);
-        assert!(
-            referred_object_ptr >= self.memory && referred_object_ptr <= self.memory.add(self.used)
-        );
-        let header_location = referred_object_ptr.offset(-(HEADER_SIZE as isize));
-        let header = &mut *(header_location as *mut Header);
-
-        match header.state() {
-            GcState::Unmarked => {
-                header.set_state(GcState::InProgress);
-                self.visit_members_of(&*object_ptr, class_resolver);
-                header.set_state(GcState::Marked);
+            // Mark all reachable objects
+            for root in roots {
+                self.mark(root, class_resolver);
             }
 
-            GcState::InProgress | GcState::Marked => {
-                // Already visited
+            self.log_marked_objects_for_debug();
+        }
+
+        unsafe fn unmark_all_objects(&mut self) {
+            let end_ptr = self.memory.add(self.used);
+            let mut ptr = self.memory;
+            while ptr < end_ptr {
+                let header = &mut *(ptr as *mut Header);
+                header.set_state(GcState::Unmarked);
+                ptr = ptr.add(header.size());
             }
         }
-    }
 
-    unsafe fn visit_members_of(
-        &self,
-        object: &Object<'a>,
-        class_resolver: &impl ClassByIdResolver<'a>,
-    ) {
-        // TODO: return an error?
-        let class = class_resolver
-            .find_class_by_id(object.class_id())
-            .expect("objects should have a valid class reference");
+        unsafe fn mark(
+            &self,
+            object_ptr: *mut Object<'a>,
+            class_resolver: &impl ClassByIdResolver<'a>,
+        ) {
+            let referred_object_ptr = *(object_ptr as *const *mut u8);
+            assert!(
+                referred_object_ptr >= self.memory && referred_object_ptr <= self.memory.add(self.used)
+            );
+            let header_location = referred_object_ptr.offset(-(HEADER_SIZE as isize));
+            let header = &mut *(header_location as *mut Header);
 
-        debug!(
-            "should visit members of {:?} of class {}",
-            object, class.name
-        );
-
-        class
-            .all_fields()
-            .enumerate()
-            .filter(|(_, f)| {
-                matches!(
-                    f.type_descriptor,
-                    FieldType::Object(_) // TODO: add arrays
-                                         //  | FieldType::Array(_)
-                )
-            })
-            .for_each(|(index, field)| {
-                debug!(
-                    "  should visit recursively field {} of object {:?}",
-                    field.name, object
-                );
-
-                let field_value_ptr = object.offset_of_field(index);
-                if 0 == std::ptr::read(field_value_ptr as *const u64) {
-                    // Skipping nulls
-                    return;
+            match header.state() {
+                GcState::Unmarked => {
+                    header.set_state(GcState::InProgress);
+                    self.visit_members_of(&*object_ptr, class_resolver);
+                    header.set_state(GcState::Marked);
                 }
-                let field_object_ptr = field_value_ptr as *mut Object;
-                self.mark(field_object_ptr, class_resolver);
-            })
-    }
 
-    // TODO: remove
-    unsafe fn log_marked_objects_for_debug(&mut self) {
-        let end_ptr = self.memory.add(self.used);
-        let mut ptr = self.memory;
-        while ptr < end_ptr {
-            let header = &mut *(ptr as *mut Header);
-            if header.state() == GcState::Marked {
-                debug!("marked object: {:?}", ptr);
-            } else {
-                debug!("unmarked object: {:?}", ptr);
+                GcState::InProgress | GcState::Marked => {
+                    // Already visited
+                }
             }
-            ptr = ptr.add(header.size());
         }
+
+        unsafe fn visit_members_of(
+            &self,
+            object: &Object<'a>,
+            class_resolver: &impl ClassByIdResolver<'a>,
+        ) {
+            // TODO: return an error?
+            let class = class_resolver
+                .find_class_by_id(object.class_id())
+                .expect("objects should have a valid class reference");
+
+            debug!(
+                "should visit members of {:?} of class {}",
+                object, class.name
+            );
+
+            class
+                .all_fields()
+                .enumerate()
+                .filter(|(_, f)| {
+                    matches!(
+                        f.type_descriptor,
+                        FieldType::Object(_) // TODO: add arrays
+                                             //  | FieldType::Array(_)
+                    )
+                })
+                .for_each(|(index, field)| {
+                    debug!(
+                        "  should visit recursively field {} of object {:?}",
+                        field.name, object
+                    );
+
+                    let field_value_ptr = object.offset_of_field(index);
+                    if 0 == std::ptr::read(field_value_ptr as *const u64) {
+                        // Skipping nulls
+                        return;
+                    }
+                    let field_object_ptr = field_value_ptr as *mut Object;
+                    self.mark(field_object_ptr, class_resolver);
+                })
+        }
+
+        // TODO: remove
+        unsafe fn log_marked_objects_for_debug(&mut self) {
+            let end_ptr = self.memory.add(self.used);
+            let mut ptr = self.memory;
+            while ptr < end_ptr {
+                let header = &mut *(ptr as *mut Header);
+                if header.state() == GcState::Marked {
+                    debug!("marked object: {:?}", ptr);
+                } else {
+                    debug!("unmarked object: {:?}", ptr);
+                }
+                ptr = ptr.add(header.size());
+            }*/
     }
 }
 

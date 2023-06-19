@@ -6,8 +6,9 @@ use typed_arena::Arena;
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::abstract_object::{string_from_char_array, AbstractObject, Array2, Object2, ObjectKind};
+use crate::native_methods_impl::array_copy;
 use crate::{
-    array::Array,
     array_entry_type::ArrayEntryType,
     call_frame::MethodCallResult,
     call_stack::CallStack,
@@ -19,7 +20,6 @@ use crate::{
     exceptions::MethodCallFailed,
     gc::ObjectAllocator,
     native_methods_registry::NativeMethodsRegistry,
-    object::Object,
     stack_trace_element::StackTraceElement,
     value::Value,
     vm_error::VmError,
@@ -37,7 +37,7 @@ pub struct Vm<'a> {
 
     /// To model static fields, we will create one special instance of each class
     /// and we will store it in this map
-    statics: HashMap<ClassId, Object<'a>>,
+    statics: HashMap<ClassId, AbstractObject<'a>>,
 
     /// Stores native methods
     pub native_methods_registry: NativeMethodsRegistry<'a>,
@@ -80,23 +80,20 @@ impl<'a> Vm<'a> {
 
     pub fn extract_str_from_java_lang_string(
         &self,
-        object: &Object<'a>,
+        object: &impl Object2<'a>,
     ) -> Result<String, VmError> {
         let class = self.get_class_by_id(object.class_id())?;
         if class.name == "java/lang/String" {
             // In our JRE's rt.jar, the first fields of String is
             //    private final char[] value;
-            if let Value::Array(array) = object.get_field(class, 0) {
-                let string_bytes = array.utf16_code_points()?;
-                let string =
-                    String::from_utf16(&string_bytes).expect("should have valid utf8 bytes");
-                return Ok(string);
+            if let Value::Object(array) = object.get_field(class, 0) {
+                return string_from_char_array(array);
             }
         }
         Err(VmError::ValidationException)
     }
 
-    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<Object<'a>> {
+    pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<AbstractObject<'a>> {
         self.statics.get(&class_id).cloned()
     }
 
@@ -176,7 +173,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<Object<'a>>,
+        object: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
     ) -> MethodCallResult<'a> {
         if class_and_method.method.is_native() {
@@ -195,7 +192,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_and_method: ClassAndMethod<'a>,
-        object: Option<Object<'a>>,
+        object: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
     ) -> MethodCallResult<'a> {
         let native_callback = self.native_methods_registry.get_method(&class_and_method);
@@ -230,12 +227,12 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
+    ) -> Result<AbstractObject<'a>, MethodCallFailed<'a>> {
         let class = self.get_or_resolve_class(call_stack, class_name)?;
         Ok(self.new_object_of_class(class))
     }
 
-    pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> Object<'a> {
+    pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> AbstractObject<'a> {
         debug!("allocating new instance of {}", class.name);
         match self.object_allocator.allocate(class) {
             Some(object) => object,
@@ -252,7 +249,7 @@ impl<'a> Vm<'a> {
         &mut self,
         call_stack: &mut CallStack<'a>,
         string: &str,
-    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
+    ) -> Result<AbstractObject<'a>, MethodCallFailed<'a>> {
         let char_array: Vec<Value<'a>> = string
             .encode_utf16()
             .map(|c| Value::Int(c as i32))
@@ -262,7 +259,12 @@ impl<'a> Vm<'a> {
         char_array
             .into_iter()
             .enumerate()
-            .for_each(|(index, value)| java_array.set_item_at(index, value).unwrap());
+            .for_each(|(index, value)| {
+                java_array
+                    .as_array_unchecked()
+                    .set_element(index, value)
+                    .unwrap()
+            });
 
         // In our JRE's rt.jar, the fields for String are:
         //    private final char[] value;
@@ -272,30 +274,32 @@ impl<'a> Vm<'a> {
         //    public static final Comparator<String> CASE_INSENSITIVE_ORDER = new CaseInsensitiveComparator();
         //    private static final int HASHING_SEED;
         //    private transient int hash32;
-        let string_object = self.new_object(call_stack, "java/lang/String")?;
-        string_object.set_field(0, Value::Array(java_array));
+        let abstract_string_object = self.new_object(call_stack, "java/lang/String")?;
+        let string_object = abstract_string_object.as_object_unchecked();
+        string_object.set_field(0, Value::Object(java_array));
         string_object.set_field(1, Value::Int(0));
         string_object.set_field(6, Value::Int(0));
-        Ok(string_object)
+        Ok(abstract_string_object)
     }
 
     pub fn new_java_lang_class_object(
         &mut self,
         call_stack: &mut CallStack<'a>,
         class_name: &str,
-    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
-        let class_object = self.new_object(call_stack, "java/lang/Class")?;
+    ) -> Result<AbstractObject<'a>, MethodCallFailed<'a>> {
+        let abstract_class_object = self.new_object(call_stack, "java/lang/Class")?;
         // TODO: build a proper instance of Class object
         let string_object = Self::new_java_lang_string_object(self, call_stack, class_name)?;
+        let class_object = abstract_class_object.as_object_unchecked();
         class_object.set_field(5, Value::Object(string_object));
-        Ok(class_object)
+        Ok(abstract_class_object)
     }
 
     pub fn new_java_lang_stack_trace_element_object(
         &mut self,
         call_stack: &mut CallStack<'a>,
         stack_trace_element: &StackTraceElement<'a>,
-    ) -> Result<Object<'a>, MethodCallFailed<'a>> {
+    ) -> Result<AbstractObject<'a>, MethodCallFailed<'a>> {
         let class_name = Value::Object(
             self.new_java_lang_string_object(call_stack, stack_trace_element.class_name)?,
         );
@@ -316,17 +320,23 @@ impl<'a> Vm<'a> {
         //     private String methodName;
         //     private String fileName;
         //     private int    lineNumber;
-        let stack_trace_element_java_object =
+        let abstract_stack_trace_element_java_object =
             self.new_object(call_stack, "java/lang/StackTraceElement")?;
+        let stack_trace_element_java_object =
+            abstract_stack_trace_element_java_object.as_object_unchecked();
         stack_trace_element_java_object.set_field(0, class_name);
         stack_trace_element_java_object.set_field(1, method_name);
         stack_trace_element_java_object.set_field(2, file_name);
         stack_trace_element_java_object.set_field(3, line_number);
 
-        Ok(stack_trace_element_java_object)
+        Ok(abstract_stack_trace_element_java_object)
     }
 
-    pub fn new_array(&mut self, elements_type: ArrayEntryType, length: usize) -> Array<'a> {
+    pub fn new_array(
+        &mut self,
+        elements_type: ArrayEntryType,
+        length: usize,
+    ) -> AbstractObject<'a> {
         match self
             .object_allocator
             .allocate_array(elements_type.clone(), length)
@@ -343,11 +353,13 @@ impl<'a> Vm<'a> {
 
     pub fn clone_array(&mut self, value: Value<'a>) -> Result<Value<'a>, VmError> {
         match &value {
-            Value::Array(array) => {
-                let new_array =
-                    self.new_array(array.get_elements_type(), array.len().into_usize_safe());
-                new_array.copy_from(array)?;
-                Ok(Value::Array(new_array))
+            Value::Object(array) if array.kind() == ObjectKind::Array => {
+                let array = array.as_array_unchecked();
+                let abstract_new_array =
+                    self.new_array(array.elements_type(), array.len().into_usize_safe());
+                let new_array = abstract_new_array.as_array_unchecked();
+                array_copy(&array, 0, &new_array, 0, array.len().into_usize_safe())?;
+                Ok(Value::Object(abstract_new_array))
             }
             _ => Err(VmError::ValidationException),
         }
@@ -355,7 +367,7 @@ impl<'a> Vm<'a> {
 
     pub(crate) fn associate_stack_trace_with_throwable(
         &mut self,
-        throwable: Object<'a>,
+        throwable: AbstractObject<'a>,
         call_stack: Vec<StackTraceElement<'a>>,
     ) {
         self.throwable_call_stacks
@@ -364,7 +376,7 @@ impl<'a> Vm<'a> {
 
     pub(crate) fn get_stack_trace_associated_with_throwable(
         &self,
-        throwable: Object<'a>,
+        throwable: AbstractObject<'a>,
     ) -> Option<&Vec<StackTraceElement<'a>>> {
         self.throwable_call_stacks
             .get(&throwable.identity_hash_code())
@@ -384,7 +396,7 @@ impl<'a> Vm<'a> {
         roots.extend(
             self.statics
                 .iter_mut()
-                .map(|(_, object)| object as *mut Object<'a>),
+                .map(|(_, object)| object as *mut AbstractObject<'a>),
         );
         roots.extend(self.call_stacks.iter_mut().flat_map(|s| s.gc_roots()));
 

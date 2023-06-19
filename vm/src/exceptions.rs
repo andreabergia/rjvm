@@ -1,4 +1,5 @@
-use crate::{object::Object, value_stack::ValueStackError, vm_error::VmError};
+use crate::abstract_object::AbstractObject;
+use crate::{value_stack::ValueStackError, vm_error::VmError};
 
 #[derive(Debug, PartialEq)]
 pub enum MethodCallFailed<'a> {
@@ -20,4 +21,4 @@ impl<'a> From<ValueStackError> for MethodCallFailed<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct JavaException<'a>(pub Object<'a>);
+pub struct JavaException<'a>(pub AbstractObject<'a>);
