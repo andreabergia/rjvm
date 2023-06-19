@@ -123,6 +123,7 @@ impl<'a> Vm<'a> {
         stack: &mut CallStack<'a>,
         class_to_init: &ClassRef<'a>,
     ) -> Result<(), MethodCallFailed<'a>> {
+        debug!("creating static instance of {}", class_to_init.name);
         let static_instance = self.new_object_of_class(class_to_init);
         self.statics.insert(class_to_init.id, static_instance);
         if let Some(clinit_method) = class_to_init.find_method("<clinit>", "()V") {

@@ -186,7 +186,7 @@ impl<'a> ObjectAllocator<'a> {
         object: &Object<'a>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) {
-        // TODO: return an error
+        // TODO: return an error?
         let class = class_resolver
             .find_class_by_id(object.class_id())
             .expect("objects should have a valid class reference");
@@ -198,17 +198,27 @@ impl<'a> ObjectAllocator<'a> {
 
         class
             .all_fields()
-            .filter(|f| {
+            .enumerate()
+            .filter(|(_, f)| {
                 matches!(
                     f.type_descriptor,
-                    FieldType::Object(_) | FieldType::Array(_)
+                    FieldType::Object(_) // TODO: add arrays
+                                         //  | FieldType::Array(_)
                 )
             })
-            .for_each(|f| {
+            .for_each(|(index, field)| {
                 debug!(
                     "  should visit recursively field {} of object {:?}",
-                    f.name, object
+                    field.name, object
                 );
+
+                let field_value_ptr = object.offset_of_field(index);
+                if 0 == std::ptr::read(field_value_ptr as *const u64) {
+                    // Skipping nulls
+                    return;
+                }
+                let field_object_ptr = field_value_ptr as *mut Object;
+                self.mark(field_object_ptr, class_resolver);
             })
     }
 

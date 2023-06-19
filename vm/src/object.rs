@@ -127,6 +127,12 @@ impl<'a> Object<'a> {
         }
     }
 
+    pub(crate) unsafe fn offset_of_field(&self, index: usize) -> *mut u8 {
+        let preceding_fields_size = 8 * index;
+        let offset = HEADER_SIZE + preceding_fields_size;
+        self.data.add(offset)
+    }
+
     // TODO: impl eq
     pub fn is_same_as(&self, other: &Object) -> bool {
         self.data == other.data
