@@ -1,6 +1,7 @@
 use std::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
+    mem::size_of,
 };
 
 use bitfield_struct::bitfield;
@@ -9,6 +10,7 @@ use rjvm_reader::field_type::{BaseType, FieldType};
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{
+    alloc_entry::AllocEntry,
     array::Array,
     array_entry_type::ArrayEntryType,
     class::{Class, ClassId, ClassRef},
@@ -25,7 +27,7 @@ pub struct AbstractObject<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-enum GcState {
+pub(crate) enum GcState {
     Unmarked,
     InProgress,
     Marked,
@@ -72,18 +74,18 @@ impl From<ObjectKind> for u64 {
 
 #[bitfield(u64)]
 #[derive(PartialEq, Eq)]
-struct AllocHeader {
+pub(crate) struct AllocHeader {
     #[bits(1)]
-    kind: ObjectKind,
+    pub(crate) kind: ObjectKind,
 
     #[bits(2)]
-    state: GcState,
+    pub(crate) state: GcState,
 
     #[bits(29)]
     identity_hash_code: i32,
 
     #[bits(32)]
-    size: usize,
+    pub(crate) size: usize,
 }
 
 #[repr(transparent)]
@@ -96,9 +98,16 @@ struct ArrayHeader {
     length: u32,
 }
 
-const ALLOC_HEADER_SIZE: usize = std::mem::size_of::<AllocHeader>();
-const OBJECT_HEADER_SIZE: usize = std::mem::size_of::<ObjectHeader>();
-const ARRAY_HEADER_SIZE: usize = std::mem::size_of::<ArrayHeader>();
+const fn align_to_8_bytes(required_size: usize) -> usize {
+    match required_size % 8 {
+        0 => required_size,
+        n => required_size + (8 - n),
+    }
+}
+
+pub(crate) const ALLOC_HEADER_SIZE: usize = align_to_8_bytes(size_of::<AllocHeader>());
+pub(crate) const OBJECT_HEADER_SIZE: usize = align_to_8_bytes(size_of::<ObjectHeader>());
+pub(crate) const ARRAY_HEADER_SIZE: usize = align_to_8_bytes(size_of::<ArrayHeader>());
 
 impl<'a> AbstractObject<'a> {
     // Each field will be stored in 8 bytes. This means we waste some memory
@@ -115,18 +124,17 @@ impl<'a> AbstractObject<'a> {
         ALLOC_HEADER_SIZE + ARRAY_HEADER_SIZE + length * 8
     }
 
-    pub fn new_object(class: &Class<'a>, ptr: *mut u8) -> Self {
-        Self::write_object_header(class, ptr);
+    pub fn new_object(class: &Class<'a>, alloc_entry: AllocEntry) -> Self {
+        Self::write_object_header(class, &alloc_entry);
         Self {
-            data: ptr,
+            data: alloc_entry.ptr,
             marker: PhantomData,
         }
     }
 
-    fn write_object_header(class: &Class, ptr: *mut u8) {
-        let alloc_size = Self::size_of_object(class);
+    fn write_object_header(class: &Class, alloc_entry: &AllocEntry) {
         unsafe {
-            let next_ptr = Self::write_alloc_header(ptr, alloc_size, ObjectKind::Object);
+            let next_ptr = Self::write_alloc_header(alloc_entry, ObjectKind::Object);
             std::ptr::write(
                 next_ptr as *mut ObjectHeader,
                 ObjectHeader { class_id: class.id },
@@ -134,18 +142,25 @@ impl<'a> AbstractObject<'a> {
         }
     }
 
-    pub fn new_array(elements_type: ArrayEntryType, array_length: usize, ptr: *mut u8) -> Self {
-        Self::write_array_header(elements_type, array_length, ptr);
+    pub fn new_array(
+        elements_type: ArrayEntryType,
+        array_length: usize,
+        alloc_entry: &AllocEntry,
+    ) -> Self {
+        Self::write_array_header(elements_type, array_length, &alloc_entry);
         Self {
-            data: ptr,
+            data: alloc_entry.ptr,
             marker: PhantomData,
         }
     }
 
-    fn write_array_header(elements_type: ArrayEntryType, array_length: usize, ptr: *mut u8) {
-        let alloc_size = Self::size_of_array(array_length);
+    fn write_array_header(
+        elements_type: ArrayEntryType,
+        array_length: usize,
+        alloc_entry: &AllocEntry,
+    ) {
         unsafe {
-            let next_ptr = Self::write_alloc_header(ptr, alloc_size, ObjectKind::Array);
+            let next_ptr = Self::write_alloc_header(alloc_entry, ObjectKind::Array);
             std::ptr::write(
                 next_ptr as *mut ArrayHeader,
                 ArrayHeader {
@@ -156,17 +171,24 @@ impl<'a> AbstractObject<'a> {
         }
     }
 
-    unsafe fn write_alloc_header(ptr: *mut u8, alloc_size: usize, kind: ObjectKind) -> *mut u8 {
-        let next_ptr = ptr as *mut AllocHeader;
+    unsafe fn write_alloc_header(alloc_entry: &AllocEntry, kind: ObjectKind) -> *mut u8 {
+        let next_ptr = alloc_entry.ptr as *mut AllocHeader;
         std::ptr::write(
             next_ptr,
             AllocHeader::new()
                 .with_kind(kind)
                 .with_state(GcState::Unmarked)
-                .with_identity_hash_code(identity_hash_code(ptr))
-                .with_size(alloc_size),
+                .with_identity_hash_code(identity_hash_code(alloc_entry.ptr))
+                .with_size(alloc_entry.alloc_size),
         );
         next_ptr.add(1) as *mut u8
+    }
+
+    pub(crate) fn from_raw_ptr(ptr: *mut u8) -> Self {
+        Self {
+            data: ptr,
+            marker: PhantomData,
+        }
     }
 
     // TODO: should we implement eq rather than this function?
@@ -281,7 +303,7 @@ impl<'a> AbstractObject<'a> {
         }
     }
 
-    unsafe fn field_ptr(&self, field_index: usize) -> *mut u8 {
+    pub(crate) unsafe fn ptr_to_field_value(&self, field_index: usize) -> *mut u8 {
         let preceding_fields_size = 8 * field_index;
         let offset = ALLOC_HEADER_SIZE + OBJECT_HEADER_SIZE + preceding_fields_size;
         self.data.add(offset)
@@ -295,7 +317,7 @@ impl<'a> Object<'a> for AbstractObject<'a> {
 
     fn set_field(&self, index: usize, value: Value<'a>) {
         unsafe {
-            let ptr = self.field_ptr(index);
+            let ptr = self.ptr_to_field_value(index);
             write_value(ptr, value);
         }
     }
@@ -303,7 +325,7 @@ impl<'a> Object<'a> for AbstractObject<'a> {
     fn get_field(&self, object_class: ClassRef, index: usize) -> Value<'a> {
         let field = object_class.field_at_index(index).unwrap();
         unsafe {
-            let ptr = self.field_ptr(index);
+            let ptr = self.ptr_to_field_value(index);
             read_value(ptr, &field.type_descriptor)
         }
     }
@@ -327,8 +349,8 @@ impl<'a> AbstractObject<'a> {
         }
     }
 
-    unsafe fn entry_ptr(&self, field_index: usize) -> *mut u8 {
-        let entry_location = 8 * field_index;
+    pub(crate) unsafe fn ptr_to_array_element(&self, element_index: usize) -> *mut u8 {
+        let entry_location = 8 * element_index;
         let offset = ALLOC_HEADER_SIZE + ARRAY_HEADER_SIZE + entry_location;
         self.data.add(offset)
     }
@@ -348,7 +370,7 @@ impl<'a> Array<'a> for AbstractObject<'a> {
             Err(VmError::ArrayIndexOutOfBoundsException)
         } else {
             unsafe {
-                let ptr = self.entry_ptr(index);
+                let ptr = self.ptr_to_array_element(index);
                 write_value(ptr, value);
             }
             Ok(())
@@ -360,7 +382,7 @@ impl<'a> Array<'a> for AbstractObject<'a> {
             Err(VmError::ArrayIndexOutOfBoundsException)
         } else {
             unsafe {
-                let ptr = self.entry_ptr(index);
+                let ptr = self.ptr_to_array_element(index);
                 Ok(read_value2(ptr, &self.elements_type()))
             }
         }

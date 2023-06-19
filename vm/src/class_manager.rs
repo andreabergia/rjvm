@@ -140,7 +140,9 @@ impl<'a> ClassManager<'a> {
         let next_id = self.next_id;
         self.next_id += 1;
 
-        let class = Self::new_class(class_file, ClassId::new(next_id), &referenced_classes)?;
+        let id = ClassId::new(next_id);
+        debug!("loading class {} from file {}", id, class_file.name);
+        let class = Self::new_class(class_file, id, &referenced_classes)?;
         let class_ref = self.arena.alloc(class);
 
         // SAFETY: our reference class_ref is alive only for 'b.

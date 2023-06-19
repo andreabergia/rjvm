@@ -3,11 +3,14 @@ package rjvm;
 public class GarbageCollection {
     public static void main(String[] args) {
         AWrapperObject anObjectThatShouldNotBeDestroyed = new AWrapperObject(0);
+        AWrapperObject[] anotherObjectAlive = new AWrapperObject[]{new AWrapperObject(-1)};
+
         for (int i = 1; i <= 10; ++i) {
             new AWrapperObject(i);
         }
 //        tempPrint("still alive: " + anObjectThatShouldNotBeDestroyed.value);
         tempPrint(anObjectThatShouldNotBeDestroyed.getValue());
+        tempPrint(anotherObjectAlive[0].getValue());
     }
 
     public static class AWrapperObject {

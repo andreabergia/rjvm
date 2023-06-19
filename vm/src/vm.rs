@@ -239,7 +239,8 @@ impl<'a> Vm<'a> {
         match self.object_allocator.allocate(class) {
             Some(object) => object,
             None => {
-                self.do_garbage_collection();
+                self.do_garbage_collection()
+                    .expect("could run garbage collection");
                 self.object_allocator
                     .allocate(class)
                     .expect("cannot allocate object even after full garbage collection!")
@@ -336,7 +337,8 @@ impl<'a> Vm<'a> {
         {
             Some(array) => array,
             None => {
-                self.do_garbage_collection();
+                self.do_garbage_collection()
+                    .expect("could run garbage collection");
                 self.object_allocator
                     .allocate_array(elements_type, length)
                     .expect("cannot allocate array even after full garbage collection!")
@@ -380,7 +382,7 @@ impl<'a> Vm<'a> {
         )
     }
 
-    fn do_garbage_collection(&mut self) {
+    fn do_garbage_collection(&mut self) -> Result<(), VmError> {
         info!("running garbage collection");
 
         let mut roots = vec![];
@@ -393,9 +395,8 @@ impl<'a> Vm<'a> {
 
         unsafe {
             self.object_allocator
-                .do_garbage_collection(roots, &self.class_manager);
+                .do_garbage_collection(roots, &self.class_manager)?;
         }
-
-        // todo!("implement garbage collection")
+        Ok(())
     }
 }

@@ -1,4 +1,5 @@
 pub mod abstract_object;
+pub mod alloc_entry;
 pub mod array;
 pub mod array_entry_type;
 mod call_frame;
