@@ -170,20 +170,20 @@ impl<'a> AbstractObject<'a> {
         self.data == other.data
     }
 
-    fn header(&self) -> &AllocHeader {
+    fn alloc_header(&self) -> &AllocHeader {
         unsafe { &*(self.data as *const AllocHeader) }
     }
 
     pub fn identity_hash_code(&self) -> i32 {
-        self.header().identity_hash_code()
+        self.alloc_header().identity_hash_code()
     }
 
     pub fn kind(&self) -> ObjectKind {
-        self.header().kind()
+        self.alloc_header().kind()
     }
 
     pub fn alloc_size(&self) -> usize {
-        self.header().size()
+        self.alloc_header().size()
     }
 }
 
