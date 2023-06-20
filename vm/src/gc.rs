@@ -125,7 +125,6 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
-    // TODO: return an error or panic from down here?
     unsafe fn mark_members_of_object(
         &self,
         object: &AbstractObject<'a>,
