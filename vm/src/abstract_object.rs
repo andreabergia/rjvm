@@ -147,7 +147,7 @@ impl<'a> AbstractObject<'a> {
         array_length: usize,
         alloc_entry: &AllocEntry,
     ) -> Self {
-        Self::write_array_header(elements_type, array_length, &alloc_entry);
+        Self::write_array_header(elements_type, array_length, alloc_entry);
         Self {
             data: alloc_entry.ptr,
             marker: PhantomData,

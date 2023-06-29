@@ -1,3 +1,4 @@
+use std::ptr::null;
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
 use log::debug;
@@ -5,6 +6,7 @@ use log::debug;
 use rjvm_reader::field_type::FieldType;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::abstract_object::ALLOC_HEADER_SIZE;
 use crate::{
     abstract_object::{AbstractObject, AllocHeader, GcState, ObjectKind},
     alloc_entry::AllocEntry,
@@ -59,6 +61,10 @@ impl MemoryChunk {
             alloc_size: required_size,
         })
     }
+
+    unsafe fn contains(&self, ptr: *const u8) -> bool {
+        ptr >= self.memory && ptr <= self.memory.add(self.used)
+    }
 }
 
 pub struct ObjectAllocator<'a> {
@@ -100,47 +106,87 @@ impl<'a> ObjectAllocator<'a> {
         roots: Vec<*mut AbstractObject<'a>>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
-        self.unmark_all_objects();
+        // self.unmark_all_objects();
 
-        // Mark all reachable objects
-        for root in roots {
-            self.mark(root, class_resolver)?;
+        // Copy all reachable objects to the other region
+        for root in roots.iter() {
+            self.visit(*root, class_resolver)?;
         }
 
-        self.log_marked_objects_for_debug();
+        debug!("current memory: {:?}", self.current);
+        Self::log_marked_objects_for_debug(&self.current);
+        debug!("new memory: {:?}", self.other);
+        Self::log_marked_objects_for_debug(&self.other);
+
+        self.fix_references_in_new_region(class_resolver)?;
+
+        for root in roots {
+            self.fix_gc_root(root);
+        }
+
+        // Swap regions and reset alloc pointer
+        std::mem::swap(&mut self.current, &mut self.other);
+
+        debug!(
+            "gc done; previous allocated memory = {}, new allocated memory = {}",
+            self.other.used, self.current.used
+        );
+        self.other.used = 0;
+
         Ok(())
     }
 
-    unsafe fn unmark_all_objects(&mut self) {
-        let end_ptr = self.current.memory.add(self.current.used);
-        let mut ptr = self.current.memory;
-        while ptr < end_ptr {
-            let header = &mut *(ptr as *mut AllocHeader);
-            header.set_state(GcState::Unmarked);
-            ptr = ptr.add(header.size());
-        }
-    }
+    // unsafe fn unmark_all_objects(&mut self) {
+    //     let end_ptr = self.current.memory.add(self.current.used);
+    //     let mut ptr = self.current.memory;
+    //     while ptr < end_ptr {
+    //         let header = &mut *(ptr as *mut AllocHeader);
+    //         header.set_state(GcState::Unmarked);
+    //         ptr = ptr.add(header.size());
+    //     }
+    // }
 
-    unsafe fn mark(
-        &self,
+    unsafe fn visit(
+        &mut self,
         object_ptr: *const AbstractObject<'a>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
         let referred_object_ptr = *(object_ptr as *const *mut u8);
-        assert!(
-            referred_object_ptr >= self.current.memory
-                && referred_object_ptr <= self.current.memory.add(self.current.used)
-        );
+        assert!(self.current.contains(referred_object_ptr));
         let header = &mut *(referred_object_ptr as *mut AllocHeader);
 
         match header.state() {
             GcState::Unmarked => {
+                // Set as in progress to avoid infinite loops on references cycles
                 header.set_state(GcState::InProgress);
+
+                // Visit members (object fields or array entries)
                 if header.kind() == ObjectKind::Object {
-                    self.mark_members_of_object(&*object_ptr, class_resolver)?;
+                    self.visit_fields_of_object(&*object_ptr, class_resolver)?;
                 } else {
                     self.visit_entries_of_array(&*object_ptr, class_resolver)?;
                 }
+
+                // Copy to other region as-is (with pointers to the current region)
+                let new_address = self
+                    .other
+                    .alloc(header.size())
+                    .map(|alloc_entry| {
+                        std::ptr::copy_nonoverlapping(
+                            referred_object_ptr,
+                            alloc_entry.ptr,
+                            header.size(),
+                        );
+                        alloc_entry.ptr
+                    })
+                    .expect("should have enough space in the other region");
+
+                // Replace content of this object with forward reference to the new object
+                std::ptr::write(
+                    referred_object_ptr.add(ALLOC_HEADER_SIZE) as *mut *mut u8,
+                    new_address,
+                );
+
                 header.set_state(GcState::Marked);
             }
 
@@ -152,8 +198,8 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
-    unsafe fn mark_members_of_object(
-        &self,
+    unsafe fn visit_fields_of_object(
+        &mut self,
         object: &AbstractObject<'a>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
@@ -183,13 +229,13 @@ impl<'a> ObjectAllocator<'a> {
                 continue;
             }
             let field_object_ptr = field_value_ptr as *mut AbstractObject;
-            self.mark(field_object_ptr, class_resolver)?;
+            self.visit(field_object_ptr, class_resolver)?;
         }
         Ok(())
     }
 
     unsafe fn visit_entries_of_array(
-        &self,
+        &mut self,
         array: &AbstractObject<'a>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
@@ -204,7 +250,7 @@ impl<'a> ObjectAllocator<'a> {
                     match value {
                         Ok(Value::Object(array_element)) => {
                             debug!("  should visit recursively element at index {}", i);
-                            self.mark(&array_element as *const AbstractObject, class_resolver)?;
+                            self.visit(&array_element as *const AbstractObject, class_resolver)?;
                         }
                         Ok(Value::Null) => {
                             // Ok, skip it
@@ -221,19 +267,127 @@ impl<'a> ObjectAllocator<'a> {
     }
 
     // TODO: remove
-    unsafe fn log_marked_objects_for_debug(&mut self) {
-        let end_ptr = self.current.memory.add(self.current.used);
-        let mut ptr = self.current.memory;
+    unsafe fn log_marked_objects_for_debug(chunk: &MemoryChunk) {
+        let end_ptr = chunk.memory.add(chunk.used);
+        let mut ptr = chunk.memory;
         while ptr < end_ptr {
             let header = &*(ptr as *const AllocHeader);
             let object = AbstractObject::from_raw_ptr(ptr);
             if header.state() == GcState::Marked {
-                debug!("marked object: {:?} {:?}", ptr, object);
+                debug!("  marked object: {:?} {:?}", ptr, object);
             } else {
-                debug!("unmarked object: {:?} {:?}", ptr, object);
+                debug!("  unmarked object: {:?} {:?}", ptr, object);
             }
             ptr = ptr.add(header.size());
         }
+    }
+
+    unsafe fn fix_references_in_new_region(
+        &mut self,
+        class_resolver: &impl ClassByIdResolver<'a>,
+    ) -> Result<(), VmError> {
+        let end_ptr = self.other.memory.add(self.other.used);
+        let mut ptr = self.other.memory;
+        while ptr < end_ptr {
+            let header = &mut *(ptr as *mut AllocHeader);
+            let object = AbstractObject::from_raw_ptr(ptr);
+
+            if header.kind() == ObjectKind::Object {
+                self.fix_references_in_object(object, class_resolver)?;
+            } else {
+                self.fix_references_in_array(object)?;
+            }
+
+            header.set_state(GcState::Unmarked);
+            ptr = ptr.add(header.size());
+        }
+        Ok(())
+    }
+
+    unsafe fn fix_references_in_object(
+        &self,
+        object: AbstractObject<'a>,
+        class_resolver: &impl ClassByIdResolver<'a>,
+    ) -> Result<(), VmError> {
+        let class = class_resolver
+            .find_class_by_id(object.class_id())
+            .ok_or(VmError::ValidationException)?;
+
+        debug!("fixing members of {:?} of class {}", object, class.name);
+
+        for (index, field) in class.all_fields().enumerate().filter(|(_, f)| {
+            matches!(
+                f.type_descriptor,
+                FieldType::Object(_) | FieldType::Array(_)
+            )
+        }) {
+            let field_value_ptr = object.ptr_to_field_value(index);
+            debug!(
+                "  need to fix field {} at offset {:#0x}",
+                field.name, field_value_ptr as u64
+            );
+
+            let new_address = self.fix_reference(field_value_ptr);
+            debug!(
+                "  fixed field {} at offset {:#0x} - new value is {:#0x}",
+                field.name, field_value_ptr as u64, new_address as u64
+            );
+        }
+        Ok(())
+    }
+
+    unsafe fn fix_references_in_array(&mut self, array: AbstractObject<'a>) -> Result<(), VmError> {
+        match array.elements_type() {
+            ArrayEntryType::Base(_) => {
+                // No objects are kept alive by this GC-reachable array!
+                Ok(())
+            }
+            ArrayEntryType::Object(class_id) => {
+                debug!("fixing entries of array {:?} of type {}", array, class_id);
+                for i in 0..array.len().into_usize_safe() {
+                    let element_ptr = array.ptr_to_array_element(i);
+                    debug!(
+                        "  need to fix element {} at offset {:#0x}",
+                        i, element_ptr as u64
+                    );
+
+                    let new_address = self.fix_reference(element_ptr);
+                    debug!(
+                        "  fixed element {} at offset {:#0x} - new value is {:#0x}",
+                        i, element_ptr as u64, new_address as u64
+                    );
+                }
+                Ok(())
+            }
+            ArrayEntryType::Array => {
+                todo!("arrays of arrays are not supported yet")
+            }
+        }
+    }
+
+    unsafe fn fix_reference(&self, field_value_ptr: *mut u8) -> *const u8 {
+        if 0 == std::ptr::read(field_value_ptr as *const u64) {
+            // Skipping nulls
+            return null();
+        }
+
+        // Write new address, stored in the word after the header in the old object
+        let old_referred_object = std::ptr::read(field_value_ptr as *const *const u8);
+        assert!(self.current.contains(old_referred_object));
+        let new_referred_object_address =
+            std::ptr::read(old_referred_object.add(ALLOC_HEADER_SIZE) as *const *const u8);
+        assert!(self.other.contains(new_referred_object_address));
+        std::ptr::write(
+            field_value_ptr as *mut *const u8,
+            new_referred_object_address,
+        );
+        new_referred_object_address
+    }
+
+    unsafe fn fix_gc_root(&self, root: *mut AbstractObject<'a>) {
+        debug!("fixing gc root {:#0x}", root as u64);
+        self.fix_reference(root as *mut u8);
+        debug!("  fixed gc root - new pointer is {:#0x}", root as u64);
     }
 }
 

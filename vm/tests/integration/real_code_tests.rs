@@ -358,7 +358,7 @@ fn exceptions_throwing_and_catching() {
 
 #[test_log::test]
 fn gabarge_collector() {
-    let mut vm = create_base_vm(5_000_000);
+    let mut vm = create_base_vm(10_000_000);
     let main_result = invoke(
         &mut vm,
         "rjvm/GarbageCollection",
