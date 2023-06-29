@@ -26,7 +26,7 @@ fn invoke<'a>(
 
     let main_result = vm.invoke(call_stack, main_method, None, vec![]);
     vm.debug_stats();
-    print!("result of {class_name}::{method_name}: {main_result:?}");
+    println!("result of {class_name}::{method_name}: {main_result:?}");
 
     main_result
 }

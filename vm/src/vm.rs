@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use log::{debug, error, info};
+use log::{debug, error};
 use typed_arena::Arena;
 
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
@@ -377,14 +377,12 @@ impl<'a> Vm<'a> {
 
     pub fn debug_stats(&self) {
         debug!(
-            "VM classes={:?}, objects = {:?}",
+            "VM classes={:?} allocator={:?}",
             self.class_manager, self.object_allocator
         )
     }
 
     fn do_garbage_collection(&mut self) -> Result<(), VmError> {
-        info!("running garbage collection");
-
         let mut roots = vec![];
         roots.extend(
             self.statics

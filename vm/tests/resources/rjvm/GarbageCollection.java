@@ -2,15 +2,23 @@ package rjvm;
 
 public class GarbageCollection {
     public static void main(String[] args) {
+        // Gc roots can be objects or arrays
         AWrapperObject anObjectThatShouldNotBeDestroyed = new AWrapperObject(0);
         AWrapperObject[] anotherObjectAlive = new AWrapperObject[]{new AWrapperObject(-1)};
 
-        for (int i = 1; i <= 10; ++i) {
+        int count = 10;
+        ASmallObject[] anotherArray = new ASmallObject[count];
+        for (int i = 1; i <= 20; ++i) {
+            // Trigger GC repeatedly
             new AWrapperObject(i);
+
+            anotherArray[i - 1] = new ASmallObject(i);
         }
-//        tempPrint("still alive: " + anObjectThatShouldNotBeDestroyed.value);
-        tempPrint(anObjectThatShouldNotBeDestroyed.getValue());
-        tempPrint(anotherObjectAlive[0].getValue());
+
+        // TODO: we have a bug in `Long::toString`
+        tempPrint("still alive: " + (int) anObjectThatShouldNotBeDestroyed.getValue());
+        tempPrint("also still alive: " + (int) anotherObjectAlive[0].getValue());
+        tempPrint("and also still alive: " + (int) anotherArray[0].value);
     }
 
     public static class AWrapperObject {
@@ -21,7 +29,7 @@ public class GarbageCollection {
         public AWrapperObject(int value) {
             this.value = value;
             this.aSmallObject = new ASmallObject(value);
-//            tempPrint("allocated " + value);
+            tempPrint("allocated " + value);
 
             aLargeObject.oneMegabyteOfData[0] = value;
         }
@@ -43,5 +51,5 @@ public class GarbageCollection {
         private final long[] oneMegabyteOfData = new long[1024 * 1024 / 8];
     }
 
-    private static native void tempPrint(long value);
+    private static native void tempPrint(String value);
 }

@@ -1,7 +1,7 @@
 use std::ptr::null;
 use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
 
-use log::debug;
+use log::{debug, info};
 
 use rjvm_reader::field_type::FieldType;
 use rjvm_utils::type_conversion::ToUsizeSafe;
@@ -27,19 +27,21 @@ struct MemoryChunk {
 
 impl fmt::Debug for MemoryChunk {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "memory_chunk={{used={}, capacity={}}}",
-            self.used, self.capacity
-        )
+        write!(f, "{{used={}, capacity={}}}", self.used, self.capacity)
     }
 }
 
 impl MemoryChunk {
     fn new(capacity: usize) -> Self {
         let layout = Layout::from_size_align(capacity, 8).unwrap();
+        let ptr = unsafe { std::alloc::alloc_zeroed(layout) };
+        println!(
+            "allocated memory chunk of size {} at {:#0x}",
+            capacity, ptr as u64
+        );
+
         MemoryChunk {
-            memory: unsafe { std::alloc::alloc_zeroed(layout) },
+            memory: ptr,
             capacity,
             used: 0,
         }
@@ -106,17 +108,16 @@ impl<'a> ObjectAllocator<'a> {
         roots: Vec<*mut AbstractObject<'a>>,
         class_resolver: &impl ClassByIdResolver<'a>,
     ) -> Result<(), VmError> {
-        // self.unmark_all_objects();
+        info!(
+            "running gc; currently allocated memory = {}, gc roots count: {}",
+            self.current.used,
+            roots.len()
+        );
 
         // Copy all reachable objects to the other region
         for root in roots.iter() {
             self.visit(*root, class_resolver)?;
         }
-
-        debug!("current memory: {:?}", self.current);
-        Self::log_marked_objects_for_debug(&self.current);
-        debug!("new memory: {:?}", self.other);
-        Self::log_marked_objects_for_debug(&self.other);
 
         self.fix_references_in_new_region(class_resolver)?;
 
@@ -126,8 +127,7 @@ impl<'a> ObjectAllocator<'a> {
 
         // Swap regions and reset alloc pointer
         std::mem::swap(&mut self.current, &mut self.other);
-
-        debug!(
+        info!(
             "gc done; previous allocated memory = {}, new allocated memory = {}",
             self.other.used, self.current.used
         );
@@ -135,16 +135,6 @@ impl<'a> ObjectAllocator<'a> {
 
         Ok(())
     }
-
-    // unsafe fn unmark_all_objects(&mut self) {
-    //     let end_ptr = self.current.memory.add(self.current.used);
-    //     let mut ptr = self.current.memory;
-    //     while ptr < end_ptr {
-    //         let header = &mut *(ptr as *mut AllocHeader);
-    //         header.set_state(GcState::Unmarked);
-    //         ptr = ptr.add(header.size());
-    //     }
-    // }
 
     unsafe fn visit(
         &mut self,
@@ -266,22 +256,6 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    // TODO: remove
-    unsafe fn log_marked_objects_for_debug(chunk: &MemoryChunk) {
-        let end_ptr = chunk.memory.add(chunk.used);
-        let mut ptr = chunk.memory;
-        while ptr < end_ptr {
-            let header = &*(ptr as *const AllocHeader);
-            let object = AbstractObject::from_raw_ptr(ptr);
-            if header.state() == GcState::Marked {
-                debug!("  marked object: {:?} {:?}", ptr, object);
-            } else {
-                debug!("  unmarked object: {:?} {:?}", ptr, object);
-            }
-            ptr = ptr.add(header.size());
-        }
-    }
-
     unsafe fn fix_references_in_new_region(
         &mut self,
         class_resolver: &impl ClassByIdResolver<'a>,
@@ -393,6 +367,6 @@ impl<'a> ObjectAllocator<'a> {
 
 impl<'a> fmt::Debug for ObjectAllocator<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "object_allocator={{current_space={:?}}}", self.current)
+        write!(f, "{{current_space={:?}}}", self.current)
     }
 }
