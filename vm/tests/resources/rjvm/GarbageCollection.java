@@ -15,10 +15,14 @@ public class GarbageCollection {
             anotherArray[i - 1] = new ASmallObject(i);
         }
 
-        // TODO: we have a bug in `Long::toString`
-        tempPrint("still alive: " + (int) anObjectThatShouldNotBeDestroyed.getValue());
-        tempPrint("also still alive: " + (int) anotherObjectAlive[0].getValue());
-        tempPrint("and also still alive: " + (int) anotherArray[0].value);
+        // TODO: we have a bug in `Int::toString` and `Long::toString`
+        tempPrint(444);
+//        tempPrint("still alive: " + (int) anObjectThatShouldNotBeDestroyed.getValue());
+//        tempPrint("also still alive: " + (int) anotherObjectAlive[0].getValue());
+//        tempPrint("and also still alive: " + (int) anotherArray[0].value);
+        tempPrint(anObjectThatShouldNotBeDestroyed.getValue());
+        tempPrint(anotherObjectAlive[0].getValue());
+        tempPrint(anotherArray[0].value);
     }
 
     public static class AWrapperObject {
@@ -29,7 +33,8 @@ public class GarbageCollection {
         public AWrapperObject(int value) {
             this.value = value;
             this.aSmallObject = new ASmallObject(value);
-            tempPrint("allocated " + value);
+//            tempPrint("allocated " + value);
+            tempPrint(value);
 
             aLargeObject.oneMegabyteOfData[0] = value;
         }
@@ -51,5 +56,5 @@ public class GarbageCollection {
         private final long[] oneMegabyteOfData = new long[1024 * 1024 / 8];
     }
 
-    private static native void tempPrint(String value);
+    private static native void tempPrint(long value);
 }
