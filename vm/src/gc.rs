@@ -17,39 +17,30 @@ use crate::{
     vm_error::VmError,
 };
 
-pub struct ObjectAllocator<'a> {
+struct MemoryChunk {
     memory: *mut u8,
     used: usize,
     capacity: usize,
-    marker: PhantomData<&'a AbstractObject<'a>>,
 }
 
-impl<'a> ObjectAllocator<'a> {
-    pub fn with_maximum_memory(max_size: usize) -> Self {
-        let result = Layout::from_size_align(max_size, 8).unwrap();
-        let memory = unsafe { std::alloc::alloc_zeroed(result) };
-        Self {
-            memory,
+impl fmt::Debug for MemoryChunk {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "memory_chunk={{used={}, capacity={}}}",
+            self.used, self.capacity
+        )
+    }
+}
+
+impl MemoryChunk {
+    fn new(capacity: usize) -> Self {
+        let layout = Layout::from_size_align(capacity, 8).unwrap();
+        MemoryChunk {
+            memory: unsafe { std::alloc::alloc_zeroed(layout) },
+            capacity,
             used: 0,
-            capacity: max_size,
-            marker: Default::default(),
         }
-    }
-
-    pub fn allocate(&mut self, class: &Class<'a>) -> Option<AbstractObject<'a>> {
-        let size = AbstractObject::size_of_object(class);
-        self.alloc(size)
-            .map(|alloc_entry| AbstractObject::new_object(class, alloc_entry))
-    }
-
-    pub fn allocate_array(
-        &mut self,
-        elements_type: ArrayEntryType,
-        length: usize,
-    ) -> Option<AbstractObject<'a>> {
-        let size = AbstractObject::size_of_array(length);
-        self.alloc(size)
-            .map(|alloc_entry| AbstractObject::new_array(elements_type, length, &alloc_entry))
     }
 
     fn alloc(&mut self, required_size: usize) -> Option<AllocEntry> {
@@ -67,6 +58,41 @@ impl<'a> ObjectAllocator<'a> {
             ptr,
             alloc_size: required_size,
         })
+    }
+}
+
+pub struct ObjectAllocator<'a> {
+    current: MemoryChunk,
+    other: MemoryChunk,
+    marker: PhantomData<&'a AbstractObject<'a>>,
+}
+
+impl<'a> ObjectAllocator<'a> {
+    pub fn with_maximum_memory(max_size: usize) -> Self {
+        let semi_space_capacity = max_size / 2;
+        Self {
+            current: MemoryChunk::new(semi_space_capacity),
+            other: MemoryChunk::new(semi_space_capacity),
+            marker: Default::default(),
+        }
+    }
+
+    pub fn allocate(&mut self, class: &Class<'a>) -> Option<AbstractObject<'a>> {
+        let size = AbstractObject::size_of_object(class);
+        self.current
+            .alloc(size)
+            .map(|alloc_entry| AbstractObject::new_object(class, alloc_entry))
+    }
+
+    pub fn allocate_array(
+        &mut self,
+        elements_type: ArrayEntryType,
+        length: usize,
+    ) -> Option<AbstractObject<'a>> {
+        let size = AbstractObject::size_of_array(length);
+        self.current
+            .alloc(size)
+            .map(|alloc_entry| AbstractObject::new_array(elements_type, length, &alloc_entry))
     }
 
     pub unsafe fn do_garbage_collection(
@@ -86,8 +112,8 @@ impl<'a> ObjectAllocator<'a> {
     }
 
     unsafe fn unmark_all_objects(&mut self) {
-        let end_ptr = self.memory.add(self.used);
-        let mut ptr = self.memory;
+        let end_ptr = self.current.memory.add(self.current.used);
+        let mut ptr = self.current.memory;
         while ptr < end_ptr {
             let header = &mut *(ptr as *mut AllocHeader);
             header.set_state(GcState::Unmarked);
@@ -102,7 +128,8 @@ impl<'a> ObjectAllocator<'a> {
     ) -> Result<(), VmError> {
         let referred_object_ptr = *(object_ptr as *const *mut u8);
         assert!(
-            referred_object_ptr >= self.memory && referred_object_ptr <= self.memory.add(self.used)
+            referred_object_ptr >= self.current.memory
+                && referred_object_ptr <= self.current.memory.add(self.current.used)
         );
         let header = &mut *(referred_object_ptr as *mut AllocHeader);
 
@@ -195,8 +222,8 @@ impl<'a> ObjectAllocator<'a> {
 
     // TODO: remove
     unsafe fn log_marked_objects_for_debug(&mut self) {
-        let end_ptr = self.memory.add(self.used);
-        let mut ptr = self.memory;
+        let end_ptr = self.current.memory.add(self.current.used);
+        let mut ptr = self.current.memory;
         while ptr < end_ptr {
             let header = &*(ptr as *const AllocHeader);
             let object = AbstractObject::from_raw_ptr(ptr);
@@ -212,10 +239,6 @@ impl<'a> ObjectAllocator<'a> {
 
 impl<'a> fmt::Debug for ObjectAllocator<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "object_allocator={{used={}, capacity={}}}",
-            self.used, self.capacity
-        )
+        write!(f, "object_allocator={{current_space={:?}}}", self.current)
     }
 }
