@@ -1,10 +1,11 @@
 use clap::Parser;
 
+use rjvm_vm::vm::ONE_MEGABYTE;
 use rjvm_vm::{
     call_stack::CallStack,
     class_and_method::ClassAndMethod,
     exceptions::MethodCallFailed,
-    vm::{Vm, DEFAULT_MAX_MEMORY},
+    vm::{Vm, DEFAULT_MAX_MEMORY_MB_STR},
     vm_error::VmError,
 };
 
@@ -17,6 +18,10 @@ struct Args {
 
     /// Class name to execute
     class_name: String,
+
+    /// Maximum memory to use in MB
+    #[arg(short, long, default_value = DEFAULT_MAX_MEMORY_MB_STR)]
+    maximum_mb_of_memory: usize,
 
     /// Java program arguments
     java_program_arguments: Vec<String>,
@@ -55,7 +60,7 @@ fn resolve_class_and_main_method<'a>(
 }
 
 fn run(args: Args) -> Result<i32, String> {
-    let mut vm = Vm::new(DEFAULT_MAX_MEMORY);
+    let mut vm = Vm::new(args.maximum_mb_of_memory * ONE_MEGABYTE);
     append_classpath(&mut vm, &args)?;
 
     let (call_stack, main_method) = resolve_class_and_main_method(&mut vm, &args)?;

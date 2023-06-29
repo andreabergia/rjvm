@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::string::ToString;
 
-use log::{debug, error};
+use log::{debug, error, info};
 use typed_arena::Arena;
 
 use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
@@ -56,8 +57,10 @@ pub struct Vm<'a> {
     pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
 }
 
-const ONE_MEGABYTE: usize = 1024 * 1024;
+pub const ONE_MEGABYTE: usize = 1024 * 1024;
+const DEFAULT_MAX_MB_OF_MEMORY: usize = 100;
 pub const DEFAULT_MAX_MEMORY: usize = 100 * ONE_MEGABYTE;
+pub const DEFAULT_MAX_MEMORY_MB_STR: &str = const_format::formatcp!("{}", DEFAULT_MAX_MB_OF_MEMORY);
 
 impl<'a> ClassByIdResolver<'a> for Vm<'a> {
     fn find_class_by_id(&self, class_id: ClassId) -> Option<ClassRef<'a>> {
@@ -67,6 +70,7 @@ impl<'a> ClassByIdResolver<'a> for Vm<'a> {
 
 impl<'a> Vm<'a> {
     pub fn new(max_memory: usize) -> Self {
+        info!("Creating new VM with maximum memory {}", max_memory);
         let mut result = Self {
             class_manager: Default::default(),
             object_allocator: ObjectAllocator::with_maximum_memory(max_memory),
