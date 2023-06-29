@@ -8,7 +8,7 @@ public class GarbageCollection {
 
         int count = 10;
         ASmallObject[] anotherArray = new ASmallObject[count];
-        for (int i = 1; i <= 20; ++i) {
+        for (int i = 1; i <= count; ++i) {
             // Trigger GC repeatedly
             new AWrapperObject(i);
 
