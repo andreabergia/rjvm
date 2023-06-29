@@ -148,7 +148,7 @@ impl<'a> ObjectAllocator<'a> {
         match header.state() {
             GcState::Unmarked => {
                 // Set as in progress to avoid infinite loops on references cycles
-                header.set_state(GcState::InProgress);
+                header.set_state(GcState::Marked);
 
                 // Visit members (object fields or array entries)
                 if header.kind() == ObjectKind::Object {
@@ -176,11 +176,9 @@ impl<'a> ObjectAllocator<'a> {
                     referred_object_ptr.add(ALLOC_HEADER_SIZE) as *mut *mut u8,
                     new_address,
                 );
-
-                header.set_state(GcState::Marked);
             }
 
-            GcState::InProgress | GcState::Marked => {
+            GcState::Marked => {
                 // Already visited
             }
         }

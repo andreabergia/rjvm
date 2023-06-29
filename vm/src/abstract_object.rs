@@ -29,7 +29,6 @@ pub struct AbstractObject<'a> {
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub(crate) enum GcState {
     Unmarked,
-    InProgress,
     Marked,
 }
 
@@ -37,8 +36,7 @@ impl From<u64> for GcState {
     fn from(value: u64) -> Self {
         match value {
             0 => Self::Unmarked,
-            1 => Self::InProgress,
-            2 => Self::Marked,
+            1 => Self::Marked,
             _ => panic!("invalid value for GcState: {}", value),
         }
     }
@@ -78,10 +76,10 @@ pub(crate) struct AllocHeader {
     #[bits(1)]
     pub(crate) kind: ObjectKind,
 
-    #[bits(2)]
+    #[bits(1)]
     pub(crate) state: GcState,
 
-    #[bits(29)]
+    #[bits(30)]
     identity_hash_code: i32,
 
     #[bits(32)]
@@ -238,8 +236,9 @@ fn identity_hash_code(ptr: *mut u8) -> i32 {
     let addr = ptr as u64;
     let hash = (addr >> 32) ^ (addr);
 
-    // Note: we'll take the 29 least significant bits here, since we'll store this in AllocHeader!
-    let hash = (hash & ((1 << 29) - 1)) as u32;
+    // Note: we'll take some of the least significant bits here,
+    // since we'll store this in AllocHeader!
+    let hash = (hash & ((1 << 30) - 1)) as u32;
 
     unsafe { std::mem::transmute(hash) }
 }
