@@ -16,7 +16,7 @@ pub struct ClassLoadingError {
 impl ClassLoadingError {
     pub fn new(error: impl Error + 'static) -> Self {
         Self {
-            message: format!("{error}"),
+            message: error.to_string(),
             source: Box::new(error),
         }
     }

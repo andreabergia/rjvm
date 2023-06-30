@@ -107,10 +107,10 @@ impl<'a> ClassManager<'a> {
         let class_file_bytes = self
             .class_path
             .resolve(class_name)
-            .map_err(|_| VmError::ClassLoadingError)?
+            .map_err(|err| VmError::ClassLoadingError(err.to_string()))?
             .ok_or(VmError::ClassNotFoundException(class_name.to_string()))?;
-        let class_file =
-            class_reader::read_buffer(&class_file_bytes).map_err(|_| VmError::ClassLoadingError)?;
+        let class_file = class_reader::read_buffer(&class_file_bytes)
+            .map_err(|err| VmError::ClassLoadingError(err.to_string()))?;
         self.load_class(class_file)
     }
 

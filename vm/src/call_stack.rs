@@ -63,8 +63,8 @@ impl<'a> CallStack<'a> {
         Ok(reference)
     }
 
-    fn check_receiver<'b>(
-        class_and_method: &'b ClassAndMethod,
+    fn check_receiver(
+        class_and_method: &ClassAndMethod,
         receiver: Option<AbstractObject>,
     ) -> Result<(), VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
