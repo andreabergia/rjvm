@@ -7,7 +7,7 @@ program in Rust and I've used to learn the language - thus, I'm sure some parts 
 Rust since I'm just learning the language.
 
 The code quality is definitely not production ready - there are not enough tests, there isn't enough documentation and
-some of the initial decision should be revisited.
+some of the initial decision should be revisited. (I.e.: I write code for work better than this 😊.)
 
 The code is licensed under the [Apache v2 license](./LICENSE).
 
@@ -25,6 +25,8 @@ Things not implemented (and not planned to):
 - [class file verification](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10)
 - I/O
 - just in time code execution (JIT)
+- class linkage and validation
+- proper class loaders
 
 However, there's quite a few things implemented:
 
@@ -43,18 +45,17 @@ The JVM uses the real classes from [OpenJDK 7](https://jdk.java.net/java-se-ri/7
 `java.lang.Object`, `java.lang.String` or `java.lang.Exception` are _real_ classes, without any modifications. The JVM
 is "good enough" to parse and execute their code.
 
-## What has still to be implemented
+The VM is limited to 64 bits platforms, as there are a few places where we assume that the size of a pointer is 8 bytes.
 
-Before declaring the project "complete", these are the things I still plan to implement:
+## Further poor implementations that I should fix (but I won't)
 
-- throwing real java exceptions (rather than internal errors that will abort executions) for things like stack overflow,
-  accessing an array out of bounds, divisions by zero, etc
+One poor implementation detail is that for things like stack overflow, accessing an array out of bounds, divisions by 
+zero, etc we should be throwing real java exceptions, rather than internal errors that will abort executions. 
 
 There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
-but it is "good enough" to execute some simple code; for example arrays aren't real objects, or we don't really have the
-concept of "identity hash code". However, it is unlikely I will fix those issues.
+but it is "good enough" to execute some simple code; for example we do not have a class for arrays.
 
-The VM is limited to 64 bits platforms, as there are a few places where we assume that the size of a pointer is 8 bytes.
+If you're curious, look for the TODO in the code.
 
 ## Code structure
 
