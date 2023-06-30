@@ -106,8 +106,8 @@ fn allocate_java_args<'a>(
     let class_id_java_lang_string = vm.get_or_resolve_class(call_stack, "java/lang/String")?.id;
 
     let strings: Result<Vec<Value<'a>>, MethodCallFailed<'a>> = command_line_args
-        .into_iter()
-        .map(|s| new_java_lang_string_object(vm, call_stack, &s).map(Value::Object))
+        .iter()
+        .map(|s| new_java_lang_string_object(vm, call_stack, s).map(Value::Object))
         .collect();
 
     let strings = strings?;
