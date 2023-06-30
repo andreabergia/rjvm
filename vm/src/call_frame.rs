@@ -1501,7 +1501,8 @@ impl<'a> CallFrame<'a> {
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
     ) -> Result<(), MethodCallFailed<'a>> {
-        let (is_instance_of, _) = self.is_instanceof(vm, call_stack, constant_index)?;
+        let value = self.pop()?;
+        let is_instance_of = self.is_instanceof(vm, call_stack, constant_index, &value)?;
         self.push(Int(is_instance_of as i32))
     }
 
@@ -1511,7 +1512,8 @@ impl<'a> CallFrame<'a> {
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
     ) -> Result<(), MethodCallFailed<'a>> {
-        let (is_instance_of, value) = self.is_instanceof(vm, call_stack, constant_index)?;
+        let value = self.pop()?;
+        let is_instance_of = self.is_instanceof(vm, call_stack, constant_index, &value)?;
         if is_instance_of {
             self.push(value)
         } else {
@@ -1525,7 +1527,8 @@ impl<'a> CallFrame<'a> {
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         constant_index: u16,
-    ) -> Result<(bool, Value<'a>), MethodCallFailed<'a>> {
+        value: &Value<'a>,
+    ) -> Result<bool, MethodCallFailed<'a>> {
         let class_name = self.get_constant_class_reference(constant_index)?;
 
         // TODO: we should model classes of arrays
@@ -1541,7 +1544,6 @@ impl<'a> CallFrame<'a> {
             }
         };
 
-        let value = self.pop()?;
         let is_instance_of = match &value {
             Null => false,
 
@@ -1570,7 +1572,7 @@ impl<'a> CallFrame<'a> {
                 ))
             }
         };
-        Ok((is_instance_of, value))
+        Ok(is_instance_of)
     }
 
     fn execute_getfield(
