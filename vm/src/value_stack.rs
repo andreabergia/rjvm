@@ -7,11 +7,16 @@ use thiserror::Error;
 
 use crate::value::Value;
 
+/// Models the stack in a given call frame
+///
+/// The java stack has a few more features over the classical push and pop,
+/// i.e. the various dup instructions, so it is modelled explicitly
 #[derive(Debug)]
 pub struct ValueStack<'a> {
     stack: Vec<Value<'a>>,
 }
 
+/// Errors returned from various stack operations
 #[derive(Error, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ValueStackError {
     #[error("trying to grow stack beyond maximum capacity")]
@@ -21,6 +26,8 @@ pub enum ValueStackError {
 }
 
 impl<'a> ValueStack<'a> {
+    /// Maximum size is known because it is stored in the class file,
+    /// thus we can do only one allocation
     pub fn with_max_size(max_size: usize) -> Self {
         Self {
             stack: Vec::with_capacity(max_size),
@@ -141,6 +148,7 @@ impl<'a> ValueStack<'a> {
     }
 }
 
+/// Allows using the [] operator
 impl<'a, I> Index<I> for ValueStack<'a>
 where
     I: SliceIndex<[Value<'a>]>,

@@ -5,6 +5,7 @@ use crate::{
     class_and_method::ClassAndMethod, value::Value, vm::Vm,
 };
 
+/// A callback that implements a java method marked with "native"
 pub type NativeCallback<'a> = fn(
     &mut Vm<'a>,
     &mut CallStack<'a>,
@@ -12,13 +13,14 @@ pub type NativeCallback<'a> = fn(
     Vec<Value<'a>>,
 ) -> MethodCallResult<'a>;
 
+/// The registry of all known native methods
 #[derive(Default)]
 pub struct NativeMethodsRegistry<'a> {
     methods: HashMap<ClassMethodAndDescriptor, NativeCallback<'a>>,
 
     // Hack for checking that integration tests can actually print the correct values:
     // this just stores the values printed by a method named `tempPrint` into an array
-    // in the Vm object
+    // in the Vm object. This method is used for all classes whose name starts with rjvm.
     temp_print_callback: Option<NativeCallback<'a>>,
 }
 
@@ -46,7 +48,7 @@ impl<'a> NativeMethodsRegistry<'a> {
         );
     }
 
-    pub fn register_temp_print(&mut self, callback: NativeCallback<'a>) {
+    pub(crate) fn register_temp_print(&mut self, callback: NativeCallback<'a>) {
         self.temp_print_callback = Some(callback);
     }
 
@@ -65,6 +67,7 @@ impl<'a> NativeMethodsRegistry<'a> {
         type_descriptor: &str,
     ) -> Option<NativeCallback<'a>> {
         if class_name.starts_with("rjvm/") && method_name == "tempPrint" {
+            // Hack: this method is valid for all classes in the rjvm package
             self.temp_print_callback
         } else {
             self.methods
@@ -78,6 +81,7 @@ impl<'a> NativeMethodsRegistry<'a> {
     }
 }
 
+/// Hash key for the native method registry
 #[derive(Debug, PartialEq, Hash, Eq)]
 struct ClassMethodAndDescriptor {
     class: String,

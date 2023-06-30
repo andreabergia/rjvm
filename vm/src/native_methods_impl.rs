@@ -19,6 +19,7 @@ use crate::{
     vm_error::VmError,
 };
 
+/// Registers the built-in native methods
 pub(crate) fn register_natives(registry: &mut NativeMethodsRegistry) {
     registry.register_temp_print(|vm, _, _, args| temp_print(vm, args));
     register_noops(registry);
@@ -29,6 +30,7 @@ pub(crate) fn register_natives(registry: &mut NativeMethodsRegistry) {
     register_throwable_methods(registry);
 }
 
+/// These various methods are noop, i.e. they do not do anything
 fn register_noops(registry: &mut NativeMethodsRegistry) {
     registry.register(
         "java/lang/Object",
@@ -53,6 +55,7 @@ fn register_noops(registry: &mut NativeMethodsRegistry) {
     );
 }
 
+/// Methods to access the system clock
 fn register_time_methods(registry: &mut NativeMethodsRegistry) {
     registry.register("java/lang/System", "nanoTime", "()J", |_, _, _, _| {
         Ok(Some(Value::Long(get_nano_time())))
@@ -65,6 +68,7 @@ fn register_time_methods(registry: &mut NativeMethodsRegistry) {
     );
 }
 
+/// Methods related to the garbage collector
 fn register_gc_methods(registry: &mut NativeMethodsRegistry) {
     registry.register(
         "java/lang/System",
@@ -72,8 +76,13 @@ fn register_gc_methods(registry: &mut NativeMethodsRegistry) {
         "(Ljava/lang/Object;)I",
         |_, _, _, args| identity_hash_code(args),
     );
+    registry.register("java/lang/System", "gc", "()V", |vm, _, _, _| {
+        vm.run_garbage_collection()?;
+        Ok(None)
+    });
 }
 
+/// Native methods that deal with the internal representation of data
 fn register_native_repr_methods(registry: &mut NativeMethodsRegistry) {
     registry.register(
         "java/lang/System",
@@ -95,6 +104,7 @@ fn register_native_repr_methods(registry: &mut NativeMethodsRegistry) {
     );
 }
 
+/// Methods related to reflection
 fn register_reflection_methods(registry: &mut NativeMethodsRegistry) {
     registry.register(
         "java/lang/Class",
@@ -116,6 +126,7 @@ fn register_reflection_methods(registry: &mut NativeMethodsRegistry) {
     );
 }
 
+/// Methods of java.lang.Throwable
 fn register_throwable_methods(registry: &mut NativeMethodsRegistry) {
     registry.register(
         "java/lang/Throwable",
@@ -137,6 +148,7 @@ fn register_throwable_methods(registry: &mut NativeMethodsRegistry) {
     );
 }
 
+/// Debug method that does a "println", useful since we do not have real I/O
 fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a> {
     let arg = args.get(0).ok_or(VmError::ValidationException)?;
 
@@ -165,7 +177,7 @@ fn identity_hash_code(args: Vec<Value<'_>>) -> MethodCallResult<'_> {
 }
 
 fn native_array_copy(args: Vec<Value>) -> MethodCallResult {
-    // TODO: handle NullPointerException
+    // TODO: handle NullPointerException with the correct error
 
     let src = expect_array_at(&args, 0)?;
     let src_pos = expect_int_at(&args, 1)?;
@@ -184,7 +196,7 @@ pub fn array_copy<'a>(
     length: usize,
 ) -> Result<(), VmError> {
     if dest.elements_type() != src.elements_type() {
-        // TODO: we should throw ArrayStoreException
+        // TODO: we should throw an instance of ArrayStoreException
         return Err(VmError::ValidationException);
     }
 
@@ -214,7 +226,7 @@ fn double_to_raw_long_bits<'a>(args: &[Value<'a>]) -> MethodCallResult<'a> {
 fn get_class_loader(receiver: Option<AbstractObject>) -> MethodCallResult {
     debug!("invoked get class loader for object {:?}", receiver);
 
-    // TODO: it seems ok to return just null for the moment
+    // It seems ok to return just null for the moment
     Ok(Some(Value::Null))
 }
 

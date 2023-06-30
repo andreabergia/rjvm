@@ -4,6 +4,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+/// One element of the stack trace information. Models java.lang.StackTraceElement
 #[derive(Debug, Clone)]
 pub struct StackTraceElement<'a> {
     pub class_name: &'a str,

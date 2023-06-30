@@ -65,12 +65,18 @@ impl ClassPathEntry for JarFileClassPathEntry {
     }
 }
 
+/// Error returned if searching a class inside a Jar fails
 #[derive(Error, Debug, PartialEq)]
 pub enum JarFileError {
+    /// The jar file does not exist!
     #[error("file {0} not found")]
     NotFound(String),
+
+    /// Generic I/O error reading the file
     #[error("error reading file {0}")]
     ReadingError(String),
+
+    /// The file is not actually a valid jar
     #[error("file {0} is not a valid jar")]
     InvalidJar(String),
 }

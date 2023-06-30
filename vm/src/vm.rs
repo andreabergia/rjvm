@@ -243,7 +243,7 @@ impl<'a> Vm<'a> {
         match self.object_allocator.allocate(class) {
             Some(object) => object,
             None => {
-                self.do_garbage_collection()
+                self.run_garbage_collection()
                     .expect("could run garbage collection");
                 self.object_allocator
                     .allocate(class)
@@ -341,7 +341,7 @@ impl<'a> Vm<'a> {
         {
             Some(array) => array,
             None => {
-                self.do_garbage_collection()
+                self.run_garbage_collection()
                     .expect("could run garbage collection");
                 self.object_allocator
                     .allocate_array(elements_type, length)
@@ -386,7 +386,7 @@ impl<'a> Vm<'a> {
         )
     }
 
-    fn do_garbage_collection(&mut self) -> Result<(), VmError> {
+    pub fn run_garbage_collection(&mut self) -> Result<(), VmError> {
         let mut roots = vec![];
         roots.extend(
             self.statics
