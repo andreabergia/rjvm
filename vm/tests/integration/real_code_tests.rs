@@ -5,6 +5,8 @@ use rjvm_vm::{
     vm::{Vm, DEFAULT_MAX_MEMORY},
 };
 
+// This file tests the real classes in ../resources/rjvm
+
 fn create_base_vm(max_memory: usize) -> Vm<'static> {
     let mut vm = Vm::new(max_memory);
 

@@ -4,12 +4,14 @@ use rjvm_reader::{
     class_file_field::{ClassFileField, FieldConstantValue},
     field_flags::FieldFlags,
     field_type::{BaseType, FieldType},
-    utils,
 };
+use utils::read_class_from_bytes;
+
+use crate::utils;
 
 #[test_log::test]
 fn can_read_constants() {
-    let class = utils::read_class_from_bytes(include_bytes!("../resources/rjvm/Constants.class"));
+    let class = read_class_from_bytes(include_bytes!("../resources/rjvm/Constants.class"));
     assert_eq!(
         vec!(
             ClassFileField {

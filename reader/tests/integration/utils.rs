@@ -1,6 +1,6 @@
 use log::info;
 
-use crate::{class_file::ClassFile, class_reader};
+use rjvm_reader::{class_file::ClassFile, class_reader};
 
 pub fn read_class_from_bytes(bytes: &[u8]) -> ClassFile {
     let class = class_reader::read_buffer(bytes).unwrap();

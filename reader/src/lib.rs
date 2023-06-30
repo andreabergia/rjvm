@@ -21,4 +21,3 @@ pub mod method_descriptor;
 pub mod method_flags;
 pub mod program_counter;
 pub mod type_conversion;
-pub mod utils;

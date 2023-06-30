@@ -5,15 +5,14 @@ use rjvm_reader::{
     exception_table::{ExceptionTable, ExceptionTableEntry},
     method_flags::MethodFlags,
     program_counter::ProgramCounter,
-    utils,
 };
+use utils::read_class_from_bytes;
 
-use crate::assertions::check_method;
+use crate::{assertions::check_method, utils};
 
 #[test_log::test]
 fn can_read_class_with_exception_handler_and_throws() {
-    let class =
-        utils::read_class_from_bytes(include_bytes!("../resources/rjvm/ExceptionsHandlers.class"));
+    let class = read_class_from_bytes(include_bytes!("../resources/rjvm/ExceptionsHandlers.class"));
     assert_eq!("rjvm/ExceptionsHandlers", class.name);
 
     check_methods(&class);

@@ -1,11 +1,11 @@
 extern crate rjvm_reader;
 
-use rjvm_reader::utils;
+use crate::utils;
+use utils::read_class_from_bytes;
 
 #[test_log::test]
 fn can_read_deprecated_attribute() {
-    let class =
-        utils::read_class_from_bytes(include_bytes!("../resources/rjvm/DeprecatedClass.class"));
+    let class = read_class_from_bytes(include_bytes!("../resources/rjvm/DeprecatedClass.class"));
     assert!(class.deprecated);
 
     class.fields.get(0).unwrap();
