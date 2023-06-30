@@ -24,19 +24,20 @@ Things not implemented (and not planned to):
 - annotations
 - [class file verification](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10)
 - I/O
-- just in time code execution
+- just in time code execution (JIT)
 
 However, there's quite a few things implemented:
 
 - parsing .class files
 - class loading from a jar file or from a folder
-- execution of code:
+- execution of real code:
     - primitive types, arrays, strings
     - control flow statements
     - classes, subclasses, interfaces
     - methods (virtual, static, natives)
     - exception throwing and catching
     - stack traces
+    - garbage collection
 
 The JVM uses the real classes from [OpenJDK 7](https://jdk.java.net/java-se-ri/7) - meaning the classes such as
 `java.lang.Object`, `java.lang.String` or `java.lang.Exception` are _real_ classes, without any modifications. The JVM
@@ -48,8 +49,6 @@ Before declaring the project "complete", these are the things I still plan to im
 
 - throwing real java exceptions (rather than internal errors that will abort executions) for things like stack overflow,
   accessing an array out of bounds, divisions by zero, etc
-- review of the memory layout of objects
-- garbage collection
 
 There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
 but it is "good enough" to execute some simple code; for example arrays aren't real objects, or we don't really have the
