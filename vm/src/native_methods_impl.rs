@@ -13,7 +13,7 @@ use crate::{
     time::{get_current_time_millis, get_nano_time},
     value::{
         expect_abstract_object_at, expect_array_at, expect_concrete_object_at, expect_double_at,
-        expect_float_at, expect_int_at, expect_receiver, Value,
+        expect_float_at, expect_int_at, Value,
     },
     vm::Vm,
     vm_error::VmError,
@@ -246,7 +246,7 @@ fn fill_in_stack_trace<'a>(
     call_stack: &mut CallStack<'a>,
     receiver: Option<AbstractObject<'a>>,
 ) -> MethodCallResult<'a> {
-    let receiver = expect_receiver(receiver)?;
+    let receiver = expect_some_receiver(receiver)?;
     let stack_trace_elements = call_stack.get_stack_trace_elements();
     vm.associate_stack_trace_with_throwable(receiver.clone(), stack_trace_elements);
     Ok(Some(Value::Object(receiver)))
@@ -256,7 +256,7 @@ fn get_stack_trace_depth<'a>(
     vm: &mut Vm<'a>,
     receiver: Option<AbstractObject<'a>>,
 ) -> MethodCallResult<'a> {
-    let receiver = expect_receiver(receiver)?;
+    let receiver = expect_some_receiver(receiver)?;
     match vm.get_stack_trace_associated_with_throwable(receiver) {
         Some(stack_trace_elements) => Ok(Some(Value::Int(stack_trace_elements.len() as i32))),
         None => Err(MethodCallFailed::InternalError(
@@ -271,7 +271,7 @@ fn get_stack_trace_element<'a>(
     receiver: Option<AbstractObject<'a>>,
     args: Vec<Value<'a>>,
 ) -> MethodCallResult<'a> {
-    let receiver = expect_receiver(receiver)?;
+    let receiver = expect_some_receiver(receiver)?;
     let index = expect_int_at(&args, 0)?;
     match vm.get_stack_trace_associated_with_throwable(receiver) {
         Some(stack_trace_elements) => {
@@ -283,5 +283,12 @@ fn get_stack_trace_element<'a>(
         None => Err(MethodCallFailed::InternalError(
             VmError::ValidationException,
         )),
+    }
+}
+
+fn expect_some_receiver(receiver: Option<AbstractObject>) -> Result<AbstractObject, VmError> {
+    match receiver {
+        Some(v) => Ok(v),
+        None => Err(VmError::ValidationException),
     }
 }

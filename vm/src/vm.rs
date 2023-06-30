@@ -240,13 +240,13 @@ impl<'a> Vm<'a> {
 
     pub fn new_object_of_class(&mut self, class: ClassRef<'a>) -> AbstractObject<'a> {
         debug!("allocating new instance of {}", class.name);
-        match self.object_allocator.allocate(class) {
+        match self.object_allocator.allocate_object(class) {
             Some(object) => object,
             None => {
                 self.run_garbage_collection()
                     .expect("could run garbage collection");
                 self.object_allocator
-                    .allocate(class)
+                    .allocate_object(class)
                     .expect("cannot allocate object even after full garbage collection!")
             }
         }

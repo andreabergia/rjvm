@@ -19,6 +19,7 @@ use crate::{
     vm_error::VmError,
 };
 
+/// Models an allocated chunk of memory
 struct MemoryChunk {
     memory: *mut u8,
     used: usize,
@@ -27,7 +28,11 @@ struct MemoryChunk {
 
 impl fmt::Debug for MemoryChunk {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{{used={}, capacity={}}}", self.used, self.capacity)
+        write!(
+            f,
+            "{{address={:#0x}, used={}, capacity={}}}",
+            self.memory as u64, self.used, self.capacity
+        )
     }
 }
 
@@ -35,7 +40,7 @@ impl MemoryChunk {
     fn new(capacity: usize) -> Self {
         let layout = Layout::from_size_align(capacity, 8).unwrap();
         let ptr = unsafe { std::alloc::alloc_zeroed(layout) };
-        println!(
+        debug!(
             "allocated memory chunk of size {} at {:#0x}",
             capacity, ptr as u64
         );
@@ -47,12 +52,13 @@ impl MemoryChunk {
         }
     }
 
+    /// Allocates from the chunk, or returns None if there is not enough space
     fn alloc(&mut self, required_size: usize) -> Option<AllocEntry> {
         if self.used + required_size > self.capacity {
             return None;
         }
 
-        // We need all allocations to be aligned to 8
+        // We require all allocations to be aligned to 8 bytes!
         assert_eq!(required_size % 8, 0);
 
         let ptr = unsafe { self.memory.add(self.used) };
@@ -69,6 +75,16 @@ impl MemoryChunk {
     }
 }
 
+/// Models the object allocator and the garbage collector!
+///
+/// For the garbage collection, we use a very simple semi-space copying collector. We split the
+/// memory in two chunks (semi-spaces), and we allocate objects in one of them. When the current
+/// chunk is full, we run the garbage collector, which copies all reachable objects to the other
+/// chunk, and then swaps the chunks. Finally, it updates all the given gc roots.
+///
+/// Obviously, this wastes half the memory, which is why nobody uses this algorithm
+/// in any real inmplementation. However, it is quite simple, and handles reference cycles,
+/// so it is the one I have chosen here.
 pub struct ObjectAllocator<'a> {
     current: MemoryChunk,
     other: MemoryChunk,
@@ -85,13 +101,15 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
-    pub fn allocate(&mut self, class: &Class<'a>) -> Option<AbstractObject<'a>> {
+    /// Allocates a new object, or returns None if the memory is full
+    pub fn allocate_object(&mut self, class: &Class<'a>) -> Option<AbstractObject<'a>> {
         let size = AbstractObject::size_of_object(class);
         self.current
             .alloc(size)
             .map(|alloc_entry| AbstractObject::new_object(class, alloc_entry))
     }
 
+    /// Allocates a new array, or returns None if the memory is full
     pub fn allocate_array(
         &mut self,
         elements_type: ArrayEntryType,
@@ -103,6 +121,7 @@ impl<'a> ObjectAllocator<'a> {
             .map(|alloc_entry| AbstractObject::new_array(elements_type, length, &alloc_entry))
     }
 
+    /// Runs the garbage collection! Will update the roots with the new addresses of the objects.
     pub unsafe fn do_garbage_collection(
         &mut self,
         roots: Vec<*mut AbstractObject<'a>>,
@@ -118,9 +137,7 @@ impl<'a> ObjectAllocator<'a> {
         for root in roots.iter() {
             self.visit(*root, class_resolver)?;
         }
-
         self.fix_references_in_new_region(class_resolver)?;
-
         for root in roots {
             self.fix_gc_root(root);
         }
@@ -136,6 +153,9 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
+    /// Visits a given object, unless it was already processed.
+    /// Copies the object to the other semispace and proceeds recursively on the object's
+    /// fields or array entries.
     unsafe fn visit(
         &mut self,
         object_ptr: *const AbstractObject<'a>,
@@ -186,6 +206,7 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
+    /// Invokes recursively [visit] on all field of the given object.
     unsafe fn visit_fields_of_object(
         &mut self,
         object: &AbstractObject<'a>,
@@ -195,10 +216,7 @@ impl<'a> ObjectAllocator<'a> {
             .find_class_by_id(object.class_id())
             .ok_or(VmError::ValidationException)?;
 
-        debug!(
-            "should visit members of {:?} of class {}",
-            object, class.name
-        );
+        debug!("should visit members of {object:?} of class {}", class.name);
 
         for (index, field) in class.all_fields().enumerate().filter(|(_, f)| {
             matches!(
@@ -222,6 +240,7 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
+    /// Invokes recursively [visit] on all entries of the given array.
     unsafe fn visit_entries_of_array(
         &mut self,
         array: &AbstractObject<'a>,
@@ -254,6 +273,8 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
+    /// Iterates over the copied objects in the new region, which still have pointers to the
+    /// objects in the original semispace, by updating the references with the copies' addresses.
     unsafe fn fix_references_in_new_region(
         &mut self,
         class_resolver: &impl ClassByIdResolver<'a>,
@@ -276,6 +297,7 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
+    /// Fixes all the references for each field in the given object
     unsafe fn fix_references_in_object(
         &self,
         object: AbstractObject<'a>,
@@ -285,7 +307,7 @@ impl<'a> ObjectAllocator<'a> {
             .find_class_by_id(object.class_id())
             .ok_or(VmError::ValidationException)?;
 
-        debug!("fixing members of {:?} of class {}", object, class.name);
+        debug!("fixing members of {object:?} of class {}", class.name);
 
         for (index, field) in class.all_fields().enumerate().filter(|(_, f)| {
             matches!(
@@ -308,6 +330,7 @@ impl<'a> ObjectAllocator<'a> {
         Ok(())
     }
 
+    /// Fixes all the references for each element in the given array
     unsafe fn fix_references_in_array(&mut self, array: AbstractObject<'a>) -> Result<(), VmError> {
         match array.elements_type() {
             ArrayEntryType::Base(_) => {
@@ -315,18 +338,18 @@ impl<'a> ObjectAllocator<'a> {
                 Ok(())
             }
             ArrayEntryType::Object(class_id) => {
-                debug!("fixing entries of array {:?} of type {}", array, class_id);
+                debug!("fixing entries of array {array:?} of type {class_id}");
                 for i in 0..array.len().into_usize_safe() {
                     let element_ptr = array.ptr_to_array_element(i);
                     debug!(
-                        "  need to fix element {} at offset {:#0x}",
-                        i, element_ptr as u64
+                        "  need to fix element {i} at offset {:#0x}",
+                        element_ptr as u64
                     );
 
                     let new_address = self.fix_reference(element_ptr);
                     debug!(
-                        "  fixed element {} at offset {:#0x} - new value is {:#0x}",
-                        i, element_ptr as u64, new_address as u64
+                        "  fixed element {i} at offset {:#0x} - new value is {:#0x}",
+                        element_ptr as u64, new_address as u64
                     );
                 }
                 Ok(())
@@ -337,18 +360,23 @@ impl<'a> ObjectAllocator<'a> {
         }
     }
 
+    /// Updates a reference from the old semispace by replacing it with the new value.
+    /// Assumes that the word after the old reference's header contains the address of the new
+    /// object, as set by [visit].
     unsafe fn fix_reference(&self, field_value_ptr: *mut u8) -> *const u8 {
         if 0 == std::ptr::read(field_value_ptr as *const u64) {
-            // Skipping nulls
+            // Skip nulls
             return null();
         }
 
         // Write new address, stored in the word after the header in the old object
         let old_referred_object = std::ptr::read(field_value_ptr as *const *const u8);
         assert!(self.current.contains(old_referred_object));
-        let new_referred_object_address =
-            std::ptr::read(old_referred_object.add(ALLOC_HEADER_SIZE) as *const *const u8);
+
+        let word_after_header = old_referred_object.add(ALLOC_HEADER_SIZE) as *const *const u8;
+        let new_referred_object_address = std::ptr::read(word_after_header);
         assert!(self.other.contains(new_referred_object_address));
+
         std::ptr::write(
             field_value_ptr as *mut *const u8,
             new_referred_object_address,
@@ -356,6 +384,7 @@ impl<'a> ObjectAllocator<'a> {
         new_referred_object_address
     }
 
+    /// Updates a gc root so that it points to the new object
     unsafe fn fix_gc_root(&self, root: *mut AbstractObject<'a>) {
         debug!("fixing gc root {:#0x}", root as u64);
         self.fix_reference(root as *mut u8);
