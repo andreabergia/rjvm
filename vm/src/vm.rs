@@ -28,6 +28,7 @@ use crate::{
     vm_error::VmError,
 };
 
+/// An instance of the virtual machine. Single-threaded, can execute one method (generally `main`).
 pub struct Vm<'a> {
     /// Responsible for allocating and storing classes
     class_manager: ClassManager<'a>,
@@ -39,7 +40,8 @@ pub struct Vm<'a> {
     call_stacks: Arena<CallStack<'a>>,
 
     /// To model static fields, we will create one special instance of each class
-    /// and we will store it in this map
+    /// and we will store it in this map. This is a bit hacky, and wastes memory
+    /// because we will allocate space for non-static fields, but it works easily!
     statics: HashMap<ClassId, AbstractObject<'a>>,
 
     /// Stores native methods
@@ -54,7 +56,9 @@ pub struct Vm<'a> {
     /// clarity.
     throwable_call_stacks: HashMap<i32, Vec<StackTraceElement<'a>>>,
 
-    pub printed: Vec<Value<'a>>, // Temporary, used for testing purposes
+    /// Since we do not have I/O, we have a fake native method that does a println.
+    /// To check in the tests what the java bytecode printed, we store it here.
+    pub printed: Vec<Value<'a>>,
 }
 
 pub const ONE_MEGABYTE: usize = 1024 * 1024;
@@ -82,21 +86,6 @@ impl<'a> Vm<'a> {
         };
         crate::native_methods_impl::register_natives(&mut result.native_methods_registry);
         result
-    }
-
-    pub fn extract_str_from_java_lang_string(
-        &self,
-        object: &impl Object<'a>,
-    ) -> Result<String, VmError> {
-        let class = self.get_class_by_id(object.class_id())?;
-        if class.name == "java/lang/String" {
-            // In our JRE's rt.jar, the first fields of String is
-            //    private final char[] value;
-            if let Value::Object(array) = object.get_field(class, 0) {
-                return string_from_char_array(array);
-            }
-        }
-        Err(VmError::ValidationException)
     }
 
     pub(crate) fn get_static_instance(&self, class_id: ClassId) -> Option<AbstractObject<'a>> {
@@ -186,6 +175,7 @@ impl<'a> Vm<'a> {
             return self.invoke_native(call_stack, class_and_method, object, args);
         }
 
+        // Generic bytecode method
         let mut frame = call_stack.add_frame(class_and_method, object, args)?;
         let result = frame.as_mut().execute(self, call_stack);
         call_stack
@@ -221,6 +211,8 @@ impl<'a> Vm<'a> {
         }
     }
 
+    /// Allocates a new call stack. We need to store it to be able to refer it later, for
+    /// extracting the gc roots.
     pub fn allocate_call_stack(&mut self) -> &'a mut CallStack<'a> {
         let stack = self.call_stacks.alloc(CallStack::new());
         unsafe {
@@ -281,6 +273,21 @@ impl<'a> Vm<'a> {
         string_object.set_field(1, Value::Int(0));
         string_object.set_field(6, Value::Int(0));
         Ok(string_object)
+    }
+
+    pub fn extract_str_from_java_lang_string(
+        &self,
+        object: &impl Object<'a>,
+    ) -> Result<String, VmError> {
+        let class = self.get_class_by_id(object.class_id())?;
+        if class.name == "java/lang/String" {
+            // In our JRE's rt.jar, the first fields of String is
+            //    private final char[] value;
+            if let Value::Object(array) = object.get_field(class, 0) {
+                return string_from_char_array(array);
+            }
+        }
+        Err(VmError::ValidationException)
     }
 
     pub fn new_java_lang_class_object(

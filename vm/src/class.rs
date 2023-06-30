@@ -45,6 +45,7 @@ pub struct Class<'a> {
     pub methods: Vec<ClassFileMethod>,
     // Base classes field have the same index they have in the base class, and our own
     // field come after. This is the index of the first "owned" field.
+    // Note that this will include the static fields, as required by the bytecode specs.
     pub first_field_index: usize,
     // The total number of fields in this class, including those in the base class.
     pub num_total_fields: usize,

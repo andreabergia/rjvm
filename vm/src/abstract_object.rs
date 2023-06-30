@@ -120,6 +120,7 @@ impl<'a> AbstractObject<'a> {
     // for fields that would fit in 4 or less, but it means computing a
     // field offset is trivial (index * 8) and that we have no problem with
     // memory alignment.
+    // We also waste space because we allocate space for the static fields in each instance.
     pub(crate) fn size_of_object(class: &Class) -> usize {
         let fields_sizes: usize = 8 * class.num_total_fields;
         ALLOC_HEADER_SIZE + OBJECT_HEADER_SIZE + fields_sizes
