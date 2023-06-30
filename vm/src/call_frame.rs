@@ -32,8 +32,71 @@ use crate::{
     vm_error::VmError,
 };
 
+/// A method call can return:
+/// - for success: a value, or a None option in case of void methods
+/// - for failures: a MethodCallFailed error
 pub type MethodCallResult<'a> = Result<Option<Value<'a>>, MethodCallFailed<'a>>;
 
+#[derive(Debug)]
+struct MethodReference<'a> {
+    class_name: &'a str,
+    method_name: &'a str,
+    type_descriptor: &'a str,
+}
+
+#[derive(Debug)]
+struct FieldReference<'a> {
+    class_name: &'a str,
+    field_name: &'a str,
+    #[allow(dead_code)]
+    type_descriptor: &'a str,
+}
+
+/// A call frame for a single method call inside a [CallStack].
+#[derive(Debug)]
+pub struct CallFrame<'a> {
+    /// The class and method that is being executed
+    class_and_method: ClassAndMethod<'a>,
+
+    /// The current program counter
+    pc: ProgramCounter,
+
+    /// The locals variables' map of the method
+    locals: Vec<Value<'a>>,
+
+    /// The current stack
+    stack: ValueStack<'a>,
+
+    /// The bytecode to execute
+    code: &'a Vec<u8>,
+}
+
+/// One of the possible invocation kind of methods in the JVM.
+#[derive(Clone, Copy)]
+enum InvokeKind {
+    /// Special instance methods include constructors and calls to method of this class,
+    /// bypassing virtual function resolution
+    Special,
+    /// Static methods do not take a receiver object
+    Static,
+    /// Virtual instance methods will apply the virtual function resolution
+    Virtual,
+    /// Invokation of an interface's method. Will apply the virtual function resolution
+    Interface,
+}
+
+/// Possible execution result of an instruction
+enum InstructionCompleted<'a> {
+    /// Indicates that the instruction executed was one of the return family. The caller
+    /// should stop the method execution and return the value.
+    ReturnFromMethod(Option<Value<'a>>),
+
+    /// Indicates that the instruction was not a return, and thus the execution should
+    /// resume from the instruction at the program counter.
+    ContinueMethodExecution,
+}
+
+/// Pops a Value of the appropriate type from the stack
 macro_rules! generate_pop {
     ($name:ident, $variant:ident, $type:ty) => {
         fn $name(&mut self) -> Result<$type, MethodCallFailed<'a>> {
@@ -48,6 +111,7 @@ macro_rules! generate_pop {
     };
 }
 
+/// Executes a return with a value of the given type, popping from the stack
 macro_rules! generate_execute_return {
     ($name:ident, $variant:ident) => {
         fn $name(&mut self) -> MethodCallResult<'a> {
@@ -63,6 +127,7 @@ macro_rules! generate_execute_return {
     };
 }
 
+/// Generic arithmetic isntruction: pops two values, executes an operation, and pushes the result
 macro_rules! generate_execute_math {
     ($name:ident, $pop_fn:ident, $variant:ident, $type:ty) => {
         fn $name<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
@@ -77,6 +142,7 @@ macro_rules! generate_execute_math {
     };
 }
 
+/// Pops a number, negates it, and pushes the negated value
 macro_rules! generate_execute_neg {
     ($name:ident, $pop_fn:ident, $variant:ident) => {
         fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
@@ -86,6 +152,7 @@ macro_rules! generate_execute_neg {
     };
 }
 
+/// Coerces a type to another via a function
 macro_rules! generate_execute_coerce {
     ($name:ident, $pop_fn:ident, $type:ty) => {
         fn $name<T>(&mut self, evaluator: T) -> Result<(), MethodCallFailed<'a>>
@@ -99,6 +166,7 @@ macro_rules! generate_execute_coerce {
     };
 }
 
+/// Pops two values, compares them, and pushes the result (+1, -1, or zero)
 macro_rules! generate_compare {
     ($name:ident, $pop_fn:ident) => {
         fn $name(&mut self, sign_for_greater: i32) -> Result<(), MethodCallFailed<'a>> {
@@ -115,6 +183,7 @@ macro_rules! generate_compare {
     };
 }
 
+/// Pushes the value of a local variable on the stack
 macro_rules! generate_execute_load {
     ($name:ident, $($variant:ident),+) => {
         fn $name(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
@@ -129,6 +198,7 @@ macro_rules! generate_execute_load {
     };
 }
 
+/// Pops and then stores the value on a local variable
 macro_rules! generate_execute_store {
     ($name:ident, $variant:ident) => {
         fn $name(&mut self, index: usize) -> Result<(), MethodCallFailed<'a>> {
@@ -146,6 +216,7 @@ macro_rules! generate_execute_store {
     };
 }
 
+/// Pops the index and the array and pushes the element at the index
 macro_rules! generate_execute_array_load {
     ($name:ident, $($variant:pat),+) => {
         fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
@@ -162,6 +233,7 @@ macro_rules! generate_execute_array_load {
     };
 }
 
+/// Pops the value, the index, and the array, and sets the element at the index
 macro_rules! generate_execute_array_store {
     ($name:ident, $pop_fn:ident, $map_fn:ident, $($variant:pat),+) => {
         fn $name(&mut self) -> Result<(), MethodCallFailed<'a>> {
@@ -177,43 +249,6 @@ macro_rules! generate_execute_array_store {
             Ok(())
         }
     };
-}
-
-#[derive(Debug)]
-struct MethodReference<'a> {
-    class_name: &'a str,
-    method_name: &'a str,
-    type_descriptor: &'a str,
-}
-
-#[derive(Debug)]
-struct FieldReference<'a> {
-    class_name: &'a str,
-    field_name: &'a str,
-    #[allow(dead_code)]
-    type_descriptor: &'a str,
-}
-
-#[derive(Debug)]
-pub struct CallFrame<'a> {
-    class_and_method: ClassAndMethod<'a>,
-    pc: ProgramCounter,
-    locals: Vec<Value<'a>>,
-    stack: ValueStack<'a>,
-    code: &'a Vec<u8>,
-}
-
-#[derive(Clone, Copy)]
-enum InvokeKind {
-    Special,
-    Static,
-    Virtual,
-    Interface,
-}
-
-enum InstructionCompleted<'a> {
-    ReturnFromMethod(Option<Value<'a>>),
-    ContinueMethodExecution,
 }
 
 impl<'a> CallFrame<'a> {
@@ -258,6 +293,7 @@ impl<'a> CallFrame<'a> {
         None
     }
 
+    /// Executes the whole method
     pub fn execute(
         &mut self,
         vm: &mut Vm<'a>,
@@ -308,6 +344,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
+    // Reference: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html
     fn execute_instruction(
         &mut self,
         vm: &mut Vm<'a>,
@@ -653,7 +690,7 @@ impl<'a> CallFrame<'a> {
 
             Instruction::Athrow => self.execute_athrow()?,
 
-            /* Unsupported instructions:
+            /* Unimplemented instructions:
             Instruction::Goto_w => {}
             Instruction::Invokedynamic(_) => {}
             Instruction::Jsr(_) => {}
@@ -753,8 +790,9 @@ impl<'a> CallFrame<'a> {
         let method_reference = self.get_constant_method_reference(constant_index)?;
         if method_reference.class_name.starts_with('[') && method_reference.method_name == "clone" {
             // TODO:
-            // Since we have NOT modelled arrays properly (i.e. they are not an object, as they
-            // should be), we need a special case for invoking "clone" on an array.
+            //  Since we have NOT modelled arrays properly (i.e. we do not have a real class
+            //  to model them), we cannot lookup methods naturally. Thus we have a special case for
+            //  invoking "clone" on an array.
             let array = self.pop()?;
             let clone = vm.clone_array(array)?;
             return self.push(clone);
@@ -1009,8 +1047,11 @@ impl<'a> CallFrame<'a> {
                 class_and_method.class,
             )?)
         };
+
+        // Faster than repeated pops :-)
         let mut params = Vec::from(&self.stack[cur_stack_len - num_params..cur_stack_len]);
         Self::fix_long_and_double_params(&mut params)?;
+
         Ok((
             receiver,
             params,
@@ -1018,10 +1059,11 @@ impl<'a> CallFrame<'a> {
         ))
     }
 
-    // long and double arguments should take two slots in the variable table
+    // By the JVM spec, long and double method arguments should take two slots in the
+    // method variable table. However, on the stack they are _one_ entry!
     // Since in our implementation we do not "split" the numbers in two 32-bits parts,
     // we can just add an empty slot in the variable after a long or a double. All the
-    // bytecode instructions should refer to the "first" value anyway.
+    // bytecode instructions will refer to the "first" value anyway.
     fn fix_long_and_double_params(params: &mut Vec<Value>) -> Result<(), VmError> {
         let mut num_params = params.len();
         let mut i = 0usize;
@@ -1368,8 +1410,7 @@ impl<'a> CallFrame<'a> {
 
     fn execute_array_length(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let array = self.pop_array()?;
-        let len = array.len();
-        let len = len as i32;
+        let len = array.len() as i32;
         self.push(Int(len))?;
         Ok(())
     }
@@ -1478,6 +1519,7 @@ impl<'a> CallFrame<'a> {
         }
     }
 
+    // Pops a value from the stack and returns whether the cast is valid or not, and the popped value
     fn is_instanceof(
         &mut self,
         vm: &mut Vm<'a>,
@@ -1486,7 +1528,8 @@ impl<'a> CallFrame<'a> {
     ) -> Result<(bool, Value<'a>), MethodCallFailed<'a>> {
         let class_name = self.get_constant_class_reference(constant_index)?;
 
-        // TODO: multidimensional arrays
+        // TODO: we should model classes of arrays
+        // TODO: multidimensional arrays are not supported!
         let (is_array, expected_class) = {
             if class_name.starts_with("[L") && class_name.ends_with(';') {
                 (

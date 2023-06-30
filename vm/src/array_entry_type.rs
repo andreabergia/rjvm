@@ -4,6 +4,11 @@ use crate::{class::ClassId, class_resolver_by_id::ClassByIdResolver};
 
 #[derive(PartialEq, Clone, Debug)]
 #[repr(u8)]
+// TODO: this should eventually be removed.
+/// This models the entries of an array, and it is stored in the same memory as the entries.
+/// Ideally, we'd want to reuse [FieldType], but unfortunately we cannot since it contains a
+/// String, and its points to heap-allocated data. We could use modify that to use a raw
+/// &str and create it from our memory chunk, but it would be complicated.
 pub enum ArrayEntryType {
     Base(BaseType),
     Object(ClassId),
@@ -23,8 +28,7 @@ impl ArrayEntryType {
                 .find_class_by_id(class_id)
                 .map(|class| FieldType::Object(class.name.clone())),
             ArrayEntryType::Array => {
-                // Arrays of arrays are not supported at the moment
-                todo!()
+                todo!("Arrays of arrays are not supported at the moment")
             }
         }
     }

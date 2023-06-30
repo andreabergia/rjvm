@@ -19,6 +19,9 @@ use crate::{
     vm_error::VmError,
 };
 
+// TODO: I am not super happy with this implementation.
+//  We reuse the same model as an array, or as a real object, via two traits, but there is no type
+//  enforcement, only runtime checks.
 #[derive(PartialEq, Clone)]
 #[repr(transparent)]
 pub struct AbstractObject<'a> {
@@ -32,6 +35,7 @@ pub(crate) enum GcState {
     Marked,
 }
 
+// Needed for usage with bitfield
 impl From<u64> for GcState {
     fn from(value: u64) -> Self {
         match value {
@@ -54,6 +58,7 @@ pub enum ObjectKind {
     Array,
 }
 
+// Needed for usage with bitfield
 impl From<u64> for ObjectKind {
     fn from(value: u64) -> Self {
         match value {
@@ -70,6 +75,7 @@ impl From<ObjectKind> for u64 {
     }
 }
 
+/// The first word of any allocated object
 #[bitfield(u64)]
 #[derive(PartialEq, Eq)]
 pub(crate) struct AllocHeader {
@@ -86,11 +92,13 @@ pub(crate) struct AllocHeader {
     pub(crate) size: usize,
 }
 
+/// The second word of an allocated "classical" object
 #[repr(transparent)]
 struct ObjectHeader {
     class_id: ClassId,
 }
 
+/// The second word of an allocated array
 struct ArrayHeader {
     elements_type: ArrayEntryType,
     length: u32,
@@ -232,9 +240,12 @@ impl<'a> Debug for AbstractObject<'a> {
     }
 }
 
+fn hash(data: u64) -> u64 {
+    (data >> 32) ^ (data)
+}
+
 fn identity_hash_code(ptr: *mut u8) -> i32 {
-    let addr = ptr as u64;
-    let hash = (addr >> 32) ^ (addr);
+    let hash = hash(ptr as u64);
 
     // Note: we'll take some of the least significant bits here,
     // since we'll store this in AllocHeader!
@@ -328,13 +339,6 @@ impl<'a> Object<'a> for AbstractObject<'a> {
             read_value(ptr, &field.type_descriptor)
         }
     }
-
-    fn as_abstract_object(&self) -> AbstractObject {
-        AbstractObject {
-            data: self.data,
-            marker: PhantomData,
-        }
-    }
 }
 
 // As arrays
@@ -386,15 +390,9 @@ impl<'a> Array<'a> for AbstractObject<'a> {
             }
         }
     }
-
-    fn as_abstract_object(&self) -> AbstractObject {
-        AbstractObject {
-            data: self.data,
-            marker: PhantomData,
-        }
-    }
 }
 
+/// Expects a char[] array and returns it as a string. Must contain valid utf-16.
 pub fn string_from_char_array(array: AbstractObject) -> Result<String, VmError> {
     if array.kind() != ObjectKind::Array {
         return Err(VmError::ValidationException);
