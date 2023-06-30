@@ -5,6 +5,10 @@ use itertools::Itertools;
 
 use crate::program_counter::ProgramCounter;
 
+/// Table that models the relationship between program counters and line numbers in the source code.
+/// Entries are sorted by program counter. A table with two entries, the first starting at 0 and
+/// the second at 3, means that the first three instructions in the bytecode correspond to line 1
+/// and the rest to line 2.
 #[derive(Debug, PartialEq)]
 pub struct LineNumberTable {
     entries: Vec<LineNumberTableEntry>,
@@ -29,6 +33,7 @@ impl LineNumberTable {
     }
 }
 
+/// Entries of a [LineNumberTable]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct LineNumberTableEntry {
     pub program_counter: ProgramCounter,

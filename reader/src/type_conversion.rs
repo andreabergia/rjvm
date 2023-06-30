@@ -1,3 +1,5 @@
+/// Simple utility trait that models the conversion of various integer types into usize.
+/// Assumes that these types are all smaller than usize, or panics.
 pub trait ToUsizeSafe {
     fn into_usize_safe(self) -> usize;
 }

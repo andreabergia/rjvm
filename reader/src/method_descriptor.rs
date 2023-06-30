@@ -7,6 +7,8 @@ use crate::{
     field_type::FieldType,
 };
 
+/// Models the signature of a method, i.e. the type of the parameters it takes and the type
+/// of the return value
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct MethodDescriptor {
     pub parameters: Vec<FieldType>,
@@ -25,6 +27,8 @@ impl fmt::Display for MethodDescriptor {
 }
 
 impl MethodDescriptor {
+    /// Parses a method descriptor as specified in the JVM specs:
+    /// https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.3
     pub fn parse(descriptor: &str) -> Result<MethodDescriptor, ClassReaderError> {
         let mut chars = descriptor.chars();
         match chars.next() {

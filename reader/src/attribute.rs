@@ -1,5 +1,6 @@
 use std::{fmt, fmt::Formatter};
 
+/// An attribute in the class file, which can belong to a class, field, method, or code block.
 #[derive(Debug, Default, PartialEq)]
 pub struct Attribute {
     pub name: String,

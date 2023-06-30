@@ -5,10 +5,13 @@ use std::{
 
 use crate::{buffer::BufferError, constant_pool::InvalidConstantPoolIndexError};
 
+/// Models the possible errors returned when reading a .class file
 #[derive(Debug, PartialEq, Eq)]
 pub enum ClassReaderError {
+    /// Generic error meaning that the class file is invalid
     InvalidClassData(String, Option<InvalidConstantPoolIndexError>),
     UnsupportedVersion(u16, u16),
+    /// Error while parsing a given type descriptor in the file
     InvalidTypeDescriptor(String),
 }
 

@@ -1,4 +1,5 @@
 bitflags! {
+    /// Flags of a class method
     pub struct MethodFlags: u16 {
         const PUBLIC = 0x0001;
         const PRIVATE = 0x0002;

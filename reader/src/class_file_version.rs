@@ -1,5 +1,6 @@
 use crate::class_reader_error::{ClassReaderError, Result};
 
+/// Versions of the JVM class file format.
 #[derive(Debug, PartialEq, Default, strum_macros::Display)]
 #[allow(dead_code)]
 pub enum ClassFileVersion {
@@ -10,6 +11,7 @@ pub enum ClassFileVersion {
     Jdk1_5,
     Jdk6,
     Jdk7,
+    #[default]
     Jdk8,
     Jdk9,
     Jdk10,
@@ -19,11 +21,16 @@ pub enum ClassFileVersion {
     Jdk14,
     Jdk15,
     Jdk16,
-    #[default]
     Jdk17,
+    Jdk18,
+    Jdk19,
+    Jdk20,
+    Jdk21,
+    Jdk22,
 }
 
 impl ClassFileVersion {
+    /// Creates a version from the major and minor versions specified in the class file
     pub fn from(major: u16, minor: u16) -> Result<ClassFileVersion> {
         match major {
             45 => Ok(ClassFileVersion::Jdk1_1),
@@ -43,6 +50,11 @@ impl ClassFileVersion {
             59 => Ok(ClassFileVersion::Jdk15),
             60 => Ok(ClassFileVersion::Jdk16),
             61 => Ok(ClassFileVersion::Jdk17),
+            62 => Ok(ClassFileVersion::Jdk18),
+            63 => Ok(ClassFileVersion::Jdk19),
+            64 => Ok(ClassFileVersion::Jdk20),
+            65 => Ok(ClassFileVersion::Jdk21),
+            66 => Ok(ClassFileVersion::Jdk22),
             _ => Err(ClassReaderError::UnsupportedVersion(major, minor)),
         }
     }

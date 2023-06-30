@@ -6,10 +6,16 @@ use ClassReaderError::InvalidTypeDescriptor;
 
 use crate::class_reader_error::ClassReaderError;
 
+/// Models the type of one field, or one parameter of a method
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldType {
+    /// Primitive types
     Base(BaseType),
+
+    /// Standard object
     Object(String),
+
+    /// Array
     Array(Box<FieldType>),
 }
 
@@ -23,6 +29,7 @@ impl fmt::Display for FieldType {
     }
 }
 
+/// Possible primitive types
 #[derive(Debug, Clone, PartialEq, strum_macros::Display)]
 #[repr(u8)]
 pub enum BaseType {
@@ -37,6 +44,8 @@ pub enum BaseType {
 }
 
 impl FieldType {
+    /// Parses a type descriptor as specified in the JVM specs:
+    /// https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.3.2
     pub fn parse(type_descriptor: &str) -> Result<FieldType, ClassReaderError> {
         let mut chars = type_descriptor.chars();
         let descriptor = Self::parse_from(type_descriptor, &mut chars)?;
@@ -46,7 +55,7 @@ impl FieldType {
         }
     }
 
-    pub fn parse_from(
+    pub(crate) fn parse_from(
         type_descriptor: &str,
         chars: &mut Chars,
     ) -> Result<FieldType, ClassReaderError> {
@@ -119,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn can_parse_simple_descriptors() {
+    fn can_parse_primitive_descriptors() {
         assert_eq!(Ok(FieldType::Base(BaseType::Byte)), FieldType::parse("B"));
         assert_eq!(Ok(FieldType::Base(BaseType::Char)), FieldType::parse("C"));
         assert_eq!(Ok(FieldType::Base(BaseType::Double)), FieldType::parse("D"));

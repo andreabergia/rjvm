@@ -1,11 +1,13 @@
 use cesu8::from_java_cesu8;
 use thiserror::Error;
 
+/// A buffer reader, used to marshall data from a generic byte array
 pub struct Buffer<'a> {
     buffer: &'a [u8],
     position: usize,
 }
 
+/// Errors related to reading from a [Buffer]
 #[derive(Error, Debug, PartialEq)]
 pub enum BufferError {
     #[error("unexpected end of data")]

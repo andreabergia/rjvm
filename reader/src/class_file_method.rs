@@ -10,15 +10,21 @@ use crate::{
     method_flags::MethodFlags,
 };
 
+/// Models a method in a class
 #[derive(Debug, PartialEq)]
 pub struct ClassFileMethod {
     pub flags: MethodFlags,
     pub name: String,
+    /// The type descriptor in the internal JVM form, i.e. something like (L)I in the unparsed form
     pub type_descriptor: String,
+    /// Parsed form of the method descriptor
     pub parsed_type_descriptor: MethodDescriptor,
+    /// Generic attributes of the method
+    // TODO: replace with some proper struct
     pub attributes: Vec<Attribute>,
     pub code: Option<ClassFileMethodCode>,
     pub deprecated: bool,
+    /// List of exceptions in the `throws` clause of the method
     pub thrown_exceptions: Vec<String>,
 }
 
@@ -67,14 +73,21 @@ impl ClassFileMethod {
     }
 }
 
+/// Code of a given method
 #[derive(Debug, Default, PartialEq)]
 pub struct ClassFileMethodCode {
+    /// Maximum depth of the stack at any time
     pub max_stack: u16,
+    /// Number of local variables used by the method
     pub max_locals: u16,
+    /// Raw bytecode
     pub code: Vec<u8>,
     pub exception_table: ExceptionTable,
     pub line_number_table: Option<LineNumberTable>,
-    pub attributes: Vec<Attribute>, // TODO: replace with some proper struct
+
+    /// Generic unmapped attributes of the code
+    // TODO: replace with some proper struct
+    pub attributes: Vec<Attribute>,
 }
 
 impl fmt::Display for ClassFileMethodCode {

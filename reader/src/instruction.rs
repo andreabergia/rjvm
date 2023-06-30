@@ -1,17 +1,6 @@
 use crate::class_reader_error::ClassReaderError;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NewArrayType {
-    Boolean,
-    Char,
-    Float,
-    Double,
-    Byte,
-    Short,
-    Int,
-    Long,
-}
-
+/// Represents a Java bytecode instruction.
 //noinspection SpellCheckingInspection
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -220,7 +209,22 @@ pub enum Instruction {
     Wide,
 }
 
+/// Possible arguments of instruction `newarray`
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NewArrayType {
+    Boolean,
+    Char,
+    Float,
+    Double,
+    Byte,
+    Short,
+    Int,
+    Long,
+}
+
 impl Instruction {
+    /// Reads one instruction from the bytecode, and returns it along
+    /// with the address of the start of the next instruction
     pub fn parse(raw_code: &[u8], address: usize) -> Result<(Self, usize), ClassReaderError> {
         let op_byte = Self::byte_at(raw_code, address)?;
         let mut address = address + 1;
@@ -310,10 +314,7 @@ impl Instruction {
             0xb4 => Instruction::Getfield(Self::read_u16(raw_code, &mut address)?),
             0xb2 => Instruction::Getstatic(Self::read_u16(raw_code, &mut address)?),
             0xa7 => Instruction::Goto(Self::read_offset(raw_code, &mut address)?),
-            0xc8 => {
-                /* OpCode::Goto_w */
-                todo!()
-            }
+            0xc8 => todo!("OpCode::Goto_w"),
             0x91 => Instruction::I2b,
             0x92 => Instruction::I2c,
             0x87 => Instruction::I2d,
@@ -396,10 +397,7 @@ impl Instruction {
             0x7c => Instruction::Iushr,
             0x82 => Instruction::Ixor,
             0xa8 => Instruction::Jsr(Self::read_offset(raw_code, &mut address)?),
-            0xc9 => {
-                /* OpCode::Jsr_w */
-                todo!()
-            }
+            0xc9 => todo!("OpCode::Jsr_w"),
             0x8a => Instruction::L2d,
             0x89 => Instruction::L2f,
             0x88 => Instruction::L2i,
@@ -421,10 +419,7 @@ impl Instruction {
             0x21 => Instruction::Lload_3,
             0x69 => Instruction::Lmul,
             0x75 => Instruction::Lneg,
-            0xab => {
-                /* OpCode::Lookupswitch */
-                todo!()
-            }
+            0xab => todo!("OpCode::Lookupswitch"),
             0x81 => Instruction::Lor,
             0x71 => Instruction::Lrem,
             0xad => Instruction::Lreturn,
@@ -475,14 +470,8 @@ impl Instruction {
             0x56 => Instruction::Sastore,
             0x11 => Instruction::Sipush(Self::read_i16(raw_code, &mut address)?),
             0x5f => Instruction::Swap,
-            0xaa => {
-                /* OpCode::Tableswitch */
-                todo!()
-            }
-            0xc4 => {
-                /* OpCode::Wide */
-                todo!()
-            }
+            0xaa => todo!("OpCode::Tableswitch"),
+            0xc4 => todo!("OpCode::Wide"),
             _ => {
                 return Err(ClassReaderError::invalid_class_data(format!(
                     "invalid op code: {op_byte:#04x} at address {address}"
@@ -493,7 +482,8 @@ impl Instruction {
         Ok((op_code, address))
     }
 
-    pub fn parse_instructions(
+    /// Parses all instructions in the given raw code.
+    pub(crate) fn parse_instructions(
         raw_code: &[u8],
     ) -> Result<Vec<(usize, Instruction)>, ClassReaderError> {
         let mut instructions: Vec<(usize, Self)> = Vec::new();

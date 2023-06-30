@@ -1,4 +1,5 @@
 bitflags! {
+    /// Class flags
     pub struct ClassAccessFlags: u16 {
         const PUBLIC = 0x0001;
         const FINAL = 0x0010;
