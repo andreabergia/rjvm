@@ -2,8 +2,7 @@ use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData, ptr::null};
 
 use log::{debug, info};
 
-use rjvm_reader::field_type::FieldType;
-use rjvm_utils::type_conversion::ToUsizeSafe;
+use rjvm_reader::{field_type::FieldType, type_conversion::ToUsizeSafe};
 
 use crate::{
     abstract_object::{AbstractObject, AllocHeader, GcState, ObjectKind, ALLOC_HEADER_SIZE},

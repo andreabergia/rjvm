@@ -6,8 +6,10 @@ use std::{
 
 use bitfield_struct::bitfield;
 
-use rjvm_reader::field_type::{BaseType, FieldType};
-use rjvm_utils::type_conversion::ToUsizeSafe;
+use rjvm_reader::{
+    field_type::{BaseType, FieldType},
+    type_conversion::ToUsizeSafe,
+};
 
 use crate::{
     alloc_entry::AllocEntry,

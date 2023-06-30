@@ -1,7 +1,7 @@
 use log::warn;
 use result::prelude::*;
 
-use rjvm_utils::{buffer::Buffer, type_conversion::ToUsizeSafe};
+use crate::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
 use crate::{
     attribute::Attribute,

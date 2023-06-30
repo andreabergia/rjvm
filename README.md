@@ -61,9 +61,6 @@ The VM is limited to 64 bits platforms, as there are a few places where we assum
 
 The code is currently structured in three crates:
 
-- `utils`, which contains some common code, unrelated to the JVM;
-    - this code is the oldest part of the project and is probably not particularly rust-idiomatic, or replaceable with
-      some crates
 - `reader`, which is able to read a `.class` file and contains various data structures for modelling their content;
 - `vm`, which contains the virtual machine that can execute the code as a library
 - `vm_cli`, which contains a very simple command-line launcher to run the vm, in the spirit of the `java` executable.

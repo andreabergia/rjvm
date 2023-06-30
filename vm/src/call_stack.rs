@@ -2,8 +2,9 @@ use std::{fmt, fmt::Formatter};
 
 use typed_arena::Arena;
 
-use rjvm_reader::{class_file_method::ClassFileMethodCode, method_flags::MethodFlags};
-use rjvm_utils::type_conversion::ToUsizeSafe;
+use rjvm_reader::{
+    class_file_method::ClassFileMethodCode, method_flags::MethodFlags, type_conversion::ToUsizeSafe,
+};
 
 use crate::{
     abstract_object::AbstractObject, call_frame::CallFrame, class_and_method::ClassAndMethod,

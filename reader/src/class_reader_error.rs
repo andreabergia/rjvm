@@ -3,8 +3,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::constant_pool::InvalidConstantPoolIndexError;
-use rjvm_utils::buffer::BufferError;
+use crate::{buffer::BufferError, constant_pool::InvalidConstantPoolIndexError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ClassReaderError {

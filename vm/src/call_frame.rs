@@ -8,8 +8,8 @@ use rjvm_reader::{
     instruction::{Instruction, NewArrayType},
     line_number::LineNumber,
     program_counter::ProgramCounter,
+    type_conversion::ToUsizeSafe,
 };
-use rjvm_utils::type_conversion::ToUsizeSafe;
 
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},

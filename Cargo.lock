@@ -568,21 +568,13 @@ name = "rjvm_reader"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "cesu8",
  "env_logger",
  "itertools",
  "log",
  "result",
- "rjvm_utils",
  "strum_macros",
  "test-log",
- "thiserror",
-]
-
-[[package]]
-name = "rjvm_utils"
-version = "0.1.0"
-dependencies = [
- "cesu8",
  "thiserror",
 ]
 
@@ -597,7 +589,6 @@ dependencies = [
  "log",
  "result",
  "rjvm_reader",
- "rjvm_utils",
  "test-log",
  "thiserror",
  "typed-arena",

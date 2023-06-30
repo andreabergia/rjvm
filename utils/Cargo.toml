@@ -1,8 +1,0 @@
-[package]
-name = "rjvm_utils"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-thiserror = "1"
-cesu8 = "1.1"

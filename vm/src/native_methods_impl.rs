@@ -1,6 +1,6 @@
 use log::{debug, info};
 
-use rjvm_utils::type_conversion::ToUsizeSafe;
+use rjvm_reader::type_conversion::ToUsizeSafe;
 
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},

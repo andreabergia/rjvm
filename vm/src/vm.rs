@@ -3,7 +3,7 @@ use std::{collections::HashMap, string::ToString};
 use log::{debug, error, info};
 use typed_arena::Arena;
 
-use rjvm_utils::type_conversion::ToUsizeSafe;
+use rjvm_reader::type_conversion::ToUsizeSafe;
 
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},

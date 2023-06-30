@@ -2,6 +2,7 @@
 extern crate bitflags;
 
 mod attribute;
+mod buffer;
 pub mod class_access_flags;
 pub mod class_file;
 pub mod class_file_field;
@@ -19,4 +20,5 @@ pub mod line_number_table;
 pub mod method_descriptor;
 pub mod method_flags;
 pub mod program_counter;
+pub mod type_conversion;
 pub mod utils;
