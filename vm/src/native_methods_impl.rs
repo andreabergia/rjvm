@@ -2,6 +2,10 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::java_objects_creation::{
+    extract_str_from_java_lang_string, new_java_lang_class_object,
+    new_java_lang_stack_trace_element_object,
+};
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
@@ -158,7 +162,7 @@ fn temp_print<'a>(vm: &mut Vm<'a>, args: Vec<Value<'a>>) -> MethodCallResult<'a>
                 .get_class_by_id(object.class_id())
                 .expect("cannot get an object without a valid class id");
             if class.name == "java/lang/String" {
-                vm.extract_str_from_java_lang_string(object)
+                extract_str_from_java_lang_string(vm, object)
                     .expect("should be able to get a string's content")
             } else {
                 format!("{:?}", object)
@@ -236,8 +240,8 @@ fn get_primitive_class<'a>(
     args: &[Value<'a>],
 ) -> MethodCallResult<'a> {
     let arg = expect_concrete_object_at(args, 0)?;
-    let class_name = vm.extract_str_from_java_lang_string(&arg)?;
-    let java_lang_class_instance = vm.new_java_lang_class_object(stack, &class_name)?;
+    let class_name = extract_str_from_java_lang_string(vm, &arg)?;
+    let java_lang_class_instance = new_java_lang_class_object(vm, stack, &class_name)?;
     Ok(Some(Value::Object(java_lang_class_instance)))
 }
 
@@ -277,7 +281,7 @@ fn get_stack_trace_element<'a>(
         Some(stack_trace_elements) => {
             let stack_trace_element = &stack_trace_elements[index.into_usize_safe()].clone();
             let stack_trace_element_java_object =
-                vm.new_java_lang_stack_trace_element_object(call_stack, stack_trace_element)?;
+                new_java_lang_stack_trace_element_object(vm, call_stack, stack_trace_element)?;
             Ok(Some(Value::Object(stack_trace_element_java_object)))
         }
         None => Err(MethodCallFailed::InternalError(

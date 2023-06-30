@@ -1,3 +1,4 @@
+use rjvm_vm::java_objects_creation::extract_str_from_java_lang_string;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
     value::{expect_concrete_object_at, Value},
@@ -34,8 +35,7 @@ fn invoke<'a>(
 fn extract_printed_string(vm: &Vm, index: usize) -> String {
     let string = expect_concrete_object_at(&vm.printed, index)
         .unwrap_or_else(|_| panic!("should have printed an object at position {index}"));
-    vm.extract_str_from_java_lang_string(&string)
-        .expect("should have a valid string")
+    extract_str_from_java_lang_string(vm, &string).expect("should have a valid string")
 }
 
 #[test_log::test]

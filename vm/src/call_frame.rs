@@ -11,6 +11,7 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
+use crate::java_objects_creation::{new_java_lang_class_object, new_java_lang_string_object};
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
@@ -1334,7 +1335,7 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*string_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(string) => {
-                        let string_object = vm.new_java_lang_string_object(call_stack, string)?;
+                        let string_object = new_java_lang_string_object(vm, call_stack, string)?;
                         self.push(Value::Object(string_object))
                     }
                     _ => Err(MethodCallFailed::InternalError(
@@ -1346,7 +1347,7 @@ impl<'a> CallFrame<'a> {
                 let constant = self.get_constant(*class_index)?;
                 match constant {
                     ConstantPoolEntry::Utf8(class_name) => {
-                        let class_object = vm.new_java_lang_class_object(call_stack, class_name)?;
+                        let class_object = new_java_lang_class_object(vm, call_stack, class_name)?;
                         self.push(Value::Object(class_object))
                     }
                     _ => Err(MethodCallFailed::InternalError(
