@@ -367,3 +367,15 @@ fn gabarge_collector() {
     );
     assert_eq!(Ok(None), main_result);
 }
+
+#[test_log::test]
+fn int_to_string() {
+    let mut vm = create_base_vm(DEFAULT_MAX_MEMORY);
+    let main_result = invoke(
+        &mut vm,
+        "rjvm/IntToString",
+        "main",
+        "([Ljava/lang/String;)V",
+    );
+    assert_eq!(Ok(None), main_result);
+}
