@@ -10,9 +10,10 @@ use crate::{
     stack_trace_element::StackTraceElement, value::Value, vm_error::VmError,
 };
 
+/// A call stack, which will include multiple frames, one for each method call.
 // The allocator will allocate and ensure that our call frames are alive while the call stack is.
 // Thus, we can do some unsafe magic to avoid Rc<RefCell<>>, which would mess up our code when
-// we try to get a stack trace _while_ executing a method.
+// we try to get a stack trace _while_ executing a method, which we need for exceptions.
 #[derive(Default)]
 pub struct CallStack<'a> {
     frames: Vec<CallFrameReference<'a>>,
@@ -21,6 +22,7 @@ pub struct CallStack<'a> {
 
 // SAFETY: The pointer will be valid until the generating call stack is,
 // since the pointee it is valid until the arena is.
+// We try to instruct the compiler with the <'a>
 #[derive(Debug, Clone)]
 pub struct CallFrameReference<'a>(*mut CallFrame<'a>);
 
@@ -41,13 +43,16 @@ impl<'a> CallStack<'a> {
         Default::default()
     }
 
+    /// Adds a new frame to the call stack.
+    /// Only supports bytecode methods (i.e. non native).
     pub fn add_frame(
         &mut self,
         class_and_method: ClassAndMethod<'a>,
         receiver: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
     ) -> Result<CallFrameReference<'a>, VmError> {
-        let code = Self::get_code(&class_and_method, receiver.clone())?;
+        Self::check_receiver(&class_and_method, receiver.clone())?;
+        let code = Self::get_code(&class_and_method)?;
         let locals = Self::prepare_locals(code, receiver, args);
         let new_frame = self
             .allocator
@@ -58,10 +63,10 @@ impl<'a> CallStack<'a> {
         Ok(reference)
     }
 
-    fn get_code<'b>(
+    fn check_receiver<'b>(
         class_and_method: &'b ClassAndMethod,
         receiver: Option<AbstractObject>,
-    ) -> Result<&'b ClassFileMethodCode, VmError> {
+    ) -> Result<(), VmError> {
         if class_and_method.method.flags.contains(MethodFlags::STATIC) {
             if receiver.is_some() {
                 return Err(VmError::ValidationException);
@@ -69,7 +74,12 @@ impl<'a> CallStack<'a> {
         } else if receiver.is_none() {
             return Err(VmError::NullPointerException);
         }
+        Ok(())
+    }
 
+    fn get_code<'b>(
+        class_and_method: &'b ClassAndMethod,
+    ) -> Result<&'b ClassFileMethodCode, VmError> {
         if class_and_method.is_native() {
             return Err(VmError::NotImplemented);
         };
@@ -78,6 +88,7 @@ impl<'a> CallStack<'a> {
         Ok(code)
     }
 
+    /// Returns a Vec filled with one `Unitialized` per variable
     fn prepare_locals(
         code: &ClassFileMethodCode,
         receiver: Option<AbstractObject<'a>>,

@@ -1670,7 +1670,7 @@ impl<'a> CallFrame<'a> {
         match obj {
             Value::Object(_) => {
                 // We don't really have monitors or lock, since we are single-threaded,
-                // so any monitor access will succeed
+                // so any monitor access will succeed!
                 Ok(())
             }
             _ => Err(MethodCallFailed::InternalError(
@@ -1684,8 +1684,7 @@ impl<'a> CallFrame<'a> {
         match obj {
             Value::Object(_) => {
                 // We don't really have monitors or lock, since we are single-threaded,
-                // so any monitor access will succeed
-                // TODO: check we actually have acquired monitor
+                // so any monitor access will succeed!
                 Ok(())
             }
             _ => Err(MethodCallFailed::InternalError(
@@ -1724,6 +1723,8 @@ impl<'a> CallFrame<'a> {
         // We shouldn't use self.pc, since we have already incremented it!
         let catch_handlers = exception_table.lookup(executed_instruction_pc);
 
+        // Linear search for first matching catch handler.
+        // We expect to have very few for a given instruction, in real code!
         for catch_handler in catch_handlers {
             match &catch_handler.catch_class {
                 None => return Ok(Some(catch_handler.handler_pc)),

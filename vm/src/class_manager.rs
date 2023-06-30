@@ -14,12 +14,20 @@ use crate::{
     vm_error::VmError,
 };
 
+/// An object that will allocate and manage Class objects
 pub(crate) struct ClassManager<'a> {
-    pub(crate) class_path: ClassPath,
+    class_path: ClassPath,
     classes_by_id: HashMap<ClassId, ClassRef<'a>>,
     classes_by_name: HashMap<String, ClassRef<'a>>,
+    /// Used to allocate class instances that will be alive as long as the arena
+    /// (and thus the `ClassManager` are alive).
     arena: Arena<Class<'a>>,
+
+    /// Used to generate ClassId
     next_id: u32,
+
+    /// In a real implementation, we would have a current class loader for each thread,
+    /// in a hierarchy. Currently, we only have exactly ONE global class loader.
     current_class_loader: ClassLoader<'a>,
 }
 
@@ -42,6 +50,8 @@ impl<'a> fmt::Debug for ClassManager<'a> {
     }
 }
 
+/// When a class instance is requested, returns whether the class was already loaded,
+/// or whether the requeste loaded a new class (which will need to be initialized).
 #[derive(Debug, Clone)]
 pub(crate) enum ResolvedClass<'a> {
     AlreadyLoaded(ClassRef<'a>),
@@ -57,6 +67,9 @@ impl<'a> ResolvedClass<'a> {
     }
 }
 
+/// In case a new class was loaded, maps the whole list of the classes that require
+/// initialization, in order so that a base class is initialized _before_ the derived classes.
+/// Includes the newly resolved class in the list [to_initialize].
 #[derive(Debug, Clone)]
 pub(crate) struct ClassesToInitialize<'a> {
     resolved_class: ClassRef<'a>,
@@ -149,7 +162,7 @@ impl<'a> ClassManager<'a> {
         // However we actually know that the arena will keep the value alive for 'a,
         // and I cannot find a way to convince the compiler of this fact. Thus
         // I'm using this pointer "trick" to make the compiler happy.
-        // I'm sure this can be done with safe Rust, I just do not know how at the moment...
+        // I expect this can be done with safe Rust, I just do not know how at the moment...
         let class_ref = unsafe {
             let class_ptr: *const Class<'a> = class_ref;
             &*class_ptr

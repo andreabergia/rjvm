@@ -2,6 +2,7 @@ use rjvm_reader::{class_file_method::ClassFileMethod, field_type::FieldType};
 
 use crate::class::ClassRef;
 
+/// A pair of a class and a method, used to avoid passing around two arguments
 #[derive(Debug, Clone)]
 pub struct ClassAndMethod<'a> {
     pub class: ClassRef<'a>,

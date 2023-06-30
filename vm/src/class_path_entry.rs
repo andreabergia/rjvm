@@ -1,10 +1,12 @@
 use std::{error::Error, fmt, fmt::Formatter};
 
+/// Models an entry in the class path, i.e. a single Jar or directory
 pub trait ClassPathEntry: fmt::Debug {
     // TODO: should `class_name` be a newtype?
     fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError>;
 }
 
+/// Error returned when loading a class does not work
 #[derive(Debug)]
 pub struct ClassLoadingError {
     message: String,
@@ -32,6 +34,7 @@ impl Error for ClassLoadingError {
     }
 }
 
+// Test utilities used by multiple files
 #[cfg(test)]
 pub mod tests {
     use crate::class_path_entry::ClassPathEntry;

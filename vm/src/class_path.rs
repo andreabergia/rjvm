@@ -7,12 +7,14 @@ use crate::{
     jar_file_class_path_entry::JarFileClassPathEntry,
 };
 
+/// Models a class path, i.e. a list of [ClassPathEntry]
 #[allow(dead_code)]
 #[derive(Default, Debug)]
 pub struct ClassPath {
     entries: Vec<Box<dyn ClassPathEntry>>,
 }
 
+/// Error that models the fact that a class path entry was not valid
 #[derive(Error, Debug, PartialEq)]
 pub enum ClassPathParseError {
     #[error("invalid classpath entry: {0}")]
@@ -20,6 +22,8 @@ pub enum ClassPathParseError {
 }
 
 impl ClassPath {
+    /// Parses and adds class path entries.
+    /// These should be separated by a colon (:), just like in a real JVM.
     pub fn push(&mut self, string: &str) -> Result<(), ClassPathParseError> {
         let mut entries_to_add: Vec<Box<dyn ClassPathEntry>> = Vec::new();
         for entry in string.split(':') {
@@ -49,6 +53,8 @@ impl ClassPath {
         Ok(Box::new(entry))
     }
 
+    /// Attempts to resolve a class from the various entries.
+    /// Stops at the first entry that has a match or an error.
     pub fn resolve(&self, class_name: &str) -> Result<Option<Vec<u8>>, ClassLoadingError> {
         for entry in self.entries.iter() {
             debug!("looking up class {} in {:?}", class_name, entry);

@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::class::ClassRef;
 
+// The mapping object of a java ClassLoader, with a ton of limitations.
+// Currently just contains a map name -> class.
 // TODO: class loaders should be a hierarchy
 
 #[derive(Debug, Default)]
