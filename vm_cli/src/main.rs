@@ -1,9 +1,13 @@
 use clap::Parser;
 
 use rjvm_vm::{
+    array::Array,
+    array_entry_type::ArrayEntryType,
     call_stack::CallStack,
     class_and_method::ClassAndMethod,
     exceptions::MethodCallFailed,
+    java_objects_creation::new_java_lang_string_object,
+    value::Value,
     vm::{Vm, DEFAULT_MAX_MEMORY_MB_STR, ONE_MEGABYTE},
     vm_error::VmError,
 };
@@ -24,6 +28,22 @@ struct Args {
 
     /// Java program arguments
     java_program_arguments: Vec<String>,
+}
+
+fn main() {
+    let args = Args::parse();
+    env_logger::init_from_env(
+        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+    );
+
+    let result = run(args);
+    match result {
+        Ok(exit_code) => std::process::exit(exit_code),
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(-1);
+        }
+    }
 }
 
 fn append_classpath(vm: &mut Vm, args: &Args) -> Result<(), String> {
@@ -64,9 +84,10 @@ fn run(args: Args) -> Result<i32, String> {
 
     let (call_stack, main_method) = resolve_class_and_main_method(&mut vm, &args)?;
 
-    // TODO: args
+    let main_args = allocate_java_args(&mut vm, call_stack, &args.java_program_arguments)
+        .map_err(|err| format!("{err:?}"))?;
     let main_result = vm
-        .invoke(call_stack, main_method, None, vec![])
+        .invoke(call_stack, main_method, None, vec![main_args])
         .map_err(|v| format!("execution error: {:?}", v))?;
 
     match main_result {
@@ -77,18 +98,26 @@ fn run(args: Args) -> Result<i32, String> {
     }
 }
 
-fn main() {
-    let args = Args::parse();
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
+fn allocate_java_args<'a>(
+    vm: &mut Vm<'a>,
+    call_stack: &mut CallStack<'a>,
+    command_line_args: &Vec<String>,
+) -> Result<Value<'a>, MethodCallFailed<'a>> {
+    let class_id_java_lang_string = vm.get_or_resolve_class(call_stack, "java/lang/String")?.id;
+
+    let strings: Result<Vec<Value<'a>>, MethodCallFailed<'a>> = command_line_args
+        .into_iter()
+        .map(|s| new_java_lang_string_object(vm, call_stack, &s).map(Value::Object))
+        .collect();
+
+    let strings = strings?;
+    let array = vm.new_array(
+        ArrayEntryType::Object(class_id_java_lang_string),
+        strings.len(),
     );
 
-    let result = run(args);
-    match result {
-        Ok(exit_code) => std::process::exit(exit_code),
-        Err(err) => {
-            eprintln!("{err}");
-            std::process::exit(-1);
-        }
+    for (index, string) in strings.into_iter().enumerate() {
+        array.set_element(index, string)?;
     }
+    Ok(Value::Object(array))
 }
