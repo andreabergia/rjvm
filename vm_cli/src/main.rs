@@ -1,11 +1,10 @@
 use clap::Parser;
 
-use rjvm_vm::vm::ONE_MEGABYTE;
 use rjvm_vm::{
     call_stack::CallStack,
     class_and_method::ClassAndMethod,
     exceptions::MethodCallFailed,
-    vm::{Vm, DEFAULT_MAX_MEMORY_MB_STR},
+    vm::{Vm, DEFAULT_MAX_MEMORY_MB_STR, ONE_MEGABYTE},
     vm_error::VmError,
 };
 

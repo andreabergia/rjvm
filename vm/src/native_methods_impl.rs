@@ -2,16 +2,16 @@ use log::{debug, info};
 
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::java_objects_creation::{
-    extract_str_from_java_lang_string, new_java_lang_class_object,
-    new_java_lang_stack_trace_element_object,
-};
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
     call_frame::MethodCallResult,
     call_stack::CallStack,
     exceptions::MethodCallFailed,
+    java_objects_creation::{
+        extract_str_from_java_lang_string, new_java_lang_class_object,
+        new_java_lang_stack_trace_element_object,
+    },
     native_methods_registry::NativeMethodsRegistry,
     object::Object,
     time::{get_current_time_millis, get_nano_time},

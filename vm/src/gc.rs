@@ -1,14 +1,12 @@
-use std::ptr::null;
-use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData};
+use std::{alloc::Layout, fmt, fmt::Formatter, marker::PhantomData, ptr::null};
 
 use log::{debug, info};
 
 use rjvm_reader::field_type::FieldType;
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::abstract_object::ALLOC_HEADER_SIZE;
 use crate::{
-    abstract_object::{AbstractObject, AllocHeader, GcState, ObjectKind},
+    abstract_object::{AbstractObject, AllocHeader, GcState, ObjectKind, ALLOC_HEADER_SIZE},
     alloc_entry::AllocEntry,
     array::Array,
     array_entry_type::ArrayEntryType,

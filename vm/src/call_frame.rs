@@ -11,7 +11,6 @@ use rjvm_reader::{
 };
 use rjvm_utils::type_conversion::ToUsizeSafe;
 
-use crate::java_objects_creation::{new_java_lang_class_object, new_java_lang_string_object};
 use crate::{
     abstract_object::{AbstractObject, ObjectKind},
     array::Array,
@@ -22,6 +21,7 @@ use crate::{
     class_and_method::ClassAndMethod,
     class_resolver_by_id::ClassByIdResolver,
     exceptions::{JavaException, MethodCallFailed},
+    java_objects_creation::{new_java_lang_class_object, new_java_lang_string_object},
     object::Object,
     stack_trace_element::StackTraceElement,
     value::{

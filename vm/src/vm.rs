@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::string::ToString;
+use std::{collections::HashMap, string::ToString};
 
 use log::{debug, error, info};
 use typed_arena::Arena;

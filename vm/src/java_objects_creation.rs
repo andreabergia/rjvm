@@ -1,16 +1,17 @@
-use rjvm_reader::field_type::BaseType;
-use rjvm_reader::line_number::LineNumber;
+use rjvm_reader::{field_type::BaseType, line_number::LineNumber};
 
-use crate::abstract_object::{string_from_char_array, AbstractObject};
-use crate::array::Array;
-use crate::array_entry_type::ArrayEntryType;
-use crate::call_stack::CallStack;
-use crate::exceptions::MethodCallFailed;
-use crate::object::Object;
-use crate::stack_trace_element::StackTraceElement;
-use crate::value::Value;
-use crate::vm::Vm;
-use crate::vm_error::VmError;
+use crate::{
+    abstract_object::{string_from_char_array, AbstractObject},
+    array::Array,
+    array_entry_type::ArrayEntryType,
+    call_stack::CallStack,
+    exceptions::MethodCallFailed,
+    object::Object,
+    stack_trace_element::StackTraceElement,
+    value::Value,
+    vm::Vm,
+    vm_error::VmError,
+};
 
 /// Creates a new instance of a `java.lang.String` with the given content
 pub fn new_java_lang_string_object<'a>(

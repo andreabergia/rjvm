@@ -1,6 +1,6 @@
-use rjvm_vm::java_objects_creation::extract_str_from_java_lang_string;
 use rjvm_vm::{
     exceptions::MethodCallFailed,
+    java_objects_creation::extract_str_from_java_lang_string,
     value::{expect_concrete_object_at, Value},
     vm::{Vm, DEFAULT_MAX_MEMORY},
 };
