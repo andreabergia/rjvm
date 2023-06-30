@@ -21,8 +21,8 @@ fmt:
     cargo +nightly fmt
 
 generate-test-classes:
-    cd ./reader/tests/resources && ./compile.sh
-    cd ./vm/tests/resources && ./compile.sh
+    cd ./reader/tests/resources && rm -f *.class && ./compile.sh
+    cd ./vm/tests/resources && rm -f *.class && ./compile.sh
 
 count-lines:
     wc -l */{src,tests}/**/*.rs */{src,tests}/*.rs */tests/resources/**/*.java
