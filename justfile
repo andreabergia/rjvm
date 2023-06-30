@@ -33,3 +33,6 @@ miri:
 
 prof-vm-integration: clean
     cd vm && CARGO_PROFILE_BENCH_DEBUG=true cargo flamegraph --test integration --root && open flamegraph.svg
+
+find-unused-dependencies:
+    cargo +nightly udeps --all-targets
