@@ -70,6 +70,15 @@ impl MemoryChunk {
     unsafe fn contains(&self, ptr: *const u8) -> bool {
         ptr >= self.memory && ptr <= self.memory.add(self.used)
     }
+
+    fn reset(&mut self) {
+        self.used = 0;
+
+        // Zero the memory, to attempt and catch bugs
+        unsafe {
+            std::ptr::write_bytes(self.memory, 0, self.capacity);
+        }
+    }
 }
 
 /// Models the object allocator and the garbage collector!
@@ -145,7 +154,7 @@ impl<'a> ObjectAllocator<'a> {
             "gc done; previous allocated memory = {}, new allocated memory = {}",
             self.other.used, self.current.used
         );
-        self.other.used = 0;
+        self.other.reset();
 
         Ok(())
     }
