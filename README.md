@@ -7,15 +7,31 @@ program in Rust and I've used to learn the language - thus, I'm sure some parts 
 Rust since I'm just learning the language.
 
 The code quality is definitely not production ready - there are not enough tests, there isn't enough documentation and
-some of the initial decision should be revisited. (I.e.: I write code for work better than this 😊.)
+some of the initial decision should be revisited. (I.e.: this is not representativ of the code I write for work 😊.)
 
 The code is licensed under the [Apache v2 license](./LICENSE).
 
-## What has been implemented
+## What has been implemented and what hasn't
+
+A disclaimer first: I consider the project complete. It was super instructive, but I do not plan to keep working on it.
+I do plan to blog about it [on my website](https://andreabergia.com), though!
 
 The current code can execute [various simple programs](./vm/tests/resources/rjvm), but it has a lot of limitations.
 
-Things not implemented (and not planned to):
+Here is a list of the implemented features:
+
+- parsing .class files
+- resolving classes from a jar file, or from a folder
+- execution of real code:
+  - primitive types, arrays, strings
+  - control flow statements
+  - classes, subclasses, interfaces
+  - methods (virtual, static, natives)
+  - exception throwing and catching
+  - stack traces
+  - garbage collection
+
+However, there are a lot of important things not implemented (and not planned to):
 
 - generics
 - threading
@@ -25,48 +41,39 @@ Things not implemented (and not planned to):
 - [class file verification](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.10)
 - I/O
 - just in time code execution (JIT)
-- class linkage and validation
 - proper class loaders
 
-However, there's quite a few things implemented:
+The JVM uses the _real classes_ from [OpenJDK 7](https://jdk.java.net/java-se-ri/7) - meaning the classes such as
+`java.lang.Object`, `java.lang.String` or `java.lang.Exception` are real production classes, without any modifications.
+The JVM is "good enough" to parse and execute their code, something which makes me very happy indeed. 😊
 
-- parsing .class files
-- class loading from a jar file or from a folder
-- execution of real code:
-    - primitive types, arrays, strings
-    - control flow statements
-    - classes, subclasses, interfaces
-    - methods (virtual, static, natives)
-    - exception throwing and catching
-    - stack traces
-    - garbage collection
+The VM is limited to 64 bits platforms, as there are quite a few places where we assume that the size of a pointer 
+is exactly 8 bytes.
 
-The JVM uses the real classes from [OpenJDK 7](https://jdk.java.net/java-se-ri/7) - meaning the classes such as
-`java.lang.Object`, `java.lang.String` or `java.lang.Exception` are _real_ classes, without any modifications. The JVM
-is "good enough" to parse and execute their code.
-
-The VM is limited to 64 bits platforms, as there are a few places where we assume that the size of a pointer is 8 bytes.
-
-## Further poor implementations that I should fix (but I won't)
+## Implementations that should be modified
 
 One poor implementation detail is that for things like stack overflow, accessing an array out of bounds, divisions by 
-zero, etc we should be throwing real java exceptions, rather than internal errors that will abort executions. 
+zero, etc. we should be throwing real java exceptions, rather than internal errors that will abort executions.
+In general, the error handling is not great - there are no details when you get an internal error, something that made
+debugging more painful than it should have been.
 
 There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
-but it is "good enough" to execute some simple code; for example we do not have a class for arrays.
+but it is "good enough" to execute some simple code; for example we do not have a class for arrays.  If you're curious,
+look for the TODO in the code.
 
-If you're curious, look for the TODO in the code.
+I'm also quite sure there's a million bugs in the code. 😅
 
 ## Code structure
 
 The code is currently structured in three crates:
 
 - `reader`, which is able to read a `.class` file and contains various data structures for modelling their content;
-- `vm`, which contains the virtual machine that can execute the code as a library
+- `vm`, which contains the virtual machine that can execute the code as a library;
 - `vm_cli`, which contains a very simple command-line launcher to run the vm, in the spirit of the `java` executable.
 
-There are some unit test and some integration tests - probably not enough, but since this is not production code but
-just a learning exercise, I'm not that worried about it.
+There are some unit test and some integration tests - definitely not enough, but since this is not production code but
+just a learning exercise, I'm not that worried about it. Still, IntelliJ tells me I have a bit above 80% of coverage,
+which is not bad. The error paths aren't really tested, though.
 
 I plan to extract `reader` class in a separate repository and publish it on [crates.io](https://crates.io/), since it
 could actually be useful to someone else.
