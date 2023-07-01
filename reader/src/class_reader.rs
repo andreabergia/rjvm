@@ -1,8 +1,6 @@
 use log::warn;
 use result::prelude::*;
 
-use crate::{buffer::Buffer, type_conversion::ToUsizeSafe};
-
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
@@ -21,12 +19,17 @@ use crate::{
     method_flags::MethodFlags,
     program_counter::ProgramCounter,
 };
+use crate::{buffer::Buffer, type_conversion::ToUsizeSafe};
 
+/// A reader of a byte array representing a class. Supports only a subset of Java 7 class format,
+/// in particular it does not support generics.
 struct ClassFileReader<'a> {
     buffer: Buffer<'a>,
+    /// The class being read, created empty and updated in place
     class_file: ClassFile,
 }
 
+/// Reference: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html
 impl<'a> ClassFileReader<'a> {
     fn new(data: &[u8]) -> ClassFileReader {
         ClassFileReader {
@@ -78,11 +81,11 @@ impl<'a> ClassFileReader<'a> {
                 3 => self.read_int_constant()?,
                 4 => self.read_float_constant()?,
                 5 => {
-                    i += 1;
+                    i += 1; // long constants takes up two slots in the pool
                     self.read_long_constant()?
                 }
                 6 => {
-                    i += 1;
+                    i += 1; // double constants takes up two slots in the pool
                     self.read_double_constant()?
                 }
                 7 => self.read_class_reference_constant()?,
@@ -91,6 +94,7 @@ impl<'a> ClassFileReader<'a> {
                 10 => self.read_method_reference_constant()?,
                 11 => self.read_interface_method_reference_constant()?,
                 12 => self.read_name_and_type_constant()?,
+                // For newer versions of java, there are more constant types
                 _ => {
                     warn!("invalid entry in constant pool at index {} tag {}", i, tag);
                     return Err(ClassReaderError::invalid_class_data(format!(
@@ -513,6 +517,7 @@ impl<'a> ClassFileReader<'a> {
     }
 }
 
+/// Reads a class from a byte slice.
 pub fn read_buffer(buf: &[u8]) -> Result<ClassFile> {
     ClassFileReader::new(buf).read()
 }

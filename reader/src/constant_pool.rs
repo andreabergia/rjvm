@@ -1,7 +1,8 @@
 use std::{fmt, vec::Vec};
 use thiserror::Error;
 
-/// Types of a constant in the constant pool.
+/// Types of a constant in the constant pool of a class, following the JVM spec:
+/// https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4
 #[derive(Debug, PartialEq)]
 pub enum ConstantPoolEntry {
     Utf8(String),
@@ -17,6 +18,8 @@ pub enum ConstantPoolEntry {
     NameAndTypeDescriptor(u16, u16),
 }
 
+/// Constants in the pool generally take one slot, but long and double take two. We do not use
+/// the second one, so we have a tombstone to ensure the indexes match.
 #[derive(Debug)]
 enum ConstantPoolPhysicalEntry {
     Entry(ConstantPoolEntry),
