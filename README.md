@@ -44,18 +44,18 @@ The JVM uses the _real classes_ from [OpenJDK 7](https://jdk.java.net/java-se-ri
 `java.lang.Object`, `java.lang.String` or `java.lang.Exception` are real production classes, without any modifications.
 The JVM is "good enough" to parse and execute their code, something which makes me very happy indeed. 😊
 
-The VM is limited to 64 bits platforms, as there are quite a few places where we assume that the size of a pointer
+The VM is limited to 64 bits platforms, as there are quite a few places where I assume that the size of a pointer
 is exactly 8 bytes.
 
 ## Implementations that should be modified
 
 One poor implementation detail is that for things like stack overflow, accessing an array out of bounds, divisions by
-zero, etc. we should be throwing real java exceptions, rather than internal errors that will abort executions.
+zero, etc. I should be throwing real java exceptions, rather than internal errors that will abort executions.
 In general, the error handling is not great - there are no details when you get an internal error, something that made
 debugging more painful than it should have been.
 
 There's also quite a few things whose implementation is quite poor, or not really coherent with the JVM specs,
-but it is "good enough" to execute some simple code; for example we do not have a class for arrays. If you're curious,
+but it is "good enough" to execute some simple code; for example I do not have a class for arrays. If you're curious,
 look for the TODO in the code.
 
 I'm also quite sure there's a million bugs in the code. 😅
