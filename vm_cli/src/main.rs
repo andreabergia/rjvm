@@ -101,7 +101,7 @@ fn run(args: Args) -> Result<i32, String> {
 fn allocate_java_args<'a>(
     vm: &mut Vm<'a>,
     call_stack: &mut CallStack<'a>,
-    command_line_args: &Vec<String>,
+    command_line_args: &[String],
 ) -> Result<Value<'a>, MethodCallFailed<'a>> {
     let class_id_java_lang_string = vm.get_or_resolve_class(call_stack, "java/lang/String")?.id;
 
