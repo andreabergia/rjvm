@@ -7,7 +7,7 @@ program in Rust and I've used to learn the language - thus, I'm sure some parts 
 Rust since I'm just learning the language.
 
 The code quality is definitely not production ready - there are not enough tests, there isn't enough documentation and
-some of the initial decision should be revisited. (I.e.: this is not representativ of the code I write for work 😊.)
+some of the initial decision should be revisited. (I.e.: this is not representative of the code I write for work 😊.)
 
 The code is licensed under the [Apache v2 license](./LICENSE).
 
