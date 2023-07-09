@@ -15,6 +15,8 @@ use crate::{
 // The allocator will allocate and ensure that our call frames are alive while the call stack is.
 // Thus, we can do some unsafe magic to avoid Rc<RefCell<>>, which would mess up our code when
 // we try to get a stack trace _while_ executing a method, which we need for exceptions.
+// This also means that we _never_ deallocate the call frames, even after we have finished
+// executing them!
 #[derive(Default)]
 pub struct CallStack<'a> {
     frames: Vec<CallFrameReference<'a>>,
