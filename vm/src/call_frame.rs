@@ -315,7 +315,7 @@ impl<'a> CallFrame<'a> {
             let instruction_result = self.execute_instruction(vm, call_stack, instruction);
             match instruction_result {
                 Ok(ReturnFromMethod(return_value)) => return Ok(return_value),
-                Ok(ContinueMethodExecution) => {}
+                Ok(ContinueMethodExecution) => { /* continue the loop */ }
 
                 Err(MethodCallFailed::InternalError(err)) => {
                     return Err(MethodCallFailed::InternalError(err))
