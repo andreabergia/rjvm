@@ -79,5 +79,5 @@ I use [just](https://github.com/casey/just) as a command runner, but most tasks 
 I consider the project complete. It was super instructive, but I do not plan to keep working on it. I do plan to blog
 about it [on my website](https://andreabergia.com), though!
 
-The only think I'm considering is to extract the `reader` crate in a separate repository, and publish it on
+The only thing I'm considering is to extract the `reader` crate in a separate repository, and publish it on
 [crates.io](https://crates.io/), since it could actually be useful to someone else.
