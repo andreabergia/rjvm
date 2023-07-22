@@ -369,3 +369,10 @@ fn gabarge_collector() {
     );
     assert_eq!(Ok(None), main_result);
 }
+
+#[test_log::test]
+fn generic() {
+    let mut vm = create_base_vm(10_000_000);
+    let main_result = invoke(&mut vm, "rjvm/Generic", "main", "([Ljava/lang/String;)V");
+    assert_eq!(Ok(None), main_result);
+}

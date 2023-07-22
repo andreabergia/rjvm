@@ -30,7 +30,6 @@ Here is a list of the implemented features:
 
 However, there are a lot of important things not implemented (and not planned to):
 
-- generics
 - threading
 - multi dimensional arrays
 - reflection
