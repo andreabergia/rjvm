@@ -14,7 +14,7 @@ use crate::{
 /// Models a generic value that can be stored in a local variable or on the stack.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Value<'a> {
-    /// An unitialized element.
+    /// An uninitialized element.
     /// Should never be on the stack, but it is the default state for local variables.
     #[default]
     Uninitialized,
