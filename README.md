@@ -11,6 +11,8 @@ some of the initial decision should be revisited. (I.e.: this is not representat
 
 The code is licensed under the [Apache v2 license](./LICENSE).
 
+The architecture is discussed in a series of posts on my blog, [https://andreabergia.com](https://andreabergia.com/series/writing-a-jvm-in-rust/).
+
 ## What has been implemented and what hasn't
 
 The current code can execute [various simple programs](./vm/tests/resources/rjvm), but it has a lot of limitations.
@@ -75,8 +77,7 @@ I use [just](https://github.com/casey/just) as a command runner, but most tasks 
 
 # Project status and further works
 
-I consider the project complete. It was super instructive, but I do not plan to keep working on it. I do plan to blog
-about it [on my website](https://andreabergia.com), though!
+I consider the project complete. It was super instructive, but I do not plan to keep working on it.
 
 The only thing I'm considering is to extract the `reader` crate in a separate repository, and publish it on
 [crates.io](https://crates.io/), since it could actually be useful to someone else.
