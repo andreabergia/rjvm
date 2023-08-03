@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::{
     error::Error,
     fmt::{Display, Formatter},
@@ -64,5 +65,14 @@ impl From<BufferError> for ClassReaderError {
                 Self::invalid_class_data("invalid cesu8 string".to_string())
             }
         }
+    }
+}
+
+impl<T> From<nom::Err<nom::error::Error<T>>> for ClassReaderError
+where
+    T: Debug,
+{
+    fn from(err: nom::Err<nom::error::Error<T>>) -> Self {
+        Self::invalid_class_data(format!("nom error: {err}"))
     }
 }

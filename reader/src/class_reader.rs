@@ -1,6 +1,10 @@
+use cesu8::from_java_cesu8;
 use log::warn;
+use nom::branch::alt;
+use nom::error::ErrorKind;
 use result::prelude::*;
 
+use crate::buffer::BufferError;
 use crate::{
     attribute::Attribute,
     class_access_flags::ClassAccessFlags,
@@ -20,35 +24,86 @@ use crate::{
     program_counter::ProgramCounter,
 };
 use crate::{buffer::Buffer, type_conversion::ToUsizeSafe};
+pub use nom::bytes::complete::tag;
+use nom::bytes::complete::take;
+use nom::multi::length_count;
+use nom::number::complete::{be_i32, be_u16};
+use nom::IResult;
 
 /// A reader of a byte array representing a class. Supports only a subset of Java 7 class format,
 /// in particular it does not support generics.
 struct ClassFileReader<'a> {
+    data: &'a [u8],
     buffer: Buffer<'a>,
     /// The class being read, created empty and updated in place
     class_file: ClassFile,
+}
+
+fn parse_magic_number(input: &[u8]) -> IResult<&[u8], ()> {
+    tag([0xCA, 0xFE, 0xBA, 0xBE])(input).map(|(leftover, _)| (leftover, ()))
+}
+
+struct Version {
+    major: u16,
+    minor: u16,
+}
+
+fn parse_version(input: &[u8]) -> IResult<&[u8], Version> {
+    let (input, minor) = be_u16(input)?;
+    let (input, major) = be_u16(input)?;
+    Ok((input, Version { major, minor }))
+}
+
+fn parse_constants(input: &[u8]) -> IResult<&[u8], Vec<ConstantPoolEntry>> {
+    length_count(be_u16, parse_constant)(input)
+}
+
+fn parse_constant(input: &[u8]) -> IResult<&[u8], ConstantPoolEntry> {
+    alt((parse_utf8_constant, parse_int_constant /* ... */))(input)
+}
+
+fn parse_utf8_constant(input: &[u8]) -> IResult<&[u8], ConstantPoolEntry> {
+    let (input, _) = tag([0x01])(input)?;
+    let (input, len) = be_u16(input)?;
+    let (input, str_bytes) = take(len)(input)?;
+    let s = from_java_cesu8(str_bytes)
+        .map_err(|_| BufferError::InvalidCesu8String)
+        .map_err(|_| nom::Err::Failure(nom::error::Error::new(input, ErrorKind::MapRes)))
+        .map(|cow_string| cow_string.into_owned())
+        .map(ConstantPoolEntry::Utf8)?;
+    Ok((input, s))
+}
+
+fn parse_int_constant(input: &[u8]) -> IResult<&[u8], ConstantPoolEntry> {
+    let (input, _) = tag([0x03])(input)?;
+    let (input, i) = be_i32(input)?;
+    Ok((input, ConstantPoolEntry::Integer(i)))
 }
 
 /// Reference: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html
 impl<'a> ClassFileReader<'a> {
     fn new(data: &[u8]) -> ClassFileReader {
         ClassFileReader {
+            data,
             buffer: Buffer::new(data),
             class_file: Default::default(),
         }
     }
 
     fn read(mut self) -> Result<ClassFile> {
-        self.check_magic_number()?;
-        self.read_version()?;
-        self.read_constants()?;
-        self.read_access_flags()?;
-        self.class_file.name = self.read_class_reference()?;
-        self.class_file.superclass = self.read_class_reference_optional()?;
-        self.read_interfaces()?;
-        self.read_fields()?;
-        self.read_methods()?;
-        self.read_class_attributes()?;
+        let (leftover, _) = parse_magic_number(self.data)
+            .map_err(|_| ClassReaderError::invalid_class_data("invalid magic number".to_owned()))?;
+        let (leftover, version) = parse_version(leftover)?;
+        self.class_file.version = ClassFileVersion::from(version.major, version.minor)?;
+
+        // self.read_constants()?;
+        // self.read_access_flags()?;
+        // self.class_file.name = self.read_class_reference()?;
+        // self.class_file.superclass = self.read_class_reference_optional()?;
+        // self.read_interfaces()?;
+        // self.read_fields()?;
+        // self.read_methods()?;
+        // self.read_class_attributes()?;
 
         Ok(self.class_file)
     }
@@ -529,8 +584,9 @@ mod tests {
     #[test]
     fn magic_number_is_required() {
         let data = vec![0x00, 0x01, 0x02, 0x03];
+        let x = read_buffer(&data);
         assert!(matches!(
-            read_buffer(&data),
+            x,
             Err(ClassReaderError::InvalidClassData(s, None)) if s == "invalid magic number"
         ));
     }
