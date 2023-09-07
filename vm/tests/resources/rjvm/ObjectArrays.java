@@ -4,12 +4,15 @@ public class ObjectArrays {
     public static void main(String[] args) {
         Square[] squares = new Square[]{
                 new Square(1),
-                new Square(2)
+                new Square(2),
+                null,
         };
 
         int totalArea = 0;
         for (int i = 0; i < squares.length; ++i) {
-            totalArea += squares[i].area();
+            if (squares[i] != null) {
+                totalArea += squares[i].area();
+            }
         }
         tempPrint(totalArea);
     }

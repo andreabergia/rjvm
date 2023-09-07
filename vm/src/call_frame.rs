@@ -837,7 +837,17 @@ impl<'a> CallFrame<'a> {
     generate_pop!(pop_long, Long, i64);
     generate_pop!(pop_float, Float, f32);
     generate_pop!(pop_double, Double, f64);
-    generate_pop!(pop_object, Object, AbstractObject<'a>);
+
+    fn pop_object_or_null(&mut self) -> Result<Value<'a>, MethodCallFailed<'a>> {
+        let value = self.pop()?;
+        match value {
+            Value::Object(v) => Ok(Value::Object(v)),
+            Null => Ok(Null),
+            _ => Err(MethodCallFailed::InternalError(
+                VmError::ValidationException,
+            )),
+        }
+    }
 
     fn pop_array(&mut self) -> Result<impl Array<'a>, MethodCallFailed<'a>> {
         let receiver = self.pop()?;
@@ -1474,7 +1484,7 @@ impl<'a> CallFrame<'a> {
     );
 
     fn execute_aastore(&mut self, vm: &Vm) -> Result<(), MethodCallFailed<'a>> {
-        let value = Value::Object(self.pop_object()?);
+        let value = self.pop_object_or_null()?;
         let index = self.pop_int()?.into_usize_safe();
         let array = self.pop_array()?;
         match array.elements_type() {
