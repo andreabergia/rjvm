@@ -91,7 +91,7 @@ impl<'a> CallStack<'a> {
         Ok(code)
     }
 
-    /// Returns a Vec filled with one `Unitialized` per variable
+    /// Returns a Vec filled with one `Uninitialized` per variable
     fn prepare_locals(
         code: &ClassFileMethodCode,
         receiver: Option<AbstractObject<'a>>,

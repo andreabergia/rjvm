@@ -104,7 +104,7 @@ impl fmt::Display for ClassFileMethodCode {
                 writeln!(f, "    {address:3} {instruction:?}")?;
             }
         } else {
-            writeln!(f, "    unparseable code: {:?}", self.code)?;
+            writeln!(f, "    unparsable code: {:?}", self.code)?;
         }
         Ok(())
     }
