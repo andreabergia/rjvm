@@ -89,7 +89,7 @@ impl MemoryChunk {
 /// chunk, and then swaps the chunks. Finally, it updates all the given gc roots.
 ///
 /// Obviously, this wastes half the memory, which is why nobody uses this algorithm
-/// in any real inmplementation. However, it is quite simple, and handles reference cycles,
+/// in any real implementation. However, it is quite simple, and handles reference cycles,
 /// so it is the one I have chosen here.
 pub struct ObjectAllocator<'a> {
     current: MemoryChunk,

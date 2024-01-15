@@ -82,7 +82,7 @@ enum InvokeKind {
     Static,
     /// Virtual instance methods will apply the virtual function resolution
     Virtual,
-    /// Invokation of an interface's method. Will apply the virtual function resolution
+    /// Invocation of an interface's method. Will apply the virtual function resolution
     Interface,
 }
 
