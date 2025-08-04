@@ -87,7 +87,7 @@ impl ConstantPool {
     fn fmt_entry(&self, idx: u16) -> Result<String, InvalidConstantPoolIndexError> {
         let entry = self.get(idx)?;
         let text = match entry {
-            ConstantPoolEntry::Utf8(ref s) => format!("String: \"{s}\""),
+            ConstantPoolEntry::Utf8(s) => format!("String: \"{s}\""),
             ConstantPoolEntry::Integer(n) => format!("Integer: {n}"),
             ConstantPoolEntry::Float(n) => format!("Float: {n}"),
             ConstantPoolEntry::Long(n) => format!("Long: {n}"),
@@ -141,7 +141,7 @@ impl ConstantPool {
     pub fn text_of(&self, idx: u16) -> Result<String, InvalidConstantPoolIndexError> {
         let entry = self.get(idx)?;
         let text = match entry {
-            ConstantPoolEntry::Utf8(ref s) => s.clone(),
+            ConstantPoolEntry::Utf8(s) => s.clone(),
             ConstantPoolEntry::Integer(n) => n.to_string(),
             ConstantPoolEntry::Float(n) => n.to_string(),
             ConstantPoolEntry::Long(n) => n.to_string(),

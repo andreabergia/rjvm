@@ -254,7 +254,7 @@ fn identity_hash_code(ptr: *mut u8) -> i32 {
     // since we'll store this in AllocHeader!
     let hash = (hash & ((1 << 30) - 1)) as u32;
 
-    unsafe { std::mem::transmute(hash) }
+    u32::cast_signed(hash)
 }
 
 unsafe fn write_value(ptr: *mut u8, value: Value) {

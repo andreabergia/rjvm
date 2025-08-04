@@ -519,7 +519,7 @@ impl Instruction {
 
     fn read_i8(raw_code: &[u8], address: &mut usize) -> Result<i8, ClassReaderError> {
         let value = Self::read_u8(raw_code, address)?;
-        Ok(unsafe { std::mem::transmute(value) })
+        Ok(u8::cast_signed(value))
     }
 
     fn read_u16(raw_code: &[u8], address: &mut usize) -> Result<u16, ClassReaderError> {
@@ -530,7 +530,7 @@ impl Instruction {
 
     fn read_i16(raw_code: &[u8], address: &mut usize) -> Result<i16, ClassReaderError> {
         let value = Self::read_u16(raw_code, address)?;
-        Ok(unsafe { std::mem::transmute(value) })
+        Ok(u16::cast_signed(value))
     }
 
     fn read_offset(raw_code: &[u8], address: &mut usize) -> Result<u16, ClassReaderError> {

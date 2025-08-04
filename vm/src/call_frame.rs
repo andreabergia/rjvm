@@ -229,6 +229,7 @@ macro_rules! generate_execute_array_load {
                 })+
                 _ => return Err(MethodCallFailed::InternalError(VmError::ValidationException)),
             }?;
+            drop(array);
             self.push(value)
         }
     };
@@ -1422,6 +1423,7 @@ impl<'a> CallFrame<'a> {
     fn execute_array_length(&mut self) -> Result<(), MethodCallFailed<'a>> {
         let array = self.pop_array()?;
         let len = array.len() as i32;
+        drop(array);
         self.push(Int(len))?;
         Ok(())
     }
