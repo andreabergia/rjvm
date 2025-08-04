@@ -11,7 +11,7 @@ use crate::value::Value;
 ///
 /// The java stack has a few more features over the classical push and pop,
 /// i.e. the various dup instructions, so it is modelled explicitly
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValueStack<'a> {
     stack: Vec<Value<'a>>,
 }

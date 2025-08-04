@@ -1,4 +1,8 @@
-use std::{fmt, fmt::Formatter};
+use std::{
+    cell::{Cell, Ref, RefCell, RefMut},
+    fmt::{self, Formatter},
+    rc::Rc,
+};
 
 use typed_arena::Arena;
 
@@ -19,27 +23,37 @@ use crate::{
 // executing them!
 #[derive(Default)]
 pub struct CallStack<'a> {
-    frames: Vec<CallFrameReference<'a>>,
-    allocator: Arena<CallFrame<'a>>,
+    //frames: Vec<CallFrameReference<'a>>,
+    allocator: Vec<CallFrame<'a>>,
 }
 
 // SAFETY: The pointer will be valid until the generating call stack is,
 // since the pointee it is valid until the arena is.
 // We try to instruct the compiler with the <'a>
 #[derive(Debug, Clone)]
-pub struct CallFrameReference<'a>(*mut CallFrame<'a>);
+pub struct CallFrameReference(u16);
 
-impl<'a> AsRef<CallFrame<'a>> for CallFrameReference<'a> {
-    fn as_ref(&self) -> &CallFrame<'a> {
-        unsafe { self.0.as_ref() }.unwrap()
+impl CallFrameReference {
+    pub fn borrow<'s, 'a>(&self, stack: &'s CallStack<'a>) -> &'s CallFrame<'a> {
+        stack.allocator.get(self.0 as usize).unwrap()
+    }
+
+    pub fn borrow_mut<'s, 'a>(&self, stack: &'s mut CallStack<'a>) -> &'s mut CallFrame<'a> {
+        stack.allocator.get_mut(self.0 as usize).unwrap()
     }
 }
 
-impl<'a> AsMut<CallFrame<'a>> for CallFrameReference<'a> {
-    fn as_mut(&mut self) -> &mut CallFrame<'a> {
-        unsafe { self.0.as_mut() }.unwrap()
-    }
-}
+// impl<'a> AsRef<CallFrame<'a>> for CallFrameReference<'a> {
+//     fn as_ref(&self) -> &CallFrame<'a> {
+//         &self.0
+//     }
+// }
+
+// impl<'a> AsMut<CallFrame<'a>> for CallFrameReference<'a> {
+//     fn as_mut(&mut self) -> &mut CallFrame<'a> {
+//         unsafe { self.0.as_mut() }.unwrap()
+//     }
+// }
 
 impl<'a> CallStack<'a> {
     pub fn new() -> Self {
@@ -53,16 +67,18 @@ impl<'a> CallStack<'a> {
         class_and_method: ClassAndMethod<'a>,
         receiver: Option<AbstractObject<'a>>,
         args: Vec<Value<'a>>,
-    ) -> Result<CallFrameReference<'a>, VmError> {
+    ) -> Result<CallFrameReference, VmError> {
         Self::check_receiver(&class_and_method, receiver.clone())?;
         let code = Self::get_code(&class_and_method)?;
         let locals = Self::prepare_locals(code, receiver, args);
-        let new_frame = self
-            .allocator
-            .alloc(CallFrame::new(class_and_method, locals));
+        // let new_frame = self
+        //     .allocator
+        //     .alloc(CallFrame::new(class_and_method, locals));
 
-        let reference = CallFrameReference(new_frame);
-        self.frames.push(reference.clone());
+        let frame_index = self.allocator.len() as u16;
+        self.allocator.push(CallFrame::new(class_and_method, locals));
+
+        let reference = CallFrameReference(frame_index);
         Ok(reference)
     }
 
@@ -109,26 +125,26 @@ impl<'a> CallStack<'a> {
     }
 
     pub fn pop_frame(&mut self) -> Result<(), VmError> {
-        self.frames
+        self.allocator
             .pop()
             .map(|_| ())
             .ok_or(VmError::ValidationException)
     }
 
-    pub fn get_stack_trace_elements(&self) -> Vec<StackTraceElement<'a>> {
-        self.frames
+    pub fn get_stack_trace_elements(&'a self) -> Vec<StackTraceElement<'a>> {
+        self.allocator
             .iter()
             .rev()
-            .map(|frame| frame.as_ref().to_stack_trace_element())
+            .map(|frame| frame.to_stack_trace_element())
             .collect()
     }
 
-    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut AbstractObject<'a>> {
+    pub fn gc_roots(&'a mut self) -> impl Iterator<Item = &'a mut AbstractObject<'a>> {
         let mut roots = vec![];
         roots.extend(
-            self.frames
+            self.allocator
                 .iter_mut()
-                .flat_map(|frame| frame.as_mut().gc_roots()),
+                .flat_map(|frame| frame.gc_roots()),
         );
         roots.into_iter()
     }
@@ -136,6 +152,6 @@ impl<'a> CallStack<'a> {
 
 impl<'a> fmt::Debug for CallStack<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "CallStack{{frames={:?}}}", self.frames)
+        write!(f, "CallStack{{frames={:?}}}", self.allocator)
     }
 }

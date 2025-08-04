@@ -173,11 +173,14 @@ impl<'a> Vm<'a> {
         }
 
         // Generic bytecode method
-        let mut frame = call_stack.add_frame(class_and_method, object, args)?;
-        let result = frame.as_mut().execute(self, call_stack);
+        let mut frameref = call_stack.add_frame(class_and_method, object, args)?;
+        let mut frame = frameref.borrow(call_stack);
+        let result = frame.execute(self, call_stack);
+        drop(frame);
         call_stack
             .pop_frame()
             .expect("should be able to pop the frame we just pushed");
+
         result
     }
 

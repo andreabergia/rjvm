@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use log::{debug, warn};
 
 use rjvm_reader::{
@@ -16,7 +18,7 @@ use crate::{
     array::Array,
     array_entry_type::ArrayEntryType,
     call_frame::InstructionCompleted::{ContinueMethodExecution, ReturnFromMethod},
-    call_stack::CallStack,
+    call_stack::{CallFrameReference, CallStack},
     class::Class,
     class_and_method::ClassAndMethod,
     class_resolver_by_id::ClassByIdResolver,
@@ -24,10 +26,7 @@ use crate::{
     java_objects_creation::{new_java_lang_class_object, new_java_lang_string_object},
     object::Object,
     stack_trace_element::StackTraceElement,
-    value::{
-        Value,
-        Value::{Double, Float, Int, Long, Null},
-    },
+    value::Value::{self, Double, Float, Int, Long, Null},
     value_stack::ValueStack,
     vm::Vm,
     vm_error::VmError,
@@ -60,7 +59,7 @@ pub struct CallFrame<'a> {
     class_and_method: ClassAndMethod<'a>,
 
     /// The current program counter
-    pc: ProgramCounter,
+    pc: Cell<ProgramCounter>,
 
     /// The locals variables' map of the method
     locals: Vec<Value<'a>>,
@@ -69,7 +68,7 @@ pub struct CallFrame<'a> {
     stack: ValueStack<'a>,
 
     /// The bytecode to execute
-    code: &'a Vec<u8>,
+    code: &'a [u8],
 }
 
 /// One of the possible invocation kind of methods in the JVM.
@@ -270,7 +269,7 @@ impl<'a> CallFrame<'a> {
             .code;
         CallFrame {
             class_and_method,
-            pc: ProgramCounter(0),
+            pc: Cell::new(ProgramCounter(0)),
             locals,
             stack: ValueStack::with_max_size(max_stack_size),
             code,
@@ -289,31 +288,33 @@ impl<'a> CallFrame<'a> {
     fn get_line_number(&self) -> Option<LineNumber> {
         if let Some(code) = self.class_and_method.method.code.as_ref() {
             if let Some(line_number_table) = &code.line_number_table {
-                return Some(line_number_table.lookup_pc(self.pc));
+                return Some(line_number_table.lookup_pc(self.pc.get()));
             }
         }
         None
     }
 
     /// Executes the whole method
-    pub fn execute(
-        &mut self,
+    pub fn execute<'s: 'a>(
+        //&mut self,
+        frameref: CallFrameReference,
         vm: &mut Vm<'a>,
-        call_stack: &mut CallStack<'a>,
+        call_stack: &mut CallStack<'s>,
     ) -> MethodCallResult<'a> {
-        self.debug_start_execution();
+        let frame = frameref.borrow(call_stack);
+        frame.debug_start_execution();
 
         loop {
-            let executed_instruction_pc = self.pc;
+            let executed_instruction_pc = frame.pc.get();
             let (instruction, new_address) =
-                Instruction::parse(self.code, executed_instruction_pc.0.into_usize_safe())
+                Instruction::parse(frame.code, executed_instruction_pc.0.into_usize_safe())
                     .map_err(|_| MethodCallFailed::InternalError(VmError::ValidationException))?;
-            self.debug_print_status(&instruction);
+            frame.debug_print_status(&instruction);
 
             // Move pc to the next instruction, _before_ executing it, since we want a "goto" to override this
-            self.pc = ProgramCounter(new_address as u16);
+            frame.pc.set(ProgramCounter(new_address as u16));
 
-            let instruction_result = self.execute_instruction(vm, call_stack, instruction);
+            let instruction_result = frame.execute_instruction(vm, call_stack, instruction);
             match instruction_result {
                 Ok(ReturnFromMethod(return_value)) => return Ok(return_value),
                 Ok(ContinueMethodExecution) => { /* continue the loop */ }
@@ -323,7 +324,7 @@ impl<'a> CallFrame<'a> {
                 }
 
                 Err(MethodCallFailed::ExceptionThrown(exception)) => {
-                    let exception_handler = self.find_exception_handler(
+                    let exception_handler = frame.find_exception_handler(
                         vm,
                         call_stack,
                         executed_instruction_pc,
@@ -337,8 +338,8 @@ impl<'a> CallFrame<'a> {
                         }
                         Ok(Some(catch_handler_pc)) => {
                             // Re-push exception on the stack and continue execution of this method from the catch handler
-                            self.stack.push(Value::Object(exception.0))?;
-                            self.pc = catch_handler_pc
+                            frame.stack.push(Value::Object(exception.0))?;
+                            frame.pc.set(catch_handler_pc)
                         }
                     }
                 }
@@ -348,7 +349,7 @@ impl<'a> CallFrame<'a> {
 
     // Reference: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html
     fn execute_instruction(
-        &mut self,
+        //&mut self,
         vm: &mut Vm<'a>,
         call_stack: &mut CallStack<'a>,
         instruction: Instruction,
@@ -1193,7 +1194,7 @@ impl<'a> CallFrame<'a> {
     generate_execute_coerce!(coerce_double, pop_double, f64);
 
     fn goto(&mut self, jump_address: u16) {
-        self.pc = ProgramCounter(jump_address);
+        self.pc.set(ProgramCounter(jump_address));
     }
 
     fn execute_if<T>(
@@ -1785,14 +1786,14 @@ impl<'a> CallFrame<'a> {
         )
     }
 
-    pub fn gc_roots(&mut self) -> impl Iterator<Item = *mut AbstractObject<'a>> {
+    pub fn gc_roots(&'a mut self) -> impl Iterator<Item = &'a mut AbstractObject<'a>> {
         let mut roots = vec![];
         roots.extend(self.stack.iter_mut().filter_map(|v| match v {
-            Value::Object(o) => Some(o as *mut AbstractObject),
+            Value::Object(o) => Some(o),
             _ => None,
         }));
         roots.extend(self.locals.iter_mut().filter_map(|v| match v {
-            Value::Object(o) => Some(o as *mut AbstractObject),
+            Value::Object(o) => Some(o),
             _ => None,
         }));
         roots.into_iter()
